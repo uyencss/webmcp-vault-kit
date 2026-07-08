@@ -1,0 +1,38 @@
+{
+  "name": "@gyga-browser/webmcp-vault-kit",
+  "version": "0.1.0",
+  "description": "Local encrypted credential vault (store API, CLI, and web UI) for the WebMCP automation kit: usernames, passwords, TOTP, notes, and website logins.",
+  "license": "MIT",
+  "author": "uyencss",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/uyencss/web-automation-extension.git"
+  },
+  "bin": {
+    "webmcp-vault": "bin/webmcp-vault.mjs"
+  },
+  "main": "lib/store.js",
+  "exports": {
+    ".": "./lib/store.js",
+    "./ui-server": "./lib/ui-server.js",
+    "./bin": "./bin/webmcp-vault.mjs",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "bin/",
+    "docs/",
+    "lib/",
+    "skills/webmcp-vault/",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node tests/unit/vault-store.test.mjs && node tests/unit/webmcp-vault-cli.test.mjs && node tests/unit/vault-ui-server.test.mjs && node tests/unit/vault-csv-import.test.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

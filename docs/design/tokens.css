@@ -1,0 +1,62 @@
+/* ==========================================================================
+   WebMCP Vault — design tokens
+   "Lockbox": a quiet, offline, terminal-adjacent credential vault.
+   Drop-in for lib/ui-server.js (values already CSP-safe: no @import, no
+   external fonts). Reference: docs/design/design-brief.md
+   ========================================================================== */
+
+:root {
+  color-scheme: light;
+
+  /* — Color: bone/greige neutrals + ink; ONE warm accent for the live TOTP — */
+  --paper:   #EDEBE6; /* app background (bone/greige — deliberately not cream) */
+  --surface: #FBFAF8; /* raised cards, inputs, detail pane                     */
+  --sunk:    #E7E5DF; /* inset wells: list rail, redaction bars                */
+  --ink:     #1A1B1E; /* primary text + primary (solid) buttons               */
+  --muted:   #625F58; /* labels, secondary text (>= 5:1 on paper)             */
+  --line:    #D6D4CC; /* hairline borders                                     */
+
+  --live:    #C67A1E; /* amber — reserved for the live TOTP ring + focus       */
+  --live-weak:#EFE2CC;/* amber wash for the ring track / revealed field tint   */
+  --danger:  #A3341F; /* destructive (delete) — used sparingly                 */
+  --ok:      #3F6B44; /* confirmations (saved, imported)                       */
+
+  /* — Type: two roles only. Sans = human chrome. Mono = machine secrets. — */
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Menlo, Consolas, monospace;
+
+  --fs-label: 11px;   /* uppercase field labels, eyebrows        */
+  --fs-meta:  12px;   /* list metadata, captions                 */
+  --fs-body:  14px;   /* inputs, buttons, body                   */
+  --fs-title: 16px;   /* item titles                             */
+  --fs-app:   19px;   /* app wordmark                            */
+  --fs-code:  28px;   /* the TOTP code (mono, tabular)           */
+
+  --fw-body: 400;
+  --fw-medium: 500;
+  --fw-strong: 600;
+
+  --tracking-label: 0.08em; /* letter-spaced caps for labels/eyebrows */
+
+  /* — Space (4-based) — */
+  --s1: 4px;  --s2: 8px;  --s3: 12px; --s4: 16px;
+  --s5: 20px; --s6: 24px; --s7: 32px; --s8: 48px;
+
+  /* — Shape — */
+  --r-sm: 6px;
+  --r-md: 8px;   /* inputs, buttons, cards */
+  --r-lg: 12px;  /* lock card, detail pane */
+  --border: 1px solid var(--line);
+
+  /* — Elevation (used sparingly; hairlines do most of the work) — */
+  --shadow-card: 0 1px 2px rgba(26, 27, 30, 0.04);
+  --shadow-float: 0 12px 40px -12px rgba(26, 27, 30, 0.28);
+
+  /* — Motion — */
+  --dur-fast: 120ms;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+
+  /* — The one accent for focus, consistent everywhere — */
+  --focus: 2px solid var(--live);
+  --focus-offset: 2px;
+}

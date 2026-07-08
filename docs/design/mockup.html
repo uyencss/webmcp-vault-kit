@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WebMCP Vault — design mockup</title>
+<style>
+/* Tokens (mirrors docs/design/tokens.css so this file opens standalone) */
+:root{
+  color-scheme:light;
+  --paper:#EDEBE6; --surface:#FBFAF8; --sunk:#E7E5DF;
+  --ink:#1A1B1E; --muted:#625F58; --line:#D6D4CC;
+  --live:#C67A1E; --live-weak:#EFE2CC; --danger:#A3341F; --ok:#3F6B44;
+  --font-sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --font-mono:ui-monospace,"SF Mono","Cascadia Code","JetBrains Mono",Menlo,Consolas,monospace;
+  --s1:4px;--s2:8px;--s3:12px;--s4:16px;--s5:20px;--s6:24px;--s7:32px;--s8:48px;
+  --r-sm:6px;--r-md:8px;--r-lg:12px;--border:1px solid var(--line);
+  --shadow-card:0 1px 2px rgba(26,27,30,.04);
+  --shadow-float:0 12px 40px -12px rgba(26,27,30,.28);
+  --dur:120ms;--ease:cubic-bezier(.2,0,0,1);
+}
+*{box-sizing:border-box}
+body{
+  margin:0;padding:var(--s7);background:var(--paper);color:var(--ink);
+  font-family:var(--font-sans);font-size:14px;line-height:1.45;
+  -webkit-font-smoothing:antialiased;
+}
+.stage{max-width:1040px;margin:0 auto;display:grid;gap:var(--s6)}
+.caption{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);
+  font-weight:600;margin:0 0 var(--s2) var(--s1)}
+
+/* ---- App shell ---- */
+.app{background:var(--surface);border:var(--border);border-radius:var(--r-lg);
+  overflow:hidden;box-shadow:var(--shadow-card)}
+.bar{display:flex;align-items:center;justify-content:space-between;gap:var(--s4);
+  padding:var(--s4) var(--s5);border-bottom:var(--border);background:var(--surface)}
+.brand{display:flex;align-items:center;gap:var(--s3)}
+.brand .lock{color:var(--ink)}
+.brand h1{margin:0;font-size:19px;font-weight:600;letter-spacing:-.01em}
+.path{font-family:var(--font-mono);font-size:12px;color:var(--muted);
+  background:var(--sunk);border:var(--border);border-radius:var(--r-sm);padding:2px 8px}
+.bar-right{display:flex;align-items:center;gap:var(--s4)}
+.count{font-size:12px;color:var(--muted)}
+.count b{color:var(--ink);font-weight:600}
+
+.main{display:grid;grid-template-columns:300px 1fr;min-height:520px}
+.rail,.detail{min-width:0} /* let 1fr columns shrink so nothing overflows */
+
+/* ---- Rail (list) ---- */
+.rail{border-right:var(--border);background:var(--surface);display:flex;flex-direction:column}
+.rail-top{padding:var(--s4)}
+.search{width:100%;height:38px;padding:0 var(--s3);border:var(--border);border-radius:var(--r-md);
+  background:var(--surface);font:inherit;color:var(--ink)}
+.search::placeholder{color:var(--muted)}
+.list{flex:1;overflow:auto;padding:0 var(--s3) var(--s3)}
+.item{display:grid;gap:2px;padding:var(--s3);border-radius:var(--r-md);cursor:pointer;
+  border-left:2px solid transparent;min-width:0}
+.item:hover{background:var(--sunk)}
+.item.active{background:var(--sunk);border-left-color:var(--live)}
+.item .name{font-weight:600;font-size:14px}
+.item .meta{font-family:var(--font-mono);font-size:12px;color:var(--muted);
+  min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rail-foot{display:flex;gap:var(--s2);padding:var(--s3) var(--s4);border-top:var(--border)}
+
+/* ---- Detail / editor ---- */
+.detail{padding:var(--s6);overflow:auto}
+.eyebrow{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.detail h2{margin:2px 0 var(--s5);font-size:22px;font-weight:600;letter-spacing:-.01em}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:var(--s4)}
+.field{display:grid;gap:6px}
+.field.wide{grid-column:1/-1}
+label{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+input,textarea{width:100%;min-height:38px;padding:9px 11px;border:var(--border);
+  border-radius:var(--r-md);background:var(--surface);font:inherit;color:var(--ink)}
+.mono input,input.mono,textarea.mono{font-family:var(--font-mono)}
+textarea{min-height:84px;resize:vertical;font-family:var(--font-mono)}
+
+/* Redaction: secrets hide as mono dots until revealed */
+.secret{display:flex;align-items:center;gap:var(--s2)}
+.secret .val{flex:1;min-height:38px;display:flex;align-items:center;padding:0 11px;
+  border:var(--border);border-radius:var(--r-md);background:var(--sunk);
+  font-family:var(--font-mono);letter-spacing:.06em;color:var(--muted)}
+.secret .val.shown{background:var(--surface);color:var(--ink);letter-spacing:0}
+.linkbtn{background:none;border:none;color:var(--live);font:inherit;font-weight:600;
+  cursor:pointer;padding:6px 4px;text-decoration:underline;text-underline-offset:3px}
+
+/* ---- Signature: live TOTP ---- */
+.totp{grid-column:1/-1;display:flex;align-items:center;gap:var(--s5);
+  padding:var(--s4) var(--s5);margin-top:var(--s1);
+  border:var(--border);border-radius:var(--r-md);background:var(--surface)}
+.ring{position:relative;width:64px;height:64px;flex:none}
+.ring svg{transform:rotate(-90deg)}
+.ring .code{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-family:var(--font-mono);font-weight:600;font-size:15px;font-variant-numeric:tabular-nums}
+.totp-main{display:grid;gap:2px}
+.totp-code{font-family:var(--font-mono);font-size:28px;font-weight:600;letter-spacing:.14em;
+  font-variant-numeric:tabular-nums;line-height:1}
+.totp-sub{font-size:12px;color:var(--muted)}
+.totp-sub b{color:var(--live);font-weight:600;font-variant-numeric:tabular-nums}
+.totp-copy{margin-left:auto}
+
+/* ---- Buttons ---- */
+.btn{height:38px;padding:0 var(--s4);border:var(--border);border-radius:var(--r-md);
+  background:var(--surface);color:var(--ink);font:inherit;font-weight:600;cursor:pointer;
+  display:inline-flex;align-items:center;gap:6px;transition:background var(--dur) var(--ease)}
+.btn:hover{background:var(--sunk)}
+.btn.primary{background:var(--ink);border-color:var(--ink);color:#fff}
+.btn.primary:hover{background:#000}
+.btn.ghost{background:transparent}
+.btn.danger{background:transparent;border-color:#E3B7AE;color:var(--danger)}
+.btn.danger:hover{background:#F7ECE9}
+.btn.sm{height:32px;padding:0 var(--s3);font-size:13px}
+.actions{grid-column:1/-1;display:flex;gap:var(--s2);margin-top:var(--s4);padding-top:var(--s4);
+  border-top:var(--border)}
+.actions .danger{margin-left:auto}
+
+:focus-visible{outline:2px solid var(--live);outline-offset:2px}
+
+/* ---- Lock screen ---- */
+.lockcard{max-width:400px;margin:0 auto;background:var(--surface);border:var(--border);
+  border-radius:var(--r-lg);box-shadow:var(--shadow-float);padding:var(--s7);text-align:center}
+.lockcard .seal{width:44px;height:44px;margin:0 auto var(--s4);color:var(--ink)}
+.lockcard h3{margin:0 0 var(--s1);font-size:18px;font-weight:600}
+.lockcard p{margin:0 0 var(--s5);color:var(--muted);font-size:13px}
+.lockcard label{text-align:left;display:block;margin-bottom:6px}
+.lockcard input{margin-bottom:var(--s4)}
+.lockrow{display:flex;gap:var(--s2)}
+.lockrow .btn{flex:1;justify-content:center}
+.hint{margin-top:var(--s4);font-family:var(--font-mono);font-size:11px;color:var(--muted)}
+
+@media (max-width:720px){
+  body{padding:var(--s4)}
+  .bar{flex-wrap:wrap}
+  .path{display:none}
+  .main{grid-template-columns:1fr}
+  .rail{border-right:none;border-bottom:var(--border)}
+  .grid{grid-template-columns:1fr}
+  .totp{flex-wrap:wrap}
+  .totp-copy{margin-left:0}
+}
+@media (prefers-reduced-motion:reduce){
+  .ring .prog{transition:none}
+}
+</style>
+</head>
+<body>
+<div class="stage">
+
+  <div>
+    <p class="caption">Unlocked · manage credentials</p>
+    <div class="app">
+      <div class="bar">
+        <div class="brand">
+          <svg class="lock" width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <rect x="4" y="10" width="16" height="10" rx="2" stroke="currentColor" stroke-width="1.6"/>
+            <path d="M8 10V7a4 4 0 0 1 8 0" stroke="currentColor" stroke-width="1.6" fill="none"/>
+            <circle cx="12" cy="15" r="1.4" fill="currentColor"/>
+          </svg>
+          <h1>WebMCP Vault</h1>
+          <span class="path">~/.webmcp/vault</span>
+        </div>
+        <div class="bar-right">
+          <span class="count"><b>12</b> items</span>
+          <button class="btn sm ghost">Lock</button>
+        </div>
+      </div>
+
+      <div class="main">
+        <aside class="rail">
+          <div class="rail-top"><input class="search" placeholder="Search title, user, or site"></div>
+          <div class="list">
+            <div class="item active">
+              <span class="name">GitHub</span>
+              <span class="meta">octo@example.com · github.com</span>
+            </div>
+            <div class="item">
+              <span class="name">Google</span>
+              <span class="meta">agent@example.com · accounts.google.com</span>
+            </div>
+            <div class="item">
+              <span class="name">Cloudflare</span>
+              <span class="meta">ops@example.com · dash.cloudflare.com</span>
+            </div>
+            <div class="item">
+              <span class="name">AWS Console</span>
+              <span class="meta">root · signin.aws.amazon.com</span>
+            </div>
+            <div class="item">
+              <span class="name">Fastmail</span>
+              <span class="meta">me@fastmail.com · fastmail.com</span>
+            </div>
+          </div>
+          <div class="rail-foot">
+            <button class="btn sm primary">New</button>
+            <button class="btn sm ghost">Import CSV</button>
+          </div>
+        </aside>
+
+        <section class="detail">
+          <span class="eyebrow">Login</span>
+          <h2>GitHub</h2>
+          <div class="grid">
+            <div class="field">
+              <label>Title</label>
+              <input value="GitHub">
+            </div>
+            <div class="field">
+              <label>Website</label>
+              <input class="mono" value="https://github.com">
+            </div>
+            <div class="field">
+              <label>Username</label>
+              <input class="mono" value="octo@example.com">
+            </div>
+            <div class="field">
+              <label>Password</label>
+              <div class="secret">
+                <span class="val shown" id="pw">s3cr3t-p@ss</span>
+                <button class="linkbtn" id="pwToggle">Hide</button>
+              </div>
+            </div>
+
+            <!-- Signature: the one live element — a 30s TOTP countdown -->
+            <div class="totp">
+              <div class="ring" aria-hidden="true">
+                <svg width="64" height="64" viewBox="0 0 64 64">
+                  <circle cx="32" cy="32" r="28" fill="none" stroke="var(--live-weak)" stroke-width="4"/>
+                  <circle class="prog" id="ring" cx="32" cy="32" r="28" fill="none"
+                          stroke="var(--live)" stroke-width="4" stroke-linecap="round"
+                          stroke-dasharray="175.9" stroke-dashoffset="0"/>
+                </svg>
+                <span class="code" id="ringNum">18</span>
+              </div>
+              <div class="totp-main">
+                <span class="eyebrow">One-time code</span>
+                <span class="totp-code" id="code">418 402</span>
+                <span class="totp-sub">expires in <b id="secs">18s</b></span>
+              </div>
+              <button class="btn sm ghost totp-copy">Copy</button>
+            </div>
+
+            <div class="field wide">
+              <label>TOTP secret</label>
+              <div class="secret">
+                <span class="val">••••  ••••  ••••  ••••</span>
+                <button class="linkbtn">Reveal</button>
+              </div>
+            </div>
+            <div class="field wide">
+              <label>Note</label>
+              <textarea>Recovery codes are in the team safe.</textarea>
+            </div>
+
+            <div class="actions">
+              <button class="btn primary">Save</button>
+              <button class="btn ghost">Reveal all</button>
+              <button class="btn danger">Delete</button>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <p class="caption">Locked · first thing you see</p>
+    <div class="lockcard">
+      <svg class="seal" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <rect x="4" y="10" width="16" height="11" rx="2" stroke="currentColor" stroke-width="1.5"/>
+        <path d="M7.5 10V7.5a4.5 4.5 0 0 1 9 0V10" stroke="currentColor" stroke-width="1.5" fill="none"/>
+        <circle cx="12" cy="15" r="1.5" fill="currentColor"/>
+        <path d="M12 16.5V18" stroke="currentColor" stroke-width="1.5"/>
+      </svg>
+      <h3>Vault is locked</h3>
+      <p>Enter your unlock key to decrypt this device's credentials.</p>
+      <label>Unlock key</label>
+      <input type="password" class="mono" value="············">
+      <div class="lockrow">
+        <button class="btn primary">Unlock</button>
+        <button class="btn ghost">Initialize</button>
+      </div>
+      <p class="hint">key from WEBMCP_VAULT_KEY · nothing leaves this machine</p>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// Functional (not decorative): drive the signature TOTP countdown so the mockup
+// shows the live behavior. Respects reduced-motion via CSS on .prog.
+(function(){
+  var period=30, C=2*Math.PI*28; // circumference for r=28
+  var ring=document.getElementById('ring');
+  var ringNum=document.getElementById('ringNum');
+  var secsEl=document.getElementById('secs');
+  ring.style.transition='stroke-dashoffset 250ms linear';
+  function tick(){
+    var t=Date.now()/1000, rem=period-(t%period), frac=rem/period;
+    ring.setAttribute('stroke-dashoffset', (C*(1-frac)).toFixed(1));
+    var s=Math.ceil(rem);
+    ringNum.textContent=s; secsEl.textContent=s+'s';
+  }
+  tick(); setInterval(tick,250);
+
+  var pw=document.getElementById('pw'), tog=document.getElementById('pwToggle');
+  tog.addEventListener('click',function(){
+    var shown=pw.classList.toggle('shown');
+    pw.textContent=shown?'s3cr3t-p@ss':'••••••••••';
+    tog.textContent=shown?'Hide':'Reveal';
+  });
+})();
+</script>
+</body>
+</html>

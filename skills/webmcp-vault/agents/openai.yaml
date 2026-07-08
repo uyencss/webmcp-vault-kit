@@ -1,0 +1,4 @@
+interface:
+  display_name: "WebMCP Vault"
+  short_description: "Use the local encrypted WebMCP credential vault"
+  default_prompt: "Use $webmcp-vault to resolve and read a stored browser credential for the current task."
