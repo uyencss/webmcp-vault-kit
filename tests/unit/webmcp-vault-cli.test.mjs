@@ -123,3 +123,95 @@ test('webmcp vault backup and restore preserve a portable encrypted snapshot', (
   const password = parseJson(runVault(['read', created.item.id, 'password', '--json'], { home }));
   assert.equal(password.value, 'portable-secret');
 });
+
+test('webmcp vault CLI manages vault folders and targets item operations by vault', () => {
+  const home = tempHome();
+  parseJson(runVault(['init', '--json'], { home }));
+
+  const initialVaults = parseJson(runVault(['list-vaults', '--json'], { home }));
+  const personal = initialVaults.vaults.find((vault) => vault.isDefault);
+  assert.equal(initialVaults.count, 1);
+
+  const createdVault = parseJson(runVault([
+    'create-vault',
+    '--name', 'Work',
+    '--description', 'Automation accounts',
+    '--icon', 'briefcase',
+    '--json',
+  ], { home })).vault;
+  assert.equal(createdVault.name, 'Work');
+  assert.equal(createdVault.icon, 'briefcase');
+
+  const workItem = parseJson(runVault([
+    'create', '--vault', createdVault.id, '--stdin-json', '--json',
+  ], {
+    home,
+    input: JSON.stringify({ title: 'Shared Login', username: 'work-user' }),
+  })).item;
+  const personalItem = parseJson(runVault(['create', '--stdin-json', '--json'], {
+    home,
+    input: JSON.stringify({ title: 'Shared Login', username: 'personal-user' }),
+  })).item;
+  assert.equal(workItem.vaultId, createdVault.id);
+  assert.equal(personalItem.vaultId, personal.id);
+
+  const workItems = parseJson(runVault([
+    'list', '--vault', createdVault.id, '--json',
+  ], { home }));
+  assert.deepEqual(workItems.items.map((item) => item.id), [workItem.id]);
+
+  const resolved = parseJson(runVault([
+    'resolve', 'Shared Login', '--vault', createdVault.id, '--json',
+  ], { home }));
+  assert.equal(resolved.item.id, workItem.id);
+
+  const moved = parseJson(runVault([
+    'update', workItem.id, '--vault', personal.id, '--stdin-json', '--json',
+  ], { home, input: '{}' })).item;
+  assert.equal(moved.vaultId, personal.id);
+
+  const csvFile = path.join(home, 'work.csv');
+  fs.writeFileSync(csvFile, 'title,username,password\nImported Work,import-user,import-secret\n');
+  const imported = parseJson(runVault([
+    'import', csvFile, '--vault', createdVault.id, '--json',
+  ], { home }));
+  assert.equal(imported.createdCount, 1);
+  assert.equal(parseJson(runVault([
+    'list', '--vault', createdVault.id, '--json',
+  ], { home })).items[0].title, 'Imported Work');
+
+  const renamed = parseJson(runVault([
+    'update-vault', createdVault.id,
+    '--name', 'Client Work',
+    '--description=Managed client credentials',
+    '--icon', 'people',
+    '--json',
+  ], { home })).vault;
+  assert.equal(renamed.name, 'Client Work');
+  assert.equal(renamed.description, 'Managed client credentials');
+
+  const refused = runVault(['delete-vault', createdVault.id, '--json'], { home });
+  assert.notEqual(refused.status, 0);
+  assert.match(refused.stderr, /--confirm/);
+
+  const deleted = parseJson(runVault([
+    'delete-vault', createdVault.id,
+    '--move-to', personal.id,
+    '--confirm',
+    '--json',
+  ], { home }));
+  assert.equal(deleted.deleted.id, createdVault.id);
+  assert.equal(parseJson(runVault(['list-vaults', '--json'], { home })).count, 1);
+  const personalItems = parseJson(runVault(['list', '--vault', personal.id, '--json'], { home }));
+  assert.equal(personalItems.items.some((item) => item.title === 'Imported Work'), true);
+});
+
+test('webmcp vault help documents vault folder commands and flags', () => {
+  const result = runVault(['help'], { home: tempHome() });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /list-vaults/);
+  assert.match(result.stdout, /create-vault --name/);
+  assert.match(result.stdout, /delete-vault <vault-id>/);
+  assert.match(result.stdout, /list .*--vault <vault-id>/);
+  assert.match(result.stdout, /import .*--vault <vault-id>/);
+});

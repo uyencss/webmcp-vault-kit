@@ -46,21 +46,30 @@ function printUsage() {
 Usage:
   webmcp-vault doctor [--json]
   webmcp-vault init [--force] [--json]
-  webmcp-vault list [--search <text>] [--web <url>] [--json]
-  webmcp-vault resolve [query] [--web <url>] [--json]
+  webmcp-vault list [--search <text>] [--web <url>] [--vault <vault-id>] [--json]
+  webmcp-vault resolve [query] [--web <url>] [--vault <vault-id>] [--json]
   webmcp-vault get <id-or-query> [--web <url>] [--reveal] [--json]
   webmcp-vault read <id-or-query> <field> [--json]
   webmcp-vault read --web <url> <field> [--json]
-  webmcp-vault create (--stdin-json | --input-json <file>) [--json]
-  webmcp-vault update <id-or-query> (--stdin-json | --input-json <file>) [--json]
-  webmcp-vault import <file.csv> [--json]
+  webmcp-vault create (--stdin-json | --input-json <file>) [--vault <vault-id>] [--json]
+  webmcp-vault update <id-or-query> (--stdin-json | --input-json <file>) [--vault <vault-id>] [--json]
+  webmcp-vault import <file.csv> [--preview] [--vault <vault-id>] [--json]
   webmcp-vault backup [--output <file>] [--force] [--json]
   webmcp-vault restore <backup.enc.json> --force [--json]
   webmcp-vault delete <id-or-query> --confirm [--json]
+  webmcp-vault list-vaults [--json]
+  webmcp-vault create-vault --name <name> [--description <text>] [--icon <icon>] [--json]
+  webmcp-vault create-vault (--stdin-json | --input-json <file>) [--json]
+  webmcp-vault update-vault <vault-id> [--name <name>] [--description <text>] [--icon <icon>] [--json]
+  webmcp-vault update-vault <vault-id> (--stdin-json | --input-json <file>) [--json]
+  webmcp-vault delete-vault <vault-id> [--move-to <vault-id>] --confirm [--json]
   webmcp-vault ui [--host 127.0.0.1] [--port 7876] [--json]
 
 Fields for read:
   username, password, otp, note, web, title, otpSecret
+
+Vault folder fields:
+  name (required), description, icon (folder|key|briefcase|people|archive)
 
 Environment:
   WEBMCP_VAULT_KEY        Unlock key (required for all read/write commands)
@@ -71,7 +80,9 @@ Secure input examples:
   printf '{"title":"GitHub","web":"https://github.com","username":"me","password":"..."}' \\
     | webmcp-vault create --stdin-json --json
 
-  webmcp-vault read --web https://github.com password --json`);
+  webmcp-vault read --web https://github.com password --json
+  webmcp-vault list --vault personal --json
+  webmcp-vault create-vault --name Work --icon briefcase --json`);
 }
 
 function printHuman(payload, fallback = '') {
@@ -104,7 +115,15 @@ async function readVaultItemInput(flags) {
     return JSON.parse(text);
   }
   if (flags['input-json']) return readJsonFile(String(flags['input-json']));
-  throw new Error('Use --stdin-json or --input-json <file> for vault writes.');
+  return null;
+}
+
+function buildVaultFolderInput(flags) {
+  const input = {};
+  if (flags.name && flags.name !== true) input.name = String(flags.name);
+  if (flags.description && flags.description !== true) input.description = String(flags.description);
+  if (flags.icon && flags.icon !== true) input.icon = String(flags.icon);
+  return input;
 }
 
 async function run(args) {
@@ -139,13 +158,13 @@ async function run(args) {
   }
 
   if (subcommand === 'list') {
-    const items = store.listItems({ search: flags.search, web: flags.web });
+    const items = store.listItems({ search: flags.search, web: flags.web, vaultId: flags.vault });
     printJsonOrHuman({ items, count: items.length }, json);
     return;
   }
 
   if (subcommand === 'resolve') {
-    const item = store.resolve(positional[0] || flags.search || '', { web: flags.web });
+    const item = store.resolve(positional[0] || flags.search || '', { web: flags.web, vaultId: flags.vault });
     printJsonOrHuman({ item }, json);
     return;
   }
@@ -176,6 +195,8 @@ async function run(args) {
 
   if (subcommand === 'create') {
     const input = await readVaultItemInput(flags);
+    if (!input) throw new Error('Use --stdin-json or --input-json <file> for vault writes.');
+    if (flags.vault) input.vaultId = String(flags.vault);
     const item = store.createItem(input);
     printJsonOrHuman({ item }, json, `Created vault item ${item.id}`);
     return;
@@ -183,10 +204,19 @@ async function run(args) {
 
   if (subcommand === 'import') {
     const filePath = positional[0];
-    if (!filePath) throw new Error('Usage: webmcp-vault import <file.csv>');
+    if (!filePath) throw new Error('Usage: webmcp-vault import <file.csv> [--preview] [--vault <id>]');
     const csvText = readFileSync(resolve(process.cwd(), filePath), 'utf8');
     const { csvToItems } = requireFromBin(resolve(ROOT, 'lib', 'store.js'));
-    const summary = store.importItems(csvToItems(csvText));
+    const inputs = csvToItems(csvText).map((item) => ({
+      ...item,
+      ...(flags.vault ? { vaultId: String(flags.vault) } : {}),
+    }));
+    if (flags.preview) {
+      const preview = store.previewImport(inputs);
+      printJsonOrHuman(preview, json, `Preview: ${preview.importableCount} importable, ${preview.skipped} duplicate(s)${preview.errors.length ? `, ${preview.errors.length} error(s)` : ''}.`);
+      return;
+    }
+    const summary = store.importItems(inputs);
     const { created, ...counts } = summary;
     printJsonOrHuman(
       counts,
@@ -225,8 +255,10 @@ async function run(args) {
 
   if (subcommand === 'update') {
     const identifier = positional[0];
-    if (!identifier) throw new Error('Usage: webmcp-vault update <id-or-query> (--stdin-json | --input-json <file>)');
+    if (!identifier) throw new Error('Usage: webmcp-vault update <id-or-query> (--stdin-json | --input-json <file>) [--vault <vault-id>]');
     const input = await readVaultItemInput(flags);
+    if (!input) throw new Error('Use --stdin-json or --input-json <file> for vault writes.');
+    if (flags.vault) input.vaultId = String(flags.vault);
     const item = store.updateItem(identifier, input);
     printJsonOrHuman({ item }, json, `Updated vault item ${item.id}`);
     return;
@@ -239,6 +271,46 @@ async function run(args) {
     }
     const item = store.deleteItem(identifier);
     printJsonOrHuman({ ok: true, deleted: item }, json, `Deleted vault item ${item.id}`);
+    return;
+  }
+
+  if (subcommand === 'list-vaults') {
+    const vaults = store.listVaults();
+    printJsonOrHuman({ vaults, count: vaults.length }, json);
+    return;
+  }
+
+  if (subcommand === 'create-vault') {
+    const stdinInput = await readVaultItemInput(flags);
+    const flagInput = buildVaultFolderInput(flags);
+    const input = stdinInput ? { ...stdinInput, ...flagInput } : flagInput;
+    if (!input.name) throw new Error('Usage: webmcp-vault create-vault --name <name> [--description <text>] [--icon <icon>]');
+    const vault = store.createVault(input);
+    printJsonOrHuman({ vault }, json, `Created vault ${vault.name} (${vault.id})`);
+    return;
+  }
+
+  if (subcommand === 'update-vault') {
+    const identifier = positional[0];
+    if (!identifier) throw new Error('Usage: webmcp-vault update-vault <vault-id> [--name <name>] [--description <text>] [--icon <icon>]');
+    const stdinInput = await readVaultItemInput(flags);
+    const flagInput = buildVaultFolderInput(flags);
+    const input = stdinInput ? { ...stdinInput, ...flagInput } : flagInput;
+    if (Object.keys(input).length === 0) throw new Error('Provide at least one field to update: --name, --description, --icon, or --stdin-json.');
+    const vault = store.updateVault(identifier, input);
+    printJsonOrHuman({ vault }, json, `Updated vault ${vault.name} (${vault.id})`);
+    return;
+  }
+
+  if (subcommand === 'delete-vault') {
+    const identifier = positional[0];
+    if (!identifier || !flags.confirm) {
+      throw new Error('Usage: webmcp-vault delete-vault <vault-id> [--move-to <vault-id>] --confirm');
+    }
+    const deleted = store.deleteVault(identifier, {
+      moveItemsTo: flags['move-to'] ? String(flags['move-to']) : undefined,
+    });
+    printJsonOrHuman({ ok: true, deleted }, json, `Deleted vault ${deleted.name} (${deleted.id})`);
     return;
   }
 
