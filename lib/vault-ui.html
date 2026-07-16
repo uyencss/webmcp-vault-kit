@@ -60,7 +60,7 @@
       letter-spacing: 0;
       -webkit-font-smoothing: antialiased;
     }
-    button, input, textarea { font: inherit; }
+    button, input, select, textarea { font: inherit; }
     .hidden { display: none !important; }
     .mono {
       font-family: var(--font-mono);
@@ -128,7 +128,7 @@
       padding: clamp(var(--s5), 4vw, var(--s8));
     }
     .app {
-      width: min(100%, 1120px);
+      width: min(100%, 1320px);
       overflow: hidden;
       border: var(--border);
       border-radius: var(--r-lg);
@@ -196,11 +196,100 @@
     .status[data-kind="error"] { color: var(--danger); }
     .main {
       display: grid;
-      grid-template-columns: 300px minmax(0, 1fr);
+      grid-template-columns: 220px 300px minmax(0, 1fr);
       height: 560px;
     }
+    .vault-sidebar,
     .rail,
     .detail { min-width: 0; }
+    .vault-sidebar {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border-right: var(--border);
+      background: var(--sunk);
+    }
+    .vault-sidebar-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--s2);
+      padding: var(--s4) var(--s4) var(--s2);
+    }
+    .vault-sidebar-head h2 {
+      margin: 0;
+      font-size: var(--fs-label);
+      letter-spacing: var(--tracking-label);
+      text-transform: uppercase;
+    }
+    .icon-button {
+      width: 30px;
+      min-height: 30px;
+      display: inline-grid;
+      place-items: center;
+      padding: 0;
+      border: 0;
+      border-radius: var(--r-sm);
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+    }
+    .icon-button:hover { background: var(--surface); color: var(--ink); }
+    .vault-list {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      margin: 0;
+      padding: var(--s1) var(--s2) var(--s3);
+      list-style: none;
+    }
+    .vault-button {
+      width: 100%;
+      display: grid;
+      grid-template-columns: 28px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: var(--s2);
+      padding: 9px var(--s2);
+      border: 0;
+      border-radius: var(--r-md);
+      background: transparent;
+      color: var(--ink);
+      text-align: left;
+      cursor: pointer;
+    }
+    .vault-button:hover,
+    .vault-button.active { background: var(--surface); }
+    .vault-glyph {
+      width: 28px;
+      height: 28px;
+      display: grid;
+      place-items: center;
+      border: var(--border);
+      border-radius: 8px;
+      background: var(--surface);
+      color: var(--live);
+      font-size: 14px;
+      font-weight: var(--fw-strong);
+    }
+    .vault-name {
+      overflow: hidden;
+      font-size: 13px;
+      font-weight: var(--fw-strong);
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .vault-count {
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: var(--fs-meta);
+    }
+    .vault-sidebar-foot {
+      display: flex;
+      gap: var(--s2);
+      padding: var(--s3);
+      border-top: var(--border);
+    }
+    .vault-sidebar-foot .btn { flex: 1; }
     .rail {
       display: flex;
       flex-direction: column;
@@ -319,9 +408,11 @@
       display: grid;
       gap: 6px;
     }
+    .field .hint { margin: 0; }
     .field.wide,
     .wide { grid-column: 1 / -1; }
     input,
+    select,
     textarea {
       width: 100%;
       min-height: 38px;
@@ -500,6 +591,18 @@
       box-shadow: var(--shadow-float);
       color: var(--ink);
     }
+    .vault-dialog-form {
+      display: grid;
+      gap: var(--s4);
+      padding: var(--s6);
+    }
+    .vault-dialog-form h2 { margin: 2px 0 0; font-size: 20px; }
+    .vault-dialog-form textarea { min-height: 76px; }
+    .vault-dialog-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: var(--s2);
+    }
     .csv-preview-dialog::backdrop { background: rgba(26, 27, 30, 0.36); }
     .csv-preview-body { padding: var(--s6); }
     .csv-preview-body h2 {
@@ -568,6 +671,11 @@
         height: auto;
         grid-template-columns: 1fr;
       }
+      .vault-sidebar {
+        max-height: 280px;
+        border-right: 0;
+        border-bottom: var(--border);
+      }
       .rail {
         height: auto;
         max-height: min(340px, 45vh);
@@ -584,6 +692,10 @@
       }
       .linkbtn { align-self: flex-start; }
       .actions .danger { margin-left: 0; }
+    }
+    @media (max-width: 760px) {
+      .vault-list { max-height: 220px; }
+      .vault-sidebar-foot .btn { min-height: 38px; }
     }
     @media (max-width: 560px) {
       .app-shell { padding: 0; }
@@ -662,6 +774,20 @@
       </header>
 
       <main class="main">
+        <aside class="vault-sidebar" aria-label="Vaults">
+          <div class="vault-sidebar-head">
+            <h2>Vaults</h2>
+            <button class="icon-button" id="newVaultButton" type="button" aria-label="Create vault" title="Create vault">
+              <svg class="btn-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14"></path></svg>
+            </button>
+          </div>
+          <ul class="vault-list" id="vaultList"></ul>
+          <div class="vault-sidebar-foot">
+            <button class="btn sm ghost" id="editVaultButton" type="button" disabled>Edit</button>
+            <button class="btn sm danger" id="deleteVaultButton" type="button" disabled>Delete</button>
+          </div>
+        </aside>
+
         <aside class="rail" aria-label="Saved logins">
           <div class="rail-top">
             <input class="search" id="search" type="search" autocomplete="off" aria-label="Search saved logins" placeholder="Search title, user, or site">
@@ -692,6 +818,11 @@
           <span class="eyebrow" id="detailEyebrow">New login</span>
           <h2 id="detailTitle">New Login</h2>
           <form id="itemForm" class="grid">
+            <div class="field wide">
+              <label for="vaultSelect">Vault</label>
+              <select id="vaultSelect" required aria-describedby="vaultSelectHint"></select>
+              <span class="hint" id="vaultSelectHint">Moving an item changes which vault contains it.</span>
+            </div>
             <div class="field">
               <label for="title">Title</label>
               <input id="title" autocomplete="off" required maxlength="200">
@@ -779,6 +910,37 @@
     </div>
   </dialog>
 
+  <dialog class="csv-preview-dialog" id="vaultDialog" aria-labelledby="vaultDialogTitle">
+    <form class="vault-dialog-form" id="vaultForm" method="dialog">
+      <div>
+        <span class="eyebrow">Vault</span>
+        <h2 id="vaultDialogTitle">Create vault</h2>
+      </div>
+      <div class="field">
+        <label for="vaultName">Name</label>
+        <input id="vaultName" required maxlength="100" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="vaultDescription">Description</label>
+        <textarea id="vaultDescription" maxlength="500"></textarea>
+      </div>
+      <div class="field">
+        <label for="vaultIcon">Icon</label>
+        <select id="vaultIcon">
+          <option value="folder">Folder</option>
+          <option value="key">Key</option>
+          <option value="briefcase">Briefcase</option>
+          <option value="people">People</option>
+          <option value="archive">Archive</option>
+        </select>
+      </div>
+      <div class="vault-dialog-actions">
+        <button class="btn ghost" id="cancelVaultButton" type="button">Cancel</button>
+        <button class="btn primary" type="submit">Save vault</button>
+      </div>
+    </form>
+  </dialog>
+
   <script nonce="{{NONCE}}">
     const token = {{TOKEN_JSON}};
     const ringCircumference = 2 * Math.PI * 28;
@@ -787,6 +949,9 @@
     const state = {
       key: '',
       items: [],
+      vaults: [],
+      selectedVaultId: 'all',
+      editingVaultId: '',
       selectedId: '',
       selectedItem: null,
       revealed: { password: false, otpSecret: false, note: false },
@@ -869,6 +1034,94 @@
     function setItemCount(count) {
       const label = count === 1 ? 'item' : 'items';
       el('itemCount').innerHTML = '<b>' + String(count) + '</b> ' + label;
+    }
+
+    function defaultVault() {
+      return state.vaults.find((vault) => vault.isDefault) || state.vaults[0] || null;
+    }
+
+    function activeVaultId() {
+      return state.selectedVaultId === 'all'
+        ? (defaultVault()?.id || '')
+        : state.selectedVaultId;
+    }
+
+    function vaultGlyph(icon) {
+      return ({ key: 'K', briefcase: 'W', people: 'G', archive: 'A', folder: 'F' })[icon] || 'F';
+    }
+
+    function syncVaultSelect(selectedId = '') {
+      const select = el('vaultSelect');
+      const preferred = selectedId || select.value || activeVaultId();
+      select.textContent = '';
+      for (const vault of state.vaults) {
+        const option = document.createElement('option');
+        option.value = vault.id;
+        option.textContent = vault.name;
+        select.append(option);
+      }
+      if (state.vaults.some((vault) => vault.id === preferred)) select.value = preferred;
+      else if (defaultVault()) select.value = defaultVault().id;
+    }
+
+    function renderVaults() {
+      const list = el('vaultList');
+      list.textContent = '';
+      const total = state.vaults.reduce((sum, vault) => sum + Number(vault.itemCount || 0), 0);
+      const entries = [{ id: 'all', name: 'All items', icon: 'archive', itemCount: total }, ...state.vaults];
+      for (const vault of entries) {
+        const row = document.createElement('li');
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'vault-button' + (vault.id === state.selectedVaultId ? ' active' : '');
+        button.dataset.vaultId = vault.id;
+        if (vault.id === state.selectedVaultId) button.setAttribute('aria-current', 'true');
+        const glyph = document.createElement('span');
+        glyph.className = 'vault-glyph';
+        glyph.textContent = vault.id === 'all' ? String.fromCharCode(9670) : vaultGlyph(vault.icon);
+        const name = document.createElement('span');
+        name.className = 'vault-name';
+        name.textContent = vault.name;
+        const count = document.createElement('span');
+        count.className = 'vault-count';
+        count.textContent = String(vault.itemCount || 0);
+        button.append(glyph, name, count);
+        button.addEventListener('click', () => selectVault(vault.id));
+        row.append(button);
+        list.append(row);
+      }
+      const selected = state.vaults.find((vault) => vault.id === state.selectedVaultId);
+      el('editVaultButton').disabled = !selected;
+      el('deleteVaultButton').disabled = !selected || selected.isDefault;
+      syncVaultSelect(state.selectedItem?.vaultId || activeVaultId());
+    }
+
+    async function loadVaults() {
+      const payload = await api('/vaults');
+      state.vaults = payload.vaults || [];
+      if (state.selectedVaultId !== 'all' && !state.vaults.some((vault) => vault.id === state.selectedVaultId)) {
+        state.selectedVaultId = 'all';
+      }
+      renderVaults();
+    }
+
+    async function selectVault(id) {
+      if (id === state.selectedVaultId || !confirmDiscardChanges()) return;
+      state.selectedVaultId = id;
+      fillForm();
+      await loadItems();
+      const selected = state.vaults.find((vault) => vault.id === id);
+      setStatus(selected ? 'Showing ' + selected.name : 'Showing all items');
+    }
+
+    function openVaultDialog(vault = null) {
+      state.editingVaultId = vault?.id || '';
+      el('vaultDialogTitle').textContent = vault ? 'Edit vault' : 'Create vault';
+      el('vaultName').value = vault?.name || '';
+      el('vaultDescription').value = vault?.description || '';
+      el('vaultIcon').value = vault?.icon || 'folder';
+      el('vaultDialog').showModal();
+      setTimeout(() => el('vaultName').focus(), 0);
     }
 
     async function api(path, options = {}) {
@@ -984,7 +1237,10 @@
       }
       let csv = await file.text();
       try {
-        const preview = await api('/import/preview', { method: 'POST', body: { csv } });
+        const preview = await api('/import/preview', {
+          method: 'POST',
+          body: { csv, vaultId: activeVaultId() },
+        });
         state.csvImport = { csv, preview };
         renderCsvPreview(preview);
         el('csvPreviewDialog').showModal();
@@ -1000,7 +1256,10 @@
       const button = el('confirmCsvImportButton');
       button.disabled = true;
       try {
-        const summary = await api('/import', { method: 'POST', body: { csv: pending.csv } });
+        const summary = await api('/import', {
+          method: 'POST',
+          body: { csv: pending.csv, vaultId: activeVaultId() },
+        });
         pending.csv = '';
         state.csvImport = null;
         el('csvPreviewDialog').close();
@@ -1074,6 +1333,7 @@
 
     function formPayload() {
       const payload = {
+        vaultId: el('vaultSelect').value || activeVaultId(),
         title: el('title').value,
         web: el('web').value,
         username: el('username').value,
@@ -1100,6 +1360,7 @@
       el('password').value = item.password || '';
       el('otpSecret').value = item.otpSecret || '';
       el('note').value = item.note || '';
+      syncVaultSelect(item.vaultId || activeVaultId());
       el('detailEyebrow').textContent = state.selectedId ? 'Login' : 'New login';
       el('detailTitle').textContent = item.title || 'New Login';
       el('deleteButton').disabled = !state.selectedId;
@@ -1175,8 +1436,12 @@
 
     async function loadItems() {
       const sequence = ++state.loadSequence;
+      await loadVaults();
       const search = encodeURIComponent(el('search').value.trim());
-      const payload = await api('/items' + (search ? '?search=' + search : ''));
+      const params = new URLSearchParams();
+      if (search) params.set('search', el('search').value.trim());
+      if (state.selectedVaultId !== 'all') params.set('vault', state.selectedVaultId);
+      const payload = await api('/items' + (params.size ? '?' + params.toString() : ''));
       if (sequence !== state.loadSequence) return false;
       state.items = payload.items || [];
       renderList();
@@ -1198,7 +1463,10 @@
           skipped += 1;
           continue;
         }
-        const payload = await api('/items', { method: 'POST', body: item });
+        const payload = await api('/items', {
+          method: 'POST',
+          body: { ...item, vaultId: activeVaultId() },
+        });
         if (payload.item) created.push(payload.item);
       }
       await loadItems();
@@ -1391,10 +1659,60 @@
         } else {
           saved = await api('/items', { method: 'POST', body: formPayload() });
         }
+        if (state.selectedVaultId !== 'all' && saved?.item?.vaultId !== state.selectedVaultId) {
+          state.selectedVaultId = saved.item.vaultId;
+        }
         await loadItems();
         if (saved?.item?.id) await selectItem(saved.item.id);
         else fillForm();
         setStatus('Saved', 'success');
+      } catch (err) {
+        setStatus(err.message, 'error');
+      }
+    });
+
+    el('newVaultButton').addEventListener('click', () => openVaultDialog());
+    el('editVaultButton').addEventListener('click', () => {
+      const vault = state.vaults.find((entry) => entry.id === state.selectedVaultId);
+      if (vault) openVaultDialog(vault);
+    });
+    el('cancelVaultButton').addEventListener('click', () => el('vaultDialog').close());
+    el('vaultForm').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const body = {
+        name: el('vaultName').value,
+        description: el('vaultDescription').value,
+        icon: el('vaultIcon').value,
+      };
+      try {
+        const payload = state.editingVaultId
+          ? await api('/vaults/' + encodeURIComponent(state.editingVaultId), { method: 'PUT', body })
+          : await api('/vaults', { method: 'POST', body });
+        state.selectedVaultId = payload.vault.id;
+        state.editingVaultId = '';
+        el('vaultDialog').close();
+        fillForm();
+        await loadItems();
+        setStatus('Vault saved', 'success');
+      } catch (err) {
+        setStatus(err.message, 'error');
+      }
+    });
+    el('deleteVaultButton').addEventListener('click', async () => {
+      const vault = state.vaults.find((entry) => entry.id === state.selectedVaultId);
+      const destination = defaultVault();
+      if (!vault || vault.isDefault || !destination) return;
+      const detail = vault.itemCount
+        ? ' Its ' + vault.itemCount + ' item(s) will move to ' + destination.name + '.'
+        : '';
+      if (!confirm('Delete vault "' + vault.name + '"?' + detail)) return;
+      try {
+        const query = vault.itemCount ? '?moveTo=' + encodeURIComponent(destination.id) : '';
+        await api('/vaults/' + encodeURIComponent(vault.id) + query, { method: 'DELETE' });
+        state.selectedVaultId = destination.id;
+        fillForm();
+        await loadItems();
+        setStatus('Vault deleted; items kept in ' + destination.name, 'success');
       } catch (err) {
         setStatus(err.message, 'error');
       }
@@ -1462,6 +1780,8 @@
       if (!confirmDiscardChanges()) return;
       state.key = '';
       state.items = [];
+      state.vaults = [];
+      state.selectedVaultId = 'all';
       fillForm();
       el('vaultKey').value = '';
       showApp(false);
@@ -1481,7 +1801,7 @@
     for (const field of secretFields) {
       el(secretConfig[field].inputId).addEventListener('input', () => markSecretDirty(field));
     }
-    for (const field of ['title', 'web', 'username']) {
+    for (const field of ['vaultSelect', 'title', 'web', 'username']) {
       el(field).addEventListener('input', () => {
         state.formDirty = true;
       });

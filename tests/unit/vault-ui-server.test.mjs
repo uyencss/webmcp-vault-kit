@@ -200,3 +200,71 @@ test('vault UI inline script is valid browser JavaScript', () => {
     Function(scripts[0][1].replace('{{TOKEN_JSON}}', JSON.stringify('test-token')));
   });
 });
+
+test('vault UI API manages vaults, filters items, and moves items on deletion', async (t) => {
+  const oldHome = process.env.WEBMCP_HOME;
+  process.env.WEBMCP_HOME = tempHome();
+
+  const ui = await startVaultUiServer({ host: '127.0.0.1', port: 0 });
+  t.after(() => {
+    ui.server.close();
+    if (oldHome === undefined) delete process.env.WEBMCP_HOME;
+    else process.env.WEBMCP_HOME = oldHome;
+  });
+
+  const headers = {
+    'Content-Type': 'application/json',
+    'x-webmcp-vault-token': ui.token,
+    'x-webmcp-vault-key': 'vault-api-key',
+  };
+  const base = `http://127.0.0.1:${ui.port}/api`;
+  await fetch(`${base}/init`, { method: 'POST', headers });
+
+  const initialVaults = await (await fetch(`${base}/vaults`, { headers })).json();
+  const personal = initialVaults.vaults.find((vault) => vault.isDefault);
+  assert.equal(initialVaults.count, 1);
+
+  const createdVaultResponse = await fetch(`${base}/vaults`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ name: 'Work', icon: 'briefcase' }),
+  });
+  assert.equal(createdVaultResponse.status, 201);
+  const work = (await createdVaultResponse.json()).vault;
+
+  const createdItem = await (await fetch(`${base}/items`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ title: 'Work Login', vaultId: work.id }),
+  })).json();
+  const filtered = await (await fetch(`${base}/items?vault=${work.id}`, { headers })).json();
+  assert.deepEqual(filtered.items.map((item) => item.id), [createdItem.item.id]);
+
+  const deleteResponse = await fetch(
+    `${base}/vaults/${encodeURIComponent(work.id)}?moveTo=${encodeURIComponent(personal.id)}`,
+    { method: 'DELETE', headers },
+  );
+  assert.equal(deleteResponse.status, 200);
+  const moved = await (await fetch(`${base}/items?vault=${personal.id}`, { headers })).json();
+  assert.deepEqual(moved.items.map((item) => item.id), [createdItem.item.id]);
+});
+
+test('vault UI template includes an accessible responsive vault sidebar', async (t) => {
+  const oldHome = process.env.WEBMCP_HOME;
+  process.env.WEBMCP_HOME = tempHome();
+  const ui = await startVaultUiServer({ host: '127.0.0.1', port: 0 });
+  t.after(() => {
+    ui.server.close();
+    if (oldHome === undefined) delete process.env.WEBMCP_HOME;
+    else process.env.WEBMCP_HOME = oldHome;
+  });
+
+  const html = await (await fetch(ui.url)).text();
+  assert.match(html, /class="vault-sidebar"/);
+  assert.match(html, /aria-label="Vaults"/);
+  assert.match(html, /id="vaultList"/);
+  assert.match(html, /id="newVaultButton"/);
+  assert.match(html, /id="vaultDialog"/);
+  assert.match(html, /id="vaultSelect"/);
+  assert.match(html, /@media \(max-width:\s*760px\)/);
+});

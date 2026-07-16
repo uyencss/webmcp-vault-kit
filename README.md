@@ -102,3 +102,19 @@ CSV imports are reviewed before any write: the UI shows only title, username,
 and host metadata, along with duplicate/invalid-row counts. Passwords, TOTP
 seeds, and notes are not rendered in the preview; they are sent to the local
 server only after the user confirms the import.
+
+## Vault organization
+
+The web UI includes a dedicated vault sidebar inspired by the organization
+model used by 1Password and Apple Passwords shared groups. A new encrypted
+store starts with a non-deletable **Personal** vault. From the sidebar you can:
+
+- create, rename, describe, and choose an icon for a vault;
+- filter the login list by one vault or show all items;
+- move an item by changing its Vault field and saving;
+- delete a non-default vault while keeping its items in Personal; and
+- import CSV rows directly into the currently selected vault.
+
+Existing encrypted payloads that predate vault folders remain compatible. On
+unlock, entries without a `vaultId` are assigned to Personal in memory and the
+upgraded shape is persisted with the next write.

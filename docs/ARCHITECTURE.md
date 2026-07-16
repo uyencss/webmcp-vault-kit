@@ -40,6 +40,10 @@ The store is the canonical API for:
 - `createItem`
 - `updateItem`
 - `deleteItem`
+- `listVaults`
+- `createVault`
+- `updateVault`
+- `deleteVault`
 - `previewImport`
 - `importItems`
 - `backup`
@@ -71,6 +75,11 @@ only redacted metadata (`title`, `web`, `username`, and secret-presence flags),
 plus importable/duplicate/invalid counts. The UI submits the original CSV to
 `/api/import` only after explicit confirmation.
 
+Vault management is exposed through `GET/POST /api/vaults` and
+`PUT/DELETE /api/vaults/:id`. `GET /api/items?vault=:id` filters item metadata
+without revealing secret fields. Deleting a populated vault requires a valid
+`moveTo` destination so items cannot become orphaned.
+
 ## Data Model
 
 The decrypted vault payload is versioned:
@@ -80,9 +89,21 @@ The decrypted vault payload is versioned:
   "version": 1,
   "createdAt": "ISO timestamp",
   "updatedAt": "ISO timestamp",
+  "vaults": [
+    {
+      "id": "personal",
+      "name": "Personal",
+      "description": "Private credentials stored on this device.",
+      "icon": "key",
+      "isDefault": true,
+      "createdAt": "ISO timestamp",
+      "updatedAt": "ISO timestamp"
+    }
+  ],
   "items": [
     {
       "id": "uuid",
+      "vaultId": "personal",
       "title": "GitHub",
       "web": "https://github.com",
       "username": "user@example.com",
@@ -104,6 +125,12 @@ List and resolve operations return redacted item metadata by default:
 
 Sensitive values are returned only by `readField()` or `getItem(..., { reveal:
 true })`.
+
+Vault names are unique case-insensitively. Every item must reference an
+existing vault, and the default vault cannot be deleted. Legacy version-1
+payloads without `vaults` or `vaultId` fields are hydrated into Personal during
+decryption; the additive migration remains in memory until the next atomic
+write.
 
 ## Storage Format
 
@@ -155,6 +182,8 @@ Controls:
 - CLI writes via stdin/file instead of sensitive command flags.
 - UI token gate plus `no-store`, CSP, `X-Frame-Options`, and loopback default.
 - CSV preview responses exclude password, TOTP seed, and note values.
+- Vault and item identifiers are validated before writes; deleting a populated
+  vault requires an explicit, existing destination.
 - TOTP codes generated on demand; seed secrets are not needed for normal login
   flows.
 
@@ -228,6 +257,7 @@ Current unit coverage should continue to exercise:
 - TOTP vectors and `otpauth://` parsing.
 - CLI JSON output and error paths.
 - UI token gate and basic REST flow.
+- Vault CRUD, item filtering/moves, and default-vault invariants.
 - CSV import parsing, Bitwarden headers, and dedupe.
 
 Future integration tests should cover:

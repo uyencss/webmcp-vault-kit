@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -13,6 +14,32 @@ const {
 
 function tempHome() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'webmcp-vault-store-'));
+}
+
+function rewriteEncryptedPayload(file, secret, mutate) {
+  const envelope = JSON.parse(fs.readFileSync(file, 'utf8'));
+  const key = crypto.scryptSync(secret, Buffer.from(envelope.kdf.salt, 'base64'), 32, {
+    N: envelope.kdf.N,
+    r: envelope.kdf.r,
+    p: envelope.kdf.p,
+    maxmem: 64 * 1024 * 1024,
+  });
+  const decipher = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(envelope.iv, 'base64'));
+  decipher.setAuthTag(Buffer.from(envelope.tag, 'base64'));
+  const payload = JSON.parse(Buffer.concat([
+    decipher.update(Buffer.from(envelope.data, 'base64')),
+    decipher.final(),
+  ]).toString('utf8'));
+  mutate(payload);
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+  const encrypted = Buffer.concat([cipher.update(JSON.stringify(payload)), cipher.final()]);
+  fs.writeFileSync(file, JSON.stringify({
+    ...envelope,
+    iv: iv.toString('base64'),
+    tag: cipher.getAuthTag().toString('base64'),
+    data: encrypted.toString('base64'),
+  }));
 }
 
 test('generateTotp supports otpauth URIs and RFC 6238 parameters', () => {
@@ -168,4 +195,96 @@ test('vault rejects hostile scrypt cost parameters before decrypting', () => {
     () => store.listItems(),
     /invalid scrypt parameters/i,
   );
+});
+
+test('vault store initializes a personal vault and organizes items by vault', () => {
+  const dataDir = tempHome();
+  const store = createVaultStore({ dataDir, key: 'organized-vault-key' });
+  store.init();
+
+  const [personal] = store.listVaults();
+  assert.equal(personal.name, 'Personal');
+  assert.equal(personal.isDefault, true);
+  assert.equal(personal.itemCount, 0);
+
+  const work = store.createVault({
+    name: 'Work',
+    description: 'Credentials used for work automation.',
+    icon: 'briefcase',
+  });
+  const created = store.createItem({
+    title: 'GitHub Work',
+    username: 'work@example.test',
+    vaultId: work.id,
+  });
+
+  assert.equal(created.vaultId, work.id);
+  assert.equal(store.listItems({ vaultId: personal.id }).length, 0);
+  assert.deepEqual(store.listItems({ vaultId: work.id }).map((item) => item.id), [created.id]);
+  assert.equal(store.listVaults().find((vault) => vault.id === work.id).itemCount, 1);
+});
+
+test('vault store validates vault names and item destinations', () => {
+  const dataDir = tempHome();
+  const store = createVaultStore({ dataDir, key: 'vault-validation-key' });
+  store.init();
+  const work = store.createVault({ name: 'Work', icon: 'folder' });
+
+  assert.throws(() => store.createVault({ name: ' work ' }), /already exists/i);
+  assert.throws(() => store.createVault({ name: '   ' }), /name is required/i);
+  assert.throws(
+    () => store.createItem({ title: 'Orphan', vaultId: 'missing-vault' }),
+    /vault does not exist/i,
+  );
+
+  const personal = store.listVaults().find((vault) => vault.isDefault);
+  const item = store.createItem({ title: 'Movable' });
+  assert.equal(item.vaultId, personal.id);
+  assert.equal(store.updateItem(item.id, { vaultId: work.id }).vaultId, work.id);
+});
+
+test('vault store renames vaults and safely moves items before deletion', () => {
+  const dataDir = tempHome();
+  const store = createVaultStore({ dataDir, key: 'vault-delete-key' });
+  store.init();
+  const personal = store.listVaults().find((vault) => vault.isDefault);
+  const work = store.createVault({ name: 'Work' });
+  const item = store.createItem({ title: 'Deploy', vaultId: work.id });
+
+  const renamed = store.updateVault(work.id, {
+    name: 'Client Work',
+    description: 'Client-owned accounts',
+    icon: 'people',
+  });
+  assert.equal(renamed.name, 'Client Work');
+  assert.equal(renamed.itemCount, 1);
+
+  assert.throws(() => store.deleteVault(work.id), /contains 1 item/i);
+  const deleted = store.deleteVault(work.id, { moveItemsTo: personal.id });
+  assert.equal(deleted.id, work.id);
+  assert.equal(store.getItem(item.id).vaultId, personal.id);
+  assert.equal(store.listVaults().some((vault) => vault.id === work.id), false);
+  assert.throws(() => store.deleteVault(personal.id), /default vault/i);
+});
+
+test('vault store hydrates legacy items without vault folders into Personal', () => {
+  const dataDir = tempHome();
+  const key = 'legacy-vault-key';
+  const store = createVaultStore({ dataDir, key });
+  store.init();
+  const item = store.createItem({ title: 'Legacy Login', password: 'legacy-secret' });
+
+  rewriteEncryptedPayload(store.file, key, (payload) => {
+    delete payload.vaults;
+    for (const entry of payload.items) delete entry.vaultId;
+  });
+
+  const [personal] = store.listVaults();
+  assert.equal(personal.id, 'personal');
+  assert.equal(personal.itemCount, 1);
+  assert.equal(store.getItem(item.id).vaultId, personal.id);
+  assert.equal(fs.readFileSync(store.file, 'utf8').includes('legacy-secret'), false);
+
+  store.updateItem(item.id, { title: 'Migrated Login' });
+  assert.equal(store.listItems({ vaultId: personal.id })[0].title, 'Migrated Login');
 });

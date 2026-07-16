@@ -81,6 +81,8 @@ webmcp vault ui
 When the UI server inherits a configured key, its lock screen provides a
 one-click configured-key unlock without exposing that key to browser storage.
 CSV import displays a redacted preview and requires confirmation before writing.
+The UI vault sidebar can create and manage folders, filter saved logins, move an
+item between vaults, and target CSV imports to the selected vault.
 
 ## Backup Path
 
