@@ -110,12 +110,14 @@ Status: Planned
 
 ### Phase 6: Hardening
 
-Status: Planned
+Status: In progress
 
 - Add explicit migration hooks for future vault schema versions.
-- Add export/backup guidance that keeps encrypted and plaintext flows separate.
-- Add file-locking or optimistic write conflict checks if multiple processes
-  begin writing to the same vault concurrently.
+- [Done 2026-07-16] Add authenticated encrypted backup and guarded restore with
+  an automatic pre-restore recovery snapshot.
+- [Done 2026-07-16] Add inter-process writer locking with stale-lock recovery.
+- [Done 2026-07-16] Add durable atomic writes with file/directory `fsync` and
+  bounded envelope/KDF validation.
 - Consider keychain integration as an optional unlock-key source.
 - Add E2E smoke tests for the UI form flow if the package grows a browser test
   dependency.
@@ -126,6 +128,8 @@ Status: Planned
 - 2026-07-07: Verified current surfaces: store API, standalone CLI, local UI,
   CSV import tests, and companion skill.
 - 2026-07-07: Added package implementation plan and architecture docs.
+- 2026-07-16: Added encrypted backup/restore, pre-restore recovery snapshots,
+  writer locking, durable writes, and crypto envelope validation.
 
 ## Verification Checklist
 

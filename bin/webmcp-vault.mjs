@@ -54,6 +54,8 @@ Usage:
   webmcp-vault create (--stdin-json | --input-json <file>) [--json]
   webmcp-vault update <id-or-query> (--stdin-json | --input-json <file>) [--json]
   webmcp-vault import <file.csv> [--json]
+  webmcp-vault backup [--output <file>] [--force] [--json]
+  webmcp-vault restore <backup.enc.json> --force [--json]
   webmcp-vault delete <id-or-query> --confirm [--json]
   webmcp-vault ui [--host 127.0.0.1] [--port 7876] [--json]
 
@@ -190,6 +192,33 @@ async function run(args) {
       counts,
       json,
       `Imported ${summary.createdCount} item(s), skipped ${summary.skipped} duplicate(s)${summary.errors.length ? `, ${summary.errors.length} error(s)` : ''}.`,
+    );
+    return;
+  }
+
+  if (subcommand === 'backup') {
+    const payload = store.backup({
+      file: flags.output ? resolve(process.cwd(), String(flags.output)) : undefined,
+      force: Boolean(flags.force),
+    });
+    printJsonOrHuman(
+      payload,
+      json,
+      `Encrypted backup saved to ${payload.file} (${payload.itemCount} item(s)).`,
+    );
+    return;
+  }
+
+  if (subcommand === 'restore') {
+    const backupFile = positional[0];
+    if (!backupFile || !flags.force) {
+      throw new Error('Usage: webmcp-vault restore <backup.enc.json> --force');
+    }
+    const payload = store.restoreBackup(resolve(process.cwd(), backupFile), { force: true });
+    printJsonOrHuman(
+      payload,
+      json,
+      `Restored ${payload.itemCount} item(s) from ${payload.source}.`,
     );
     return;
   }

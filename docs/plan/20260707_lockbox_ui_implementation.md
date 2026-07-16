@@ -123,3 +123,7 @@ node packages/webmcp-vault-kit/bin/webmcp-vault.mjs ui --host 127.0.0.1 --port 7
 - 2026-07-07: Removed forced unlocked-shell heights after Browser measurement
   showed the app frame extending below the actual content and creating a blank
   white footer.
+- 2026-07-16: Added one-click encrypted backup, unsaved-change guards,
+  field-edit/reveal conflict protection, semantic list markup, async response
+  ordering, focus restoration, and a mobile layout that does not inherit the
+  fixed desktop frame height.

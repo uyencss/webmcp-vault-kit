@@ -26,11 +26,15 @@
     "docs/",
     "lib/",
     "skills/webmcp-vault/",
+    ".env.example",
     "README.md",
     "LICENSE"
   ],
   "scripts": {
-    "test": "node tests/unit/vault-store.test.mjs && node tests/unit/webmcp-vault-cli.test.mjs && node tests/unit/vault-ui-server.test.mjs && node tests/unit/vault-csv-import.test.mjs"
+    "ui": "node bin/webmcp-vault.mjs ui",
+    "test:ui": "node tests/unit/vault-ui-server.test.mjs",
+    "test": "node tests/unit/vault-store.test.mjs && node tests/unit/webmcp-vault-cli.test.mjs && node tests/unit/vault-ui-server.test.mjs && node tests/unit/vault-csv-import.test.mjs && node tests/unit/vault-package.test.mjs",
+    "test:coverage": "node --experimental-test-coverage --test tests/unit/vault-store.test.mjs tests/unit/webmcp-vault-cli.test.mjs tests/unit/vault-ui-server.test.mjs tests/unit/vault-csv-import.test.mjs tests/unit/vault-package.test.mjs"
   },
   "engines": {
     "node": ">=18"

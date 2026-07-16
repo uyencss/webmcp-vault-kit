@@ -25,6 +25,8 @@ webmcp vault doctor --json
 If `doctor` says the vault key is missing, ask the user to provide or configure
 `WEBMCP_VAULT_KEY`/`WEBMCP_VAULT_KEY_FILE`. Do not ask the user to paste the key
 into ordinary chat when a local environment variable or key file can be used.
+The package does not load `.env` files itself; configure the environment of the
+automation/runtime process that runs the command.
 
 ## Read Path
 
@@ -76,11 +78,31 @@ Open the local UI when a human should add, edit, or import (CSV) entries:
 webmcp vault ui
 ```
 
+When the UI server inherits a configured key, its lock screen provides a
+one-click configured-key unlock without exposing that key to browser storage.
+CSV import displays a redacted preview and requires confirmation before writing.
+
+## Backup Path
+
+Only create or restore backups when the user explicitly asks for vault
+maintenance. Backups stay encrypted and require the same unlock key:
+
+```bash
+webmcp vault backup --json
+webmcp vault restore /protected/path/credentials.backup.enc.json --force --json
+```
+
+Restore is destructive to the active path (although it creates a pre-restore
+recovery snapshot), so confirm the source file and user intent before running
+it. Never print or copy the unlock key into a backup command.
+
 ## Rules
 
 - Do not print secrets in final answers, logs, or summaries.
 - Do not run `webmcp vault delete` unless the user explicitly asked to delete an
   item.
+- Do not run `webmcp vault restore` unless the user explicitly approved replacing
+  the active vault.
 - Do not use command-line flags for password, OTP seed, or notes; use
   `--stdin-json`, `--input-json`, or the local UI.
 - If a query matches multiple items, resolve by website or ask for the intended

@@ -36,10 +36,14 @@ The store is the canonical API for:
 - `resolve`
 - `getItem`
 - `readField`
+- `readTotp`
 - `createItem`
 - `updateItem`
 - `deleteItem`
+- `previewImport`
 - `importItems`
+- `backup`
+- `restoreBackup`
 
 ### CLI
 
@@ -57,7 +61,15 @@ stdin or files so secrets are not placed in shell arguments.
 - JSON API under `/api/*`
 
 The UI/API is protected by a random per-process token. The default host is
-loopback and should stay loopback for ordinary use.
+loopback and should stay loopback for ordinary use. If its host process has
+`WEBMCP_VAULT_KEY` or `WEBMCP_VAULT_KEY_FILE`, the UI can unlock with that
+server-side source without sending the key to the browser. The `/api/doctor`
+response exposes only key-source metadata, never the key itself.
+
+CSV input is previewed through `/api/import/preview`. The response includes
+only redacted metadata (`title`, `web`, `username`, and secret-presence flags),
+plus importable/duplicate/invalid counts. The UI submits the original CSV to
+`/api/import` only after explicit confirmation.
 
 ## Data Model
 
@@ -101,6 +113,12 @@ Default path:
 ${WEBMCP_HOME:-~/.webmcp}/vault/credentials.enc.json
 ```
 
+Verified encrypted snapshots default to:
+
+```text
+${WEBMCP_HOME:-~/.webmcp}/vault/backups/credentials.<timestamp>.<random>.enc.json
+```
+
 Envelope fields:
 
 - `version`: encrypted envelope version.
@@ -129,19 +147,41 @@ Controls:
 
 - AES-256-GCM authenticated encryption.
 - scrypt KDF with per-vault salt.
+- Bounded and validated envelope/KDF parameters before expensive crypto work.
 - Redacted list/get results by default.
+- Atomic private-file replacement with file and directory `fsync` where the
+  filesystem supports it.
+- Inter-process writer lock with stale-lock recovery to prevent lost updates.
 - CLI writes via stdin/file instead of sensitive command flags.
 - UI token gate plus `no-store`, CSP, `X-Frame-Options`, and loopback default.
+- CSV preview responses exclude password, TOTP seed, and note values.
 - TOTP codes generated on demand; seed secrets are not needed for normal login
   flows.
 
 Known limits:
 
 - No OS keychain integration yet.
-- No concurrent writer lock yet.
 - If malware can read process memory or environment variables, it can capture
   the unlock key or revealed secrets.
 - The UI REST API should not be exposed directly to untrusted networks.
+- Backup retention and off-device replication are user-managed; snapshots use
+  the same unlock key as the source vault.
+
+## Backup and Restore
+
+`backup()` authenticates the current envelope with the unlock key, then writes
+an exact encrypted snapshot with restrictive permissions. It never creates a
+plaintext export.
+
+`restoreBackup()` validates and decrypts the source before acquiring the writer
+lock or touching the active file. Replacing an initialized vault requires
+`force: true`; the current encrypted bytes are first copied to a unique
+`pre-restore.*.enc.json` recovery file. The restored payload is then encrypted
+with a fresh salt and IV under the active unlock key.
+
+The snapshot and its unlock key must be backed up separately. Recovery should be
+tested periodically on a temporary `WEBMCP_HOME`, not for the first time during
+an incident.
 
 ## Integration Boundaries
 
@@ -194,3 +234,4 @@ Future integration tests should cover:
 
 - `webmcp-browser-kit` bridge calls.
 - `webmcp-workflow-cli` secret resolution with redacted run history.
+- Restore drills using a temporary data directory and separately managed key.

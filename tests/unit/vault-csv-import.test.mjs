@@ -67,3 +67,31 @@ test('importItems creates rows, skips duplicates, and stays encrypted', () => {
   const rawFile = fs.readFileSync(path.join(dataDir, 'vault', 'credentials.enc.json'), 'utf8');
   assert.equal(rawFile.includes('pw1'), false);
 });
+
+test('previewImport reports importable CSV metadata without exposing secrets', () => {
+  const dataDir = tempHome();
+  const store = createVaultStore({ dataDir, key: 'preview-key' });
+  store.init();
+  store.createItem({ title: 'GitHub', web: 'https://github.com', username: 'octo' });
+
+  const preview = store.previewImport(csvToItems([
+    'title,web,username,password,otp,note',
+    'GitHub,https://github.com,octo,old-password,,',
+    'Gmail,https://mail.google.com,alice,preview-password,JBSWY3DPEHPK3PXP,private note',
+    'Gmail duplicate,https://mail.google.com,alice,duplicate-password,,',
+  ].join('\n')));
+
+  assert.equal(preview.importableCount, 1);
+  assert.equal(preview.skipped, 2);
+  assert.equal(preview.errors.length, 0);
+  assert.deepEqual(preview.items, [{
+    title: 'Gmail',
+    web: 'https://mail.google.com',
+    username: 'alice',
+    hasPassword: true,
+    hasOtp: true,
+    hasNote: true,
+  }]);
+  assert.equal(JSON.stringify(preview).includes('preview-password'), false);
+  assert.equal(JSON.stringify(preview).includes('private note'), false);
+});

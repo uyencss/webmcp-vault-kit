@@ -73,3 +73,99 @@ test('vault store rejects ambiguous search reads', () => {
     /matched multiple vault items/,
   );
 });
+
+test('vault store exposes non-secret TOTP timing metadata', () => {
+  const dataDir = tempHome();
+  const store = createVaultStore({ dataDir, key: 'totp-metadata-key' });
+  store.init();
+  const item = store.createItem({
+    title: 'Sixty-second OTP',
+    otpSecret: 'otpauth://totp/Example:test?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ&digits=8&period=60',
+  });
+
+  const otp = store.readTotp(item.id, { now: 59_000 });
+  assert.deepEqual(otp, {
+    value: '84755224',
+    period: 60,
+    digits: 8,
+  });
+});
+
+test('vault store creates a private encrypted backup and restores it safely', () => {
+  const dataDir = tempHome();
+  const store = createVaultStore({ dataDir, key: 'portable-backup-key' });
+  store.init();
+  const created = store.createItem({
+    title: 'Long-lived login',
+    web: 'https://backup.example.test',
+    username: 'backup-user',
+    password: 'backup-only-secret',
+  });
+
+  const backup = store.backup();
+  assert.equal(backup.ok, true);
+  assert.equal(backup.itemCount, 1);
+  assert.equal(fs.statSync(backup.file).mode & 0o777, 0o600);
+  assert.equal(fs.readFileSync(backup.file, 'utf8').includes('backup-only-secret'), false);
+
+  store.deleteItem(created.id);
+  assert.equal(store.listItems().length, 0);
+  assert.throws(
+    () => store.restoreBackup(backup.file),
+    /--force|force/i,
+  );
+
+  const restored = store.restoreBackup(backup.file, { force: true });
+  assert.equal(restored.ok, true);
+  assert.equal(restored.itemCount, 1);
+  assert.ok(restored.recoveryFile);
+  assert.equal(fs.existsSync(restored.recoveryFile), true);
+  assert.equal(store.readField(created.id, 'password'), 'backup-only-secret');
+});
+
+test('vault restore authenticates the backup before replacing the active vault', () => {
+  const sourceDir = tempHome();
+  const source = createVaultStore({ dataDir: sourceDir, key: 'source-key' });
+  source.init();
+  source.createItem({ title: 'Source', password: 'source-secret' });
+  const backup = source.backup();
+
+  const targetDir = tempHome();
+  const target = createVaultStore({ dataDir: targetDir, key: 'different-key' });
+  target.init();
+  const targetItem = target.createItem({ title: 'Target', password: 'target-secret' });
+
+  assert.throws(
+    () => target.restoreBackup(backup.file, { force: true }),
+    /authenticate|decrypt|invalid/i,
+  );
+  assert.equal(target.readField(targetItem.id, 'password'), 'target-secret');
+});
+
+test('vault mutations refuse to race an active writer lock', () => {
+  const dataDir = tempHome();
+  const store = createVaultStore({ dataDir, key: 'writer-lock-key' });
+  store.init();
+  const lockFile = `${store.file}.lock`;
+  fs.writeFileSync(lockFile, JSON.stringify({ pid: process.pid, createdAt: new Date().toISOString() }));
+
+  assert.throws(
+    () => store.createItem({ title: 'Must not be written' }),
+    /busy|writer/i,
+  );
+  assert.equal(store.listItems().length, 0);
+});
+
+test('vault rejects hostile scrypt cost parameters before decrypting', () => {
+  const dataDir = tempHome();
+  const store = createVaultStore({ dataDir, key: 'bounded-kdf-key' });
+  store.init();
+  const envelope = JSON.parse(fs.readFileSync(store.file, 'utf8'));
+  envelope.kdf.p = 3;
+  fs.writeFileSync(store.file, JSON.stringify(envelope));
+
+  assert.throws(
+    () => store.listItems(),
+    /invalid scrypt parameters/i,
+  );
+});

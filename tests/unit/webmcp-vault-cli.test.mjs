@@ -96,3 +96,30 @@ test('webmcp vault read fails clearly when the vault key is missing', () => {
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /WEBMCP_VAULT_KEY/);
 });
+
+test('webmcp vault backup and restore preserve a portable encrypted snapshot', () => {
+  const home = tempHome();
+  parseJson(runVault(['init', '--json'], { home }));
+  const created = parseJson(runVault(['create', '--stdin-json', '--json'], {
+    home,
+    input: JSON.stringify({
+      title: 'Portable login',
+      username: 'portable-user',
+      password: 'portable-secret',
+    }),
+  }));
+
+  const backup = parseJson(runVault(['backup', '--json'], { home }));
+  assert.equal(backup.ok, true);
+  assert.equal(backup.itemCount, 1);
+  assert.equal(fs.existsSync(backup.file), true);
+  assert.equal(fs.readFileSync(backup.file, 'utf8').includes('portable-secret'), false);
+
+  parseJson(runVault(['delete', created.item.id, '--confirm', '--json'], { home }));
+  const restored = parseJson(runVault(['restore', backup.file, '--force', '--json'], { home }));
+  assert.equal(restored.ok, true);
+  assert.equal(restored.itemCount, 1);
+
+  const password = parseJson(runVault(['read', created.item.id, 'password', '--json'], { home }));
+  assert.equal(password.value, 'portable-secret');
+});

@@ -122,11 +122,13 @@
     }
     .app-shell {
       width: 100%;
-      max-width: 1120px;
-      margin: 0 auto;
-      padding: var(--s7);
+      min-height: 100dvh;
+      display: grid;
+      place-items: center;
+      padding: clamp(var(--s5), 4vw, var(--s8));
     }
     .app {
+      width: min(100%, 1120px);
       overflow: hidden;
       border: var(--border);
       border-radius: var(--r-lg);
@@ -220,9 +222,13 @@
     textarea::placeholder { color: var(--muted); }
     .list {
       flex: 1;
+      min-height: 0;
       overflow: auto;
+      margin: 0;
       padding: 0 var(--s3) var(--s3);
+      list-style: none;
     }
+    .list-row { margin: 0; padding: 0; }
     .item {
       width: 100%;
       min-width: 0;
@@ -432,6 +438,15 @@
       cursor: pointer;
       transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
     }
+    .btn-icon {
+      width: 16px;
+      height: 16px;
+      flex: none;
+      stroke: currentColor;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-width: 1.8;
+    }
     .btn:hover { background: var(--sunk); }
     .btn.primary {
       border-color: var(--ink);
@@ -475,12 +490,70 @@
       overflow-wrap: anywhere;
       text-align: left;
     }
+    .csv-preview-dialog {
+      width: min(100% - 32px, 520px);
+      max-height: min(620px, calc(100vh - 32px));
+      padding: 0;
+      border: var(--border);
+      border-radius: var(--r-lg);
+      background: var(--surface);
+      box-shadow: var(--shadow-float);
+      color: var(--ink);
+    }
+    .csv-preview-dialog::backdrop { background: rgba(26, 27, 30, 0.36); }
+    .csv-preview-body { padding: var(--s6); }
+    .csv-preview-body h2 {
+      margin: 2px 0 var(--s2);
+      font-size: 20px;
+      line-height: 1.2;
+    }
+    .csv-preview-summary {
+      margin: 0 0 var(--s4);
+      color: var(--muted);
+      font-size: var(--fs-body);
+    }
+    .csv-preview-list {
+      max-height: 280px;
+      margin: 0;
+      padding: 0;
+      overflow: auto;
+      border: var(--border);
+      border-radius: var(--r-md);
+      list-style: none;
+    }
+    .csv-preview-list li {
+      display: grid;
+      gap: 2px;
+      padding: var(--s3);
+      border-bottom: var(--border);
+    }
+    .csv-preview-list li:last-child { border-bottom: 0; }
+    .csv-preview-list strong { font-size: var(--fs-body); }
+    .csv-preview-list span {
+      overflow: hidden;
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: var(--fs-meta);
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .csv-preview-actions {
+      display: flex;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+      gap: var(--s2);
+      margin-top: var(--s5);
+    }
     :focus-visible {
       outline: var(--focus);
       outline-offset: var(--focus-offset);
     }
     @media (max-width: 900px) {
-      .app-shell { padding: var(--s4); }
+      .app-shell {
+        min-height: 0;
+        display: block;
+        padding: var(--s4);
+      }
       .bar { flex-wrap: wrap; }
       .path { display: none; }
       .bar-right {
@@ -491,11 +564,17 @@
         max-width: none;
         text-align: left;
       }
-      .main { grid-template-columns: 1fr; }
+      .main {
+        height: auto;
+        grid-template-columns: 1fr;
+      }
       .rail {
+        height: auto;
+        max-height: min(340px, 45vh);
         border-right: 0;
         border-bottom: var(--border);
       }
+      .detail { overflow: visible; }
       .grid { grid-template-columns: 1fr; }
       .totp { flex-wrap: wrap; }
       .totp-copy { margin-left: 0; }
@@ -505,6 +584,20 @@
       }
       .linkbtn { align-self: flex-start; }
       .actions .danger { margin-left: 0; }
+    }
+    @media (max-width: 560px) {
+      .app-shell { padding: 0; }
+      .app {
+        border-right: 0;
+        border-left: 0;
+        border-radius: 0;
+      }
+      .bar,
+      .detail { padding: var(--s4); }
+      .lockcard { padding: var(--s6); }
+      .lockrow { flex-direction: column; }
+      .lockrow .btn { width: 100%; }
+      .csv-preview-body { padding: var(--s5); }
     }
     @media (prefers-reduced-motion: reduce) {
       .ring .progress,
@@ -527,8 +620,18 @@
         <label for="vaultKey">Unlock key</label>
         <input class="mono" id="vaultKey" type="password" autocomplete="current-password" required autofocus>
         <div class="lockrow">
-          <button class="btn primary" type="submit">Unlock</button>
-          <button class="btn ghost" type="button" id="initButton">Initialize</button>
+          <button class="btn primary" type="submit">
+            <svg class="btn-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none"><circle cx="8" cy="15" r="3"></circle><path d="m10.5 12.5 7-7m-3 3 2 2m-5 1 2 2"></path></svg>
+            Unlock
+          </button>
+          <button class="btn ghost" type="button" id="initButton">
+            <svg class="btn-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M12 3 5 6v5c0 4.5 3 8 7 10 4-2 7-5.5 7-10V6l-7-3Zm0 5v6m-3-3h6"></path></svg>
+            Initialize
+          </button>
+          <button class="btn ghost hidden" type="button" id="envUnlockButton">
+            <svg class="btn-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M7 14a5 5 0 1 1 4.7 3.2L9 20H6v-3l2.8-2.8A5 5 0 0 1 7 14Z"></path><circle cx="14" cy="9" r="1"></circle></svg>
+            <span id="envUnlockLabel">Use configured key</span>
+          </button>
         </div>
         <div class="inline-status" id="unlockStatus" role="status" aria-live="polite"></div>
       </form>
@@ -551,20 +654,36 @@
         <div class="bar-right">
           <span class="count" id="itemCount"><b>0</b> items</span>
           <div class="status" id="status" role="status" aria-live="polite"></div>
-          <button class="btn sm ghost" id="lockButton" type="button">Lock</button>
+          <button class="btn sm ghost" id="lockButton" type="button">
+            <svg class="btn-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none"><rect x="5" y="10" width="14" height="10" rx="2"></rect><path d="M8 10V7a4 4 0 0 1 8 0v3"></path></svg>
+            Lock
+          </button>
         </div>
       </header>
 
       <main class="main">
         <aside class="rail" aria-label="Saved logins">
           <div class="rail-top">
-            <input class="search" id="search" autocomplete="off" placeholder="Search title, user, or site">
+            <input class="search" id="search" type="search" autocomplete="off" aria-label="Search saved logins" placeholder="Search title, user, or site">
           </div>
-          <div class="list" id="itemList" role="list"></div>
+          <ul class="list" id="itemList"></ul>
           <div class="rail-foot">
-            <button class="btn sm primary" id="newButton" type="button">New</button>
-            <button class="btn sm ghost" id="importButton" type="button">Import CSV</button>
-            <button class="btn sm ghost" id="demoButton" type="button">Load demo</button>
+            <button class="btn sm primary" id="newButton" type="button">
+              <svg class="btn-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14"></path></svg>
+              New
+            </button>
+            <button class="btn sm ghost" id="importButton" type="button">
+              <svg class="btn-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M12 15V3m0 0L7 8m5-5 5 5M5 13v6h14v-6"></path></svg>
+              Import CSV
+            </button>
+            <button class="btn sm ghost" id="backupButton" type="button">
+              <svg class="btn-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M12 3v12m0 0 5-5m-5 5-5-5M5 14v5h14v-5"></path></svg>
+              Backup
+            </button>
+            <button class="btn sm ghost" id="demoButton" type="button">
+              <svg class="btn-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="m12 3 .9 4.1L17 8l-4.1.9L12 13l-.9-4.1L7 8l4.1-.9L12 3ZM5.5 14l.5 2.5L8.5 17 6 17.5 5.5 20 5 17.5 2.5 17 5 16.5 5.5 14Zm13 1 .6 2.4 2.4.6-2.4.6-.6 2.4-.6-2.4-2.4-.6 2.4-.6.6-2.4Z"></path></svg>
+              Load demo
+            </button>
             <input id="csvFile" type="file" accept=".csv,text/csv" class="hidden">
           </div>
         </aside>
@@ -606,7 +725,10 @@
                 <span class="totp-code" id="totpCode">------</span>
                 <span class="totp-sub">expires in <b id="totpSeconds">30s</b></span>
               </div>
-              <button class="btn sm ghost totp-copy" id="copyTotpButton" type="button">Copy</button>
+              <button class="btn sm ghost totp-copy" id="copyTotpButton" type="button">
+                <svg class="btn-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none"><rect x="9" y="9" width="10" height="10" rx="2"></rect><path d="M15 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h3"></path></svg>
+                Copy
+              </button>
             </div>
 
             <div class="field wide">
@@ -625,9 +747,18 @@
             </div>
 
             <div class="actions">
-              <button class="btn primary" type="submit">Save</button>
-              <button class="btn ghost" type="button" id="revealAllButton" disabled>Reveal all</button>
-              <button class="btn danger" type="button" id="deleteButton" disabled>Delete</button>
+              <button class="btn primary" type="submit">
+                <svg class="btn-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="m5 12 4 4L19 6"></path></svg>
+                Save
+              </button>
+              <button class="btn ghost" type="button" id="revealAllButton" disabled>
+                <svg class="btn-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"></path><circle cx="12" cy="12" r="2.5"></circle></svg>
+                Reveal all
+              </button>
+              <button class="btn danger" type="button" id="deleteButton" disabled>
+                <svg class="btn-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M4 7h16m-10 4v5m4-5v5M9 7l1-3h4l1 3m-9 0 1 13h10l1-13"></path></svg>
+                Delete
+              </button>
             </div>
           </form>
         </section>
@@ -635,10 +766,24 @@
     </div>
   </div>
 
+  <dialog class="csv-preview-dialog" id="csvPreviewDialog" aria-labelledby="csvPreviewTitle">
+    <div class="csv-preview-body">
+      <span class="eyebrow">CSV import</span>
+      <h2 id="csvPreviewTitle">Review import</h2>
+      <p class="csv-preview-summary" id="csvPreviewSummary" role="status"></p>
+      <ul class="csv-preview-list" id="csvPreviewList"></ul>
+      <div class="csv-preview-actions">
+        <button class="btn ghost" id="cancelCsvImportButton" type="button">Cancel</button>
+        <button class="btn primary" id="confirmCsvImportButton" type="button">Import</button>
+      </div>
+    </div>
+  </dialog>
+
   <script nonce="{{NONCE}}">
     const token = {{TOKEN_JSON}};
     const ringCircumference = 2 * Math.PI * 28;
     const mask = String.fromCharCode(8226).repeat(12);
+    const maxCsvBytes = 1024 * 1024;
     const state = {
       key: '',
       items: [],
@@ -647,9 +792,14 @@
       revealed: { password: false, otpSecret: false, note: false },
       dirty: { password: false, otpSecret: false, note: false },
       otp: '',
+      otpPeriod: 30,
       otpCounter: null,
       otpTimer: null,
       searchTimer: null,
+      loadSequence: 0,
+      selectionSequence: 0,
+      formDirty: false,
+      csvImport: null,
     };
     const el = (id) => document.getElementById(id);
     const secretFields = ['password', 'otpSecret', 'note'];
@@ -709,6 +859,7 @@
       const status = el('status');
       status.textContent = message || '';
       status.dataset.kind = kind;
+      status.title = '';
     }
 
     function setUnlockStatus(message) {
@@ -736,6 +887,41 @@
       return payload;
     }
 
+    async function refreshEnvironmentUnlock() {
+      const button = el('envUnlockButton');
+      try {
+        state.key = '';
+        const doctor = await api('/doctor');
+        const available = Boolean(doctor.key?.available) &&
+          (doctor.key.source === 'env' || doctor.key.source === 'file');
+        button.classList.toggle('hidden', !available);
+        if (available) {
+          el('envUnlockLabel').textContent = doctor.initialized
+            ? 'Use configured key'
+            : 'Initialize with configured key';
+        }
+      } catch {
+        button.classList.add('hidden');
+      }
+    }
+
+    async function unlockWithEnvironment() {
+      state.key = '';
+      const doctor = await api('/doctor');
+      if (!doctor.key?.available) {
+        throw new Error('No configured vault key is available.');
+      }
+      if (!doctor.initialized) await api('/init', { method: 'POST' });
+      await loadItems();
+      fillForm();
+      showApp(true);
+      setUnlockStatus('');
+      setStatus(
+        doctor.initialized ? 'Unlocked using configured key' : 'Vault initialized using configured key',
+        'success',
+      );
+    }
+
     function showApp(show) {
       el('unlockView').classList.toggle('hidden', show);
       el('appView').classList.toggle('hidden', !show);
@@ -750,9 +936,80 @@
       if (!raw) return '';
       try {
         const parsed = new URL(raw.includes('://') ? raw : 'https://' + raw);
-        return parsed.hostname.replace(/^www\\./, '');
+        return parsed.hostname.replace(/^www\./, '');
       } catch {
-        return raw.replace(/^https?:\\/\\//, '').replace(/^www\\./, '').split('/')[0];
+        return raw.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
+      }
+    }
+
+    function clearCsvImport() {
+      if (state.csvImport) state.csvImport.csv = '';
+      state.csvImport = null;
+    }
+
+    function renderCsvPreview(preview) {
+      const list = el('csvPreviewList');
+      list.textContent = '';
+      const count = Number(preview.importableCount || 0);
+      const skipped = Number(preview.skipped || 0);
+      const errors = Array.isArray(preview.errors) ? preview.errors.length : 0;
+      const details = [];
+      if (skipped) details.push(skipped + ' duplicate(s) skipped');
+      if (errors) details.push(errors + ' invalid row(s) excluded');
+      el('csvPreviewSummary').textContent = 'Ready to import ' + count + ' login(s)' +
+        (details.length ? '. ' + details.join('; ') + '.' : '.');
+      for (const item of preview.items || []) {
+        const row = document.createElement('li');
+        const title = document.createElement('strong');
+        title.textContent = item.title || '(untitled)';
+        const meta = document.createElement('span');
+        meta.textContent = [item.username, hostFromWeb(item.web)].filter(Boolean)
+          .join(' ' + String.fromCharCode(183) + ' ');
+        row.append(title, meta);
+        list.append(row);
+      }
+      if (count === 0 && !list.childElementCount) {
+        const row = document.createElement('li');
+        row.textContent = 'No new valid logins found in this CSV.';
+        list.append(row);
+      }
+      const confirmButton = el('confirmCsvImportButton');
+      confirmButton.disabled = count === 0;
+      confirmButton.textContent = 'Import ' + count + ' login(s)';
+    }
+
+    async function previewCsvFile(file) {
+      if (file.size > maxCsvBytes) {
+        throw new Error('CSV file is too large; maximum size is 1 MB.');
+      }
+      let csv = await file.text();
+      try {
+        const preview = await api('/import/preview', { method: 'POST', body: { csv } });
+        state.csvImport = { csv, preview };
+        renderCsvPreview(preview);
+        el('csvPreviewDialog').showModal();
+      } catch (err) {
+        csv = '';
+        throw err;
+      }
+    }
+
+    async function confirmCsvImport() {
+      const pending = state.csvImport;
+      if (!pending) return;
+      const button = el('confirmCsvImportButton');
+      button.disabled = true;
+      try {
+        const summary = await api('/import', { method: 'POST', body: { csv: pending.csv } });
+        pending.csv = '';
+        state.csvImport = null;
+        el('csvPreviewDialog').close();
+        await loadItems();
+        setStatus('Imported ' + summary.createdCount + ', skipped ' + summary.skipped +
+          (summary.errors && summary.errors.length ? ', ' + summary.errors.length + ' error(s)' : ''), 'success');
+      } catch (err) {
+        button.disabled = false;
+        throw err;
       }
     }
 
@@ -769,6 +1026,14 @@
       return secretFields.every((field) => !hasSavedSecret(field) || state.revealed[field]);
     }
 
+    function hasDirtySecret() {
+      return secretFields.some((field) => state.dirty[field]);
+    }
+
+    function confirmDiscardChanges() {
+      return !state.formDirty || confirm('Discard unsaved changes?');
+    }
+
     function resetSecretState() {
       for (const field of secretFields) {
         state.revealed[field] = false;
@@ -778,8 +1043,10 @@
 
     function updateRevealAllButton() {
       const button = el('revealAllButton');
-      button.disabled = !state.selectedId || !hasAnySavedSecret();
+      const dirty = hasDirtySecret();
+      button.disabled = !state.selectedId || !hasAnySavedSecret() || dirty;
       button.textContent = allSavedSecretsRevealed() && hasAnySavedSecret() ? 'Hide all' : 'Reveal all';
+      button.title = dirty ? 'Save or discard secret edits before revealing saved values.' : '';
     }
 
     function updateSecretUi(field) {
@@ -798,9 +1065,10 @@
       input.classList.toggle('masked', masked);
       input.placeholder = masked ? mask : config.placeholder;
       input.readOnly = field === 'note' && masked;
-      toggle.disabled = !state.selectedId || !saved;
+      toggle.disabled = !state.selectedId || !saved || dirty;
       toggle.textContent = revealed ? 'Hide' : 'Reveal';
       toggle.setAttribute('aria-label', (revealed ? 'Hide ' : 'Reveal ') + config.label.toLowerCase());
+      toggle.title = dirty ? 'Save or discard this edit before revealing the saved value.' : '';
       updateRevealAllButton();
     }
 
@@ -836,6 +1104,7 @@
       el('detailTitle').textContent = item.title || 'New Login';
       el('deleteButton').disabled = !state.selectedId;
       for (const field of secretFields) updateSecretUi(field);
+      state.formDirty = false;
       updateTotpBlock();
       renderList();
     }
@@ -844,7 +1113,7 @@
       const list = el('itemList');
       list.textContent = '';
       if (state.items.length === 0) {
-        const empty = document.createElement('div');
+        const empty = document.createElement('li');
         empty.className = 'empty-state';
         const query = el('search').value.trim();
         if (query) {
@@ -862,22 +1131,31 @@
         newButton.className = 'btn sm primary';
         newButton.type = 'button';
         newButton.textContent = 'New';
-        newButton.addEventListener('click', () => fillForm());
+        newButton.addEventListener('click', () => {
+          if (!confirmDiscardChanges()) return;
+          fillForm();
+          el('title').focus();
+        });
         const demoButton = document.createElement('button');
         demoButton.className = 'btn sm ghost';
         demoButton.type = 'button';
         demoButton.textContent = 'Load demo';
-        demoButton.addEventListener('click', () => loadDemoItems().catch((err) => setStatus(err.message, 'error')));
+        demoButton.addEventListener('click', () => {
+          if (!confirmDiscardChanges()) return;
+          loadDemoItems().catch((err) => setStatus(err.message, 'error'));
+        });
         actions.append(newButton, demoButton);
         empty.append(title, copy, actions);
         list.append(empty);
         return;
       }
       for (const item of state.items) {
+        const row = document.createElement('li');
+        row.className = 'list-row';
         const button = document.createElement('button');
         button.type = 'button';
         button.className = 'item' + (item.id === state.selectedId ? ' active' : '');
-        button.setAttribute('role', 'listitem');
+        button.dataset.itemId = item.id;
         if (item.id === state.selectedId) button.setAttribute('aria-current', 'true');
         const title = document.createElement('strong');
         title.className = 'name';
@@ -886,17 +1164,24 @@
         meta.className = 'meta';
         meta.textContent = [item.username, hostFromWeb(item.web)].filter(Boolean).join(' ' + String.fromCharCode(183) + ' ');
         button.append(title, meta);
-        button.addEventListener('click', () => selectItem(item.id));
-        list.append(button);
+        button.addEventListener('click', () => {
+          if (!confirmDiscardChanges()) return;
+          selectItem(item.id, { restoreListFocus: true });
+        });
+        row.append(button);
+        list.append(row);
       }
     }
 
     async function loadItems() {
+      const sequence = ++state.loadSequence;
       const search = encodeURIComponent(el('search').value.trim());
       const payload = await api('/items' + (search ? '?search=' + search : ''));
+      if (sequence !== state.loadSequence) return false;
       state.items = payload.items || [];
       renderList();
       setItemCount(payload.count ?? state.items.length);
+      return true;
     }
 
     function demoKey(item) {
@@ -922,9 +1207,16 @@
       setStatus('Loaded ' + created.length + ' demo item(s)' + (skipped ? ', skipped ' + skipped : ''), 'success');
     }
 
-    async function selectItem(id) {
+    async function selectItem(id, { restoreListFocus = false } = {}) {
+      const sequence = ++state.selectionSequence;
       const payload = await api('/items/' + encodeURIComponent(id));
+      if (sequence !== state.selectionSequence) return;
       fillForm(payload.item);
+      if (restoreListFocus) {
+        const selected = Array.from(document.querySelectorAll('[data-item-id]'))
+          .find((button) => button.dataset.itemId === id);
+        selected?.focus();
+      }
     }
 
     async function revealField(field) {
@@ -967,14 +1259,13 @@
     }
 
     function markSecretDirty(field) {
-      if (!state.revealed[field]) {
-        state.dirty[field] = el(secretConfig[field].inputId).value.length > 0;
-        updateSecretUi(field);
-      }
+      state.dirty[field] = true;
+      state.formDirty = true;
+      updateSecretUi(field);
     }
 
     function formatOtp(value) {
-      const raw = String(value || '').replace(/\\s+/g, '');
+      const raw = String(value || '').replace(/\s+/g, '');
       if (raw.length === 6) return raw.slice(0, 3) + ' ' + raw.slice(3);
       if (raw.length === 8) return raw.slice(0, 4) + ' ' + raw.slice(4);
       return raw || '------';
@@ -985,6 +1276,7 @@
       state.otpTimer = null;
       state.otpCounter = null;
       state.otp = '';
+      state.otpPeriod = 30;
     }
 
     function updateTotpBlock() {
@@ -1005,6 +1297,7 @@
         const payload = await api('/items/' + encodeURIComponent(selectedId) + '/read?field=otp');
         if (selectedId !== state.selectedId) return;
         state.otp = String(payload.value || '');
+        state.otpPeriod = Number(payload.period) > 0 ? Number(payload.period) : 30;
         el('totpCode').textContent = formatOtp(state.otp);
       } catch (err) {
         setStatus(err.message, 'error');
@@ -1013,7 +1306,7 @@
 
     function updateTotpClock() {
       if (el('totpBlock').classList.contains('hidden')) return;
-      const period = 30;
+      const period = state.otpPeriod;
       const nowSeconds = Math.floor(Date.now() / 1000);
       const counter = Math.floor(nowSeconds / period);
       const seconds = period - (nowSeconds % period);
@@ -1062,7 +1355,14 @@
         setStatus('Unlocked', 'success');
       } catch (err) {
         setUnlockStatus(err.message);
+        state.key = '';
+        el('vaultKey').focus();
+        el('vaultKey').select();
       }
+    });
+
+    el('envUnlockButton').addEventListener('click', () => {
+      unlockWithEnvironment().catch((err) => setUnlockStatus(err.message));
     });
 
     el('initButton').addEventListener('click', async () => {
@@ -1101,7 +1401,10 @@
     });
 
     el('deleteButton').addEventListener('click', async () => {
-      if (!state.selectedId || !confirm('Delete this vault item?')) return;
+      const prompt = state.formDirty
+        ? 'Delete this vault item and discard unsaved changes?'
+        : 'Delete this vault item?';
+      if (!state.selectedId || !confirm(prompt)) return;
       try {
         await api('/items/' + encodeURIComponent(state.selectedId), { method: 'DELETE' });
         await loadItems();
@@ -1116,24 +1419,47 @@
     el('otpSecretRevealButton').addEventListener('click', () => revealField('otpSecret').catch((err) => setStatus(err.message, 'error')));
     el('noteRevealButton').addEventListener('click', () => revealField('note').catch((err) => setStatus(err.message, 'error')));
     el('revealAllButton').addEventListener('click', () => revealAll().catch((err) => setStatus(err.message, 'error')));
-    el('newButton').addEventListener('click', () => fillForm());
-    el('demoButton').addEventListener('click', () => loadDemoItems().catch((err) => setStatus(err.message, 'error')));
+    el('newButton').addEventListener('click', () => {
+      if (!confirmDiscardChanges()) return;
+      fillForm();
+      el('title').focus();
+    });
+    el('demoButton').addEventListener('click', () => {
+      if (!confirmDiscardChanges()) return;
+      loadDemoItems().catch((err) => setStatus(err.message, 'error'));
+    });
     el('importButton').addEventListener('click', () => el('csvFile').click());
+    el('backupButton').addEventListener('click', async () => {
+      const button = el('backupButton');
+      button.disabled = true;
+      try {
+        const backup = await api('/backup', { method: 'POST' });
+        setStatus('Backup saved', 'success');
+        el('status').title = String(backup.file || '');
+      } catch (err) {
+        setStatus(err.message, 'error');
+      } finally {
+        button.disabled = false;
+      }
+    });
     el('csvFile').addEventListener('change', async () => {
       const file = el('csvFile').files[0];
       if (!file) return;
       try {
-        const csv = await file.text();
-        const summary = await api('/import', { method: 'POST', body: { csv } });
-        await loadItems();
-        setStatus('Imported ' + summary.createdCount + ', skipped ' + summary.skipped +
-          (summary.errors && summary.errors.length ? ', ' + summary.errors.length + ' error(s)' : ''), 'success');
+        await previewCsvFile(file);
       } catch (err) {
         setStatus(err.message, 'error');
+        clearCsvImport();
       }
       el('csvFile').value = '';
     });
+    el('confirmCsvImportButton').addEventListener('click', () => {
+      confirmCsvImport().catch((err) => setStatus(err.message, 'error'));
+    });
+    el('cancelCsvImportButton').addEventListener('click', () => el('csvPreviewDialog').close());
+    el('csvPreviewDialog').addEventListener('close', clearCsvImport);
     el('lockButton').addEventListener('click', () => {
+      if (!confirmDiscardChanges()) return;
       state.key = '';
       state.items = [];
       fillForm();
@@ -1155,7 +1481,18 @@
     for (const field of secretFields) {
       el(secretConfig[field].inputId).addEventListener('input', () => markSecretDirty(field));
     }
+    for (const field of ['title', 'web', 'username']) {
+      el(field).addEventListener('input', () => {
+        state.formDirty = true;
+      });
+    }
+    window.addEventListener('beforeunload', (event) => {
+      if (!state.formDirty) return;
+      event.preventDefault();
+      event.returnValue = '';
+    });
     fillForm();
+    refreshEnvironmentUnlock();
   </script>
 </body>
 </html>
