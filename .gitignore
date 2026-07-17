@@ -1,5 +1,8 @@
 node_modules/
 .DS_Store
+
+# Local Claude Code config
+.claude/
 *.log
 .env
 .env.local
