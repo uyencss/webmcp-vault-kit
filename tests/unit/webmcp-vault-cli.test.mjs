@@ -227,11 +227,15 @@ test('webmcp vault lease fill types through loopback gateway without printing se
   fs.writeFileSync(fetchMock, `
 import fs from 'node:fs';
 globalThis.fetch = async (_url, options = {}) => {
+  const body = JSON.parse(options.body);
   fs.appendFileSync(process.env.WEBMCP_FETCH_LOG, JSON.stringify({
     authorization: options.headers?.authorization,
-    body: JSON.parse(options.body),
+    body,
   }) + '\\n');
-  return new Response(JSON.stringify({ result: { ok: true } }), {
+  const result = body.method === 'evaluateJS'
+    ? { tabId: 1, result: { x: 12, y: 34, tag: 'input', name: null, type: 'text' } }
+    : { tabId: 1, ok: true };
+  return new Response(JSON.stringify({ result }), {
     status: 200,
     headers: { 'content-type': 'application/json' },
   });
@@ -268,18 +272,24 @@ globalThis.fetch = async (_url, options = {}) => {
   assert.equal(filled.submitted, false);
   assert.doesNotMatch(JSON.stringify(filled), /broker-secret|broker-user/);
   const calls = fs.readFileSync(fetchLog, 'utf8').trim().split('\n').map((line) => JSON.parse(line));
-  assert.deepEqual(calls.map((call) => call.body), [{
-    method: 'evaluateJS',
-    params: {
-      code: calls[0].body.params.code,
-    },
-    profileId: 'profile-broker-fill',
-  }]);
-  assert.match(calls[0].body.params.code, /input\[name=\\"email\\"\]/);
-  assert.match(calls[0].body.params.code, /broker-user/);
-  assert.match(calls[0].body.params.code, /input\[type=\\"password\\"\]/);
-  assert.match(calls[0].body.params.code, /broker-secret/);
-  assert.equal(Object.hasOwn(calls[0].body.params, 'text'), false);
+  // One locate+click+type round trip per field; no submit was declared.
+  assert.deepEqual(calls.map((call) => call.body.method), [
+    'evaluateJS', 'dispatchClick', 'typeText',
+    'evaluateJS', 'dispatchClick', 'typeText',
+  ]);
+  assert.ok(calls.every((call) => call.body.profileId === 'profile-broker-fill'));
+  const evaluateCalls = calls.filter((call) => call.body.method === 'evaluateJS');
+  const typeCalls = calls.filter((call) => call.body.method === 'typeText');
+  assert.match(evaluateCalls[0].body.params.code, /input\[name=\\"email\\"\]/);
+  assert.match(evaluateCalls[1].body.params.code, /input\[type=\\"password\\"\]/);
+  for (const call of evaluateCalls) {
+    assert.equal(call.body.params.code.includes('broker-user'), false);
+    assert.equal(call.body.params.code.includes('broker-secret'), false);
+    assert.equal(Object.hasOwn(call.body.params, 'text'), false);
+  }
+  // Secrets travel only as typeText command parameters (CDP Input.insertText),
+  // never serialized into page JavaScript.
+  assert.deepEqual(typeCalls.map((call) => call.body.params.text), ['broker-user', 'broker-secret']);
   assert.ok(calls.every((call) => call.authorization === 'Bearer gateway-token'));
 
   const revokeIssue = parseJson(runVault(['lease', 'issue', '--stdin-json', '--json'], {
