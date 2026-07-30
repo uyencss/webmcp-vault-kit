@@ -43,6 +43,7 @@ printf '{"title":"GitHub","web":"https://github.com","username":"me","password":
   | webmcp-vault create --stdin-json --json
 webmcp-vault import ./passwords.csv        # generic or Bitwarden login_* headers
 webmcp-vault backup                         # encrypted snapshot under ~/.webmcp/vault/backups
+webmcp-vault rotate-key --new-key-file /protected/path/new-vault.key
 webmcp-vault restore ./credentials.backup.enc.json --force
 webmcp-vault read --web https://github.com password
 webmcp-vault read --web https://github.com otp
@@ -84,6 +85,20 @@ webmcp-vault restore /protected/path/vault-2026-07.enc.json --force
 Back up the unlock key separately from the encrypted data. Losing the key makes
 both the active vault and its backups unrecoverable. Do not put the key in the
 backup filename, command arguments, or the same storage location as the backup.
+
+## Key rotation
+
+Rotate weak or exposed unlock keys with a replacement key file or the
+`WEBMCP_VAULT_NEW_KEY_FILE` environment variable. Do not pass replacement key
+material directly on the command line. Rotation first writes a `pre-rotate.*`
+encrypted recovery snapshot, then re-encrypts the active vault with the new
+key. The JSON output reports only key-source buckets and backup metadata; it
+does not print the old key, new key, or key-file path.
+
+```bash
+export WEBMCP_VAULT_KEY_FILE=/protected/path/current-vault.key
+webmcp-vault rotate-key --new-key-file /protected/path/new-vault.key --json
+```
 
 ## Web UI server
 

@@ -17,6 +17,8 @@
   "main": "lib/store.js",
   "exports": {
     ".": "./lib/store.js",
+    "./approval-receipt": "./lib/approval-receipt.js",
+    "./broker": "./lib/broker.js",
     "./ui-server": "./lib/ui-server.js",
     "./bin": "./bin/webmcp-vault.mjs",
     "./package.json": "./package.json"
@@ -33,8 +35,8 @@
   "scripts": {
     "ui": "node bin/webmcp-vault.mjs ui",
     "test:ui": "node tests/unit/vault-ui-server.test.mjs",
-    "test": "node tests/unit/vault-store.test.mjs && node tests/unit/webmcp-vault-cli.test.mjs && node tests/unit/vault-ui-server.test.mjs && node tests/unit/vault-csv-import.test.mjs && node tests/unit/vault-package.test.mjs",
-    "test:coverage": "node --experimental-test-coverage --test tests/unit/vault-store.test.mjs tests/unit/webmcp-vault-cli.test.mjs tests/unit/vault-ui-server.test.mjs tests/unit/vault-csv-import.test.mjs tests/unit/vault-package.test.mjs"
+    "test": "node tests/unit/approval-receipt.test.mjs && node tests/unit/vault-broker.test.mjs && node tests/unit/vault-store.test.mjs && node tests/unit/webmcp-vault-cli.test.mjs && node tests/unit/vault-ui-server.test.mjs && node tests/unit/vault-csv-import.test.mjs && node tests/unit/vault-package.test.mjs",
+    "test:coverage": "node --experimental-test-coverage --test tests/unit/approval-receipt.test.mjs tests/unit/vault-broker.test.mjs tests/unit/vault-store.test.mjs tests/unit/webmcp-vault-cli.test.mjs tests/unit/vault-ui-server.test.mjs tests/unit/vault-csv-import.test.mjs tests/unit/vault-package.test.mjs"
   },
   "engines": {
     "node": ">=18"

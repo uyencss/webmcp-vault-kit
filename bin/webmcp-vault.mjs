@@ -14,6 +14,10 @@ function getVaultStore() {
   return requireFromBin(resolve(ROOT, 'lib', 'store.js')).createVaultStore();
 }
 
+function getVaultBroker() {
+  return requireFromBin(resolve(ROOT, 'lib', 'broker.js'));
+}
+
 function parseFlags(args) {
   const flags = {};
   const positional = [];
@@ -55,8 +59,13 @@ Usage:
   webmcp-vault update <id-or-query> (--stdin-json | --input-json <file>) [--vault <vault-id>] [--json]
   webmcp-vault import <file.csv> [--preview] [--vault <vault-id>] [--json]
   webmcp-vault backup [--output <file>] [--force] [--json]
+  webmcp-vault rotate-key --new-key-file <file> [--backup-output <file>] [--force-backup] [--json]
   webmcp-vault restore <backup.enc.json> --force [--json]
   webmcp-vault delete <id-or-query> --confirm [--json]
+  webmcp-vault lease issue (--stdin-json | --input-json <file>) [--json]
+  webmcp-vault lease read --lease-id <id> --token <token> --field <field> --site-origin <origin> --profile-binding-id <id> --purpose <purpose> [--json]
+  webmcp-vault lease fill (--stdin-json | --input-json <file>) [--gateway-url <loopback-url>] [--gateway-token <token>] [--json]
+  webmcp-vault lease revoke --lease-id <id> [--reason timeout|cancelled|profile-released|auth-completed|operator] [--json]
   webmcp-vault list-vaults [--json]
   webmcp-vault create-vault --name <name> [--description <text>] [--icon <icon>] [--json]
   webmcp-vault create-vault (--stdin-json | --input-json <file>) [--json]
@@ -74,6 +83,8 @@ Vault folder fields:
 Environment:
   WEBMCP_VAULT_KEY        Unlock key (required for all read/write commands)
   WEBMCP_VAULT_KEY_FILE   Read the unlock key from a file
+  WEBMCP_VAULT_NEW_KEY    Replacement key for rotate-key (prefer NEW_KEY_FILE)
+  WEBMCP_VAULT_NEW_KEY_FILE Read the replacement key from a file
   WEBMCP_HOME             Data dir (default ~/.webmcp); vault at vault/credentials.enc.json
 
 Secure input examples:
@@ -83,6 +94,41 @@ Secure input examples:
   webmcp-vault read --web https://github.com password --json
   webmcp-vault list --vault personal --json
   webmcp-vault create-vault --name Work --icon briefcase --json`);
+}
+
+function loopbackGatewayApi(value = 'http://127.0.0.1:7865/api') {
+  const url = new URL(String(value));
+  if (url.protocol !== 'http:' || !['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname)
+    || url.pathname !== '/api' || url.search || url.hash || url.username || url.password) {
+    throw new Error('Broker fill gateway URL must be a plain HTTP loopback /api endpoint.');
+  }
+  return url.href;
+}
+
+function createHttpGateway({ gatewayUrl, token }) {
+  const url = loopbackGatewayApi(gatewayUrl);
+  return {
+    async call(method, params = {}) {
+      const { profileId, ...toolParams } = params;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          ...(token ? { authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          method,
+          params: toolParams,
+          ...(profileId ? { profileId } : {}),
+        }),
+      });
+      const body = await response.json().catch(() => null);
+      if (!response.ok || body?.error) {
+        throw new Error(typeof body?.error === 'string' ? body.error : 'Gateway call failed.');
+      }
+      return body;
+    },
+  };
 }
 
 function printHuman(payload, fallback = '') {
@@ -106,6 +152,19 @@ async function readStdinText() {
 
 function readJsonFile(filePath) {
   return JSON.parse(readFileSync(resolve(process.cwd(), filePath), 'utf8'));
+}
+
+function readReplacementKey(flags) {
+  const keyFile = flags['new-key-file'] || process.env.WEBMCP_VAULT_NEW_KEY_FILE;
+  const envKey = process.env.WEBMCP_VAULT_NEW_KEY;
+  if (keyFile && envKey) throw new Error('Use exactly one replacement key source.');
+  if (keyFile) {
+    const value = readFileSync(resolve(process.cwd(), String(keyFile)), 'utf8').trim();
+    if (!value) throw new Error('Replacement key file is empty.');
+    return value;
+  }
+  if (envKey) return envKey;
+  throw new Error('Use --new-key-file <file> or WEBMCP_VAULT_NEW_KEY_FILE for rotate-key.');
 }
 
 async function readVaultItemInput(flags) {
@@ -239,6 +298,20 @@ async function run(args) {
     return;
   }
 
+  if (subcommand === 'rotate-key') {
+    const payload = store.rotateKey({
+      newKey: readReplacementKey(flags),
+      backupFile: flags['backup-output'] ? String(flags['backup-output']) : undefined,
+      forceBackup: Boolean(flags['force-backup']),
+    });
+    printJsonOrHuman(
+      payload,
+      json,
+      `Vault key rotated. Recovery backup saved to ${payload.backup.file} (${payload.itemCount} item(s)).`,
+    );
+    return;
+  }
+
   if (subcommand === 'restore') {
     const backupFile = positional[0];
     if (!backupFile || !flags.force) {
@@ -272,6 +345,53 @@ async function run(args) {
     const item = store.deleteItem(identifier);
     printJsonOrHuman({ ok: true, deleted: item }, json, `Deleted vault item ${item.id}`);
     return;
+  }
+
+  if (subcommand === 'lease') {
+    const action = positional[0];
+    if (action === 'issue') {
+      const input = await readVaultItemInput(flags);
+      if (!input) throw new Error('Use --stdin-json or --input-json <file> for lease issue.');
+      const payload = store.issueLease(input);
+      printJsonOrHuman(payload, json, `Issued lease ${payload.lease.leaseId} for ${payload.lease.purpose}`);
+      return;
+    }
+    if (action === 'read') {
+      const payload = store.useLease({
+        leaseId: flags['lease-id'],
+        token: flags.token,
+        field: flags.field,
+        siteOrigin: flags['site-origin'],
+        profileBindingId: flags['profile-binding-id'],
+        purpose: flags.purpose,
+      });
+      printJsonOrHuman(payload, json, payload.value);
+      return;
+    }
+    if (action === 'fill') {
+      const input = await readVaultItemInput(flags);
+      if (!input) throw new Error('Use --stdin-json or --input-json <file> for lease fill.');
+      const { fillLoginFormWithLease } = getVaultBroker();
+      const payload = await fillLoginFormWithLease({
+        ...input,
+        store,
+        gateway: createHttpGateway({
+          gatewayUrl: flags['gateway-url'] || process.env.WEBMCP_GATEWAY_URL || 'http://127.0.0.1:7865/api',
+          token: flags['gateway-token'] === true ? null : (flags['gateway-token'] || process.env.WEBMCP_GATEWAY_TOKEN || null),
+        }),
+      });
+      printJsonOrHuman(payload, json, `Filled ${payload.fields.length} field(s) for ${payload.purpose}.`);
+      return;
+    }
+    if (action === 'revoke') {
+      const payload = store.revokeLease({
+        leaseId: flags['lease-id'],
+        reason: flags.reason,
+      });
+      printJsonOrHuman(payload, json, `Revoked lease ${payload.lease.leaseId}.`);
+      return;
+    }
+    throw new Error('Usage: webmcp-vault lease issue|read ...');
   }
 
   if (subcommand === 'list-vaults') {

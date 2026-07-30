@@ -159,12 +159,19 @@ maintenance. Backups stay encrypted and require the same unlock key:
 
 ```bash
 webmcp vault backup --json
+webmcp vault rotate-key --new-key-file /protected/path/new-vault.key --json
 webmcp vault restore /protected/path/credentials.backup.enc.json --force --json
 ```
 
 Restore is destructive to the active path (although it creates a pre-restore
 recovery snapshot), so confirm the source file and user intent before running
 it. Never print or copy the unlock key into a backup command.
+
+Use `rotate-key` when doctor reports a weak active key source. It accepts the
+replacement key only from `--new-key-file`, `WEBMCP_VAULT_NEW_KEY_FILE`, or
+`WEBMCP_VAULT_NEW_KEY`; prefer a private key file so secret material is not
+placed in shell history. Rotation creates a `pre-rotate.*` encrypted backup
+before changing the active vault and reports only redacted key-strength buckets.
 
 ## Rules
 
@@ -175,6 +182,8 @@ it. Never print or copy the unlock key into a backup command.
   deleting a vault folder.
 - Do not run `webmcp vault restore` unless the user explicitly approved replacing
   the active vault.
+- Do not rotate a real operator vault key unless the user has approved vault
+  maintenance or the active task explicitly includes machine bootstrap/hardening.
 - Do not use command-line flags for password, OTP seed, or notes; use
   `--stdin-json`, `--input-json`, or the local UI.
 - If a query matches multiple items, resolve by website, vault folder, or ask
