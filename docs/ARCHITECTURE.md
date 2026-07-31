@@ -1,7 +1,7 @@
 # WebMCP Vault Kit Architecture
 
 `@gyga-browser/webmcp-vault-kit` is the shared local credential vault for the
-WebMCP stack. It is intentionally small: one encrypted file, one Node library,
+WebMCP stack. It is intentionally small: one encrypted file, modular Node libraries,
 one CLI, and one local UI server.
 
 ## Package Layout
@@ -10,11 +10,46 @@ one CLI, and one local UI server.
 packages/webmcp-vault-kit/
 ├── bin/webmcp-vault.mjs        # Standalone CLI
 ├── lib/config.js               # WEBMCP_HOME data-dir resolution
-├── lib/store.js                # Vault storage, crypto, CRUD, TOTP, CSV import
-├── lib/ui-server.js            # Local token-gated web UI and REST API
+├── lib/approval-receipt.js     # Signed approval receipt v2 verification
+├── lib/store.js                # Composition root / facade exporting public store API
+├── lib/vault/                  # Core storage submodules
+│   ├── util.js                 # ISO dates, object guards, path expanding
+│   ├── paths.js                # Vault data paths and file resolution
+│   ├── fs-safe.js              # Atomic file writes and process file locking
+│   ├── key-source.js           # Key resolution from options/env/file & strength metrics
+│   ├── envelope.js             # scrypt KDF, AES-256-GCM vault envelope crypto
+│   ├── totp.js                 # RFC 6238 TOTP calculation & Base32 decoding
+│   ├── model.js                # String/item normalization, redaction, search & item resolution
+│   ├── csv.js                  # CSV parser, header alias mapping, import planning
+│   ├── leases.js               # Scoped short-lived credential lease store & lifecycle API
+│   └── backup.js               # Verified backup creation, key rotation, and safe restore
+├── lib/ui-server.js            # Local token-gated web UI server and REST API
+├── lib/ui/                     # Extracted web UI frontend assets
+│   ├── vault-ui.html           # HTML template shell
+│   ├── styles/                 # Extracted modular CSS
+│   │   ├── tokens.css
+│   │   ├── lock.css
+│   │   ├── layout.css
+│   │   ├── fields.css
+│   │   ├── components.css
+│   │   └── responsive.css
+│   └── app/                    # Extracted modular ES frontend JS
+│       ├── config.js
+│       ├── state.js
+│       ├── api.js
+│       ├── status.js
+│       ├── secrets.js
+│       ├── totp.js
+│       ├── view-fields.js
+│       ├── vaults.js
+│       ├── item-list.js
+│       ├── csv-import.js
+│       ├── controller.js
+│       ├── keyboard.js
+│       └── main.js
 ├── skills/webmcp-vault/        # Companion skill for agents
-├── tests/unit/                 # Store, CLI, UI, and import tests
-└── docs/                       # Architecture and implementation notes
+├── tests/unit/                 # Unit test suite for store, CLI, UI server, CSV, and package
+└── docs/                       # Architecture, plans, and implementation notes
 ```
 
 ## Public Surfaces
@@ -47,7 +82,11 @@ The store is the canonical API for:
 - `previewImport`
 - `importItems`
 - `backup`
+- `rotateKey`
 - `restoreBackup`
+- `issueLease`
+- `useLease`
+- `revokeLease`
 
 ### CLI
 
@@ -62,6 +101,7 @@ stdin or files so secrets are not placed in shell arguments.
 `startVaultUiServer()` starts a local HTTP server that serves:
 
 - HTML UI at `/`
+- Static CSS/JS assets under `/assets/*`
 - JSON API under `/api/*`
 
 The UI/API is protected by a random per-process token. The default host is
@@ -180,7 +220,7 @@ Controls:
   filesystem supports it.
 - Inter-process writer lock with stale-lock recovery to prevent lost updates.
 - CLI writes via stdin/file instead of sensitive command flags.
-- UI token gate plus `no-store`, CSP, `X-Frame-Options`, and loopback default.
+- UI token gate plus `no-store`, strict CSP (`script-src 'self' 'nonce-...'`, `style-src 'self'`), `X-Frame-Options`, and loopback default.
 - CSV preview responses exclude password, TOTP seed, and note values.
 - Vault and item identifiers are validated before writes; deleting a populated
   vault requires an explicit, existing destination.
@@ -256,7 +296,7 @@ Current unit coverage should continue to exercise:
 - Encryption redaction and decrypt/read behavior.
 - TOTP vectors and `otpauth://` parsing.
 - CLI JSON output and error paths.
-- UI token gate and basic REST flow.
+- UI token gate, asset routing, CSP headers, and REST flow.
 - Vault CRUD, item filtering/moves, and default-vault invariants.
 - CSV import parsing, Bitwarden headers, and dedupe.
 

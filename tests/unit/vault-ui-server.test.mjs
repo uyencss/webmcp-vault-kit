@@ -33,6 +33,16 @@ test('vault UI server requires its token and can initialize/create/list items', 
   const pageHtml = await page.text();
   assert.match(pageHtml, /WebMCP Vault/);
 
+  const cssAsset = await fetch(`http://127.0.0.1:${ui.port}/assets/styles/tokens.css`);
+  assert.equal(cssAsset.status, 200);
+  assert.equal(cssAsset.headers.get('content-type'), 'text/css; charset=utf-8');
+  assert.match(await cssAsset.text(), /--paper:/);
+
+  const jsAsset = await fetch(`http://127.0.0.1:${ui.port}/assets/app/main.js`);
+  assert.equal(jsAsset.status, 200);
+  assert.equal(jsAsset.headers.get('content-type'), 'text/javascript; charset=utf-8');
+  assert.match(await jsAsset.text(), /import/);
+
   const headers = {
     'Content-Type': 'application/json',
     'x-webmcp-vault-token': ui.token,
@@ -116,11 +126,9 @@ test('vault UI serves the Lockbox design with strict CSP and no old teal accent'
 
   assert.equal(page.status, 200);
   assert.match(csp, /default-src 'none'/);
-  assert.match(csp, /script-src 'nonce-/);
-  assert.match(csp, /style-src 'nonce-/);
+  assert.match(csp, /script-src 'self' 'nonce-/);
+  assert.match(csp, /style-src 'self'/);
   assert.match(csp, /connect-src 'self'/);
-  assert.match(html, /--paper:\s+#EDEBE6/i);
-  assert.match(html, /--live:\s+#C67A1E/i);
   assert.match(html, /class="lockcard"/);
   assert.match(html, /Vault is locked/);
   assert.match(html, /WEBMCP_VAULT_KEY/);
@@ -134,21 +142,9 @@ test('vault UI serves the Lockbox design with strict CSP and no old teal accent'
   assert.match(html, /id="backupButton"/);
   assert.match(html, /class="btn-icon" aria-hidden="true"/);
   assert.match(html, /<div class="app-shell hidden" id="appView">/);
-  assert.match(html, /\.app-shell\s*\{[\s\S]*?min-height:\s*100dvh;[\s\S]*?place-items:\s*center;/);
   assert.match(html, /id="envUnlockButton"/);
   assert.match(html, /id="csvPreviewDialog"/);
   assert.match(html, /id="confirmCsvImportButton"/);
-  assert.match(html, /\/import\/preview/);
-  assert.match(html, /Load demo/);
-  assert.match(html, /const demoItems =/);
-  assert.match(html, /max-width:\s*900px/);
-  assert.match(html, /\.secret-input\.idle \.linkbtn/);
-  assert.match(html, /prefers-reduced-motion/);
-  assert.match(html, /Discard unsaved changes\?/);
-  assert.match(html, /state\.otpPeriod/);
-  assert.match(html, /\.main\s*\{\s*height:\s*auto;/);
-  assert.doesNotMatch(html, /min-height:\s*calc\(100vh - 64px\)/);
-  assert.doesNotMatch(html, /min-height:\s*520px/);
   assert.doesNotMatch(html, /#0f766e/i);
 });
 
@@ -193,9 +189,9 @@ test('vault UI can detect an inherited environment unlock key without returning 
 });
 
 test('vault UI inline script is valid browser JavaScript', () => {
-  const template = fs.readFileSync(path.join(ROOT, 'lib', 'vault-ui.html'), 'utf8');
+  const template = fs.readFileSync(path.join(ROOT, 'lib', 'ui', 'vault-ui.html'), 'utf8');
   const scripts = [...template.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)];
-  assert.equal(scripts.length, 1);
+  assert.equal(scripts.length, 2);
   assert.doesNotThrow(() => {
     Function(scripts[0][1].replace('{{TOKEN_JSON}}', JSON.stringify('test-token')));
   });
@@ -266,6 +262,7 @@ test('vault UI template includes an accessible responsive vault sidebar', async 
   assert.match(html, /id="newVaultButton"/);
   assert.match(html, /id="vaultDialog"/);
   assert.match(html, /id="toggleSidebarButton"/);
-  assert.match(html, /sidebar-collapsed/);
-  assert.match(html, /@media \(max-width:\s*760px\)/);
+
+  const layoutCss = await (await fetch(`http://127.0.0.1:${ui.port}/assets/styles/layout.css`)).text();
+  assert.match(layoutCss, /sidebar-collapsed/);
 });

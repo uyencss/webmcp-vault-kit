@@ -1,0 +1,100 @@
+:focus-visible {
+  outline: var(--focus);
+  outline-offset: var(--focus-offset);
+}
+@media (max-width: 900px) {
+  .app-shell {
+    min-height: 0;
+    display: block;
+    padding: var(--s4);
+  }
+  .bar {
+    flex-wrap: wrap;
+  }
+  .path {
+    display: none;
+  }
+  .bar-right {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .status {
+    max-width: none;
+    text-align: left;
+  }
+  .main {
+    height: auto;
+    grid-template-columns: 1fr;
+  }
+  .vault-sidebar {
+    max-height: 280px;
+    border-right: 0;
+    border-bottom: var(--border);
+  }
+  .rail {
+    height: auto;
+    max-height: min(340px, 45vh);
+    border-right: 0;
+    border-bottom: var(--border);
+  }
+  .detail {
+    overflow: visible;
+  }
+  .grid {
+    grid-template-columns: 1fr;
+  }
+  .totp {
+    flex-wrap: wrap;
+  }
+  .totp-copy {
+    margin-left: 0;
+  }
+  .secret-input {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .linkbtn {
+    align-self: flex-start;
+  }
+  .detail-actions .danger {
+    margin-left: 0;
+  }
+}
+@media (max-width: 760px) {
+  .vault-list {
+    max-height: 220px;
+  }
+  .vault-sidebar-foot .btn {
+    min-height: 38px;
+  }
+}
+@media (max-width: 560px) {
+  .app-shell {
+    padding: 0;
+  }
+  .app {
+    border-right: 0;
+    border-left: 0;
+    border-radius: 0;
+  }
+  .bar,
+  .detail {
+    padding: var(--s4);
+  }
+  .lockcard {
+    padding: var(--s6);
+  }
+  .lockrow {
+    flex-direction: column;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

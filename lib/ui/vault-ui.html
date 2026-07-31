@@ -1,0 +1,526 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>WebMCP Vault</title>
+    <link rel="stylesheet" href="/assets/styles/tokens.css" />
+    <link rel="stylesheet" href="/assets/styles/lock.css" />
+    <link rel="stylesheet" href="/assets/styles/layout.css" />
+    <link rel="stylesheet" href="/assets/styles/fields.css" />
+    <link rel="stylesheet" href="/assets/styles/components.css" />
+    <link rel="stylesheet" href="/assets/styles/responsive.css" />
+  </head>
+  <body>
+    <div class="lock-shell" id="unlockView">
+      <section class="lockcard" aria-labelledby="lockTitle">
+        <svg class="seal" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <rect
+            x="4"
+            y="10"
+            width="16"
+            height="11"
+            rx="2"
+            stroke="currentColor"
+            stroke-width="1.5"
+          ></rect>
+          <path
+            d="M7.5 10V7.5a4.5 4.5 0 0 1 9 0V10"
+            stroke="currentColor"
+            stroke-width="1.5"
+          ></path>
+          <circle cx="12" cy="15" r="1.5" fill="currentColor"></circle>
+          <path d="M12 16.5V18" stroke="currentColor" stroke-width="1.5"></path>
+        </svg>
+        <h1 id="lockTitle">Vault is locked</h1>
+        <p>Enter your unlock key to decrypt this device's credentials.</p>
+        <form id="unlockForm">
+          <label for="vaultKey">Unlock key</label>
+          <input
+            class="mono"
+            id="vaultKey"
+            type="password"
+            autocomplete="current-password"
+            required
+            autofocus
+          />
+          <div class="lockrow">
+            <button class="btn primary" type="submit">
+              <svg
+                class="btn-icon"
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+              >
+                <circle cx="8" cy="15" r="3"></circle>
+                <path d="m10.5 12.5 7-7m-3 3 2 2m-5 1 2 2"></path>
+              </svg>
+              Unlock
+            </button>
+            <button class="btn ghost" type="button" id="initButton">
+              <svg
+                class="btn-icon"
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+              >
+                <path
+                  d="M12 3 5 6v5c0 4.5 3 8 7 10 4-2 7-5.5 7-10V6l-7-3Zm0 5v6m-3-3h6"
+                ></path>
+              </svg>
+              Initialize
+            </button>
+            <button class="btn ghost hidden" type="button" id="envUnlockButton">
+              <svg
+                class="btn-icon"
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+              >
+                <path
+                  d="M7 14a5 5 0 1 1 4.7 3.2L9 20H6v-3l2.8-2.8A5 5 0 0 1 7 14Z"
+                ></path>
+                <circle cx="14" cy="9" r="1"></circle>
+              </svg>
+              <span id="envUnlockLabel">Use configured key</span>
+            </button>
+          </div>
+          <div
+            class="inline-status"
+            id="unlockStatus"
+            role="status"
+            aria-live="polite"
+          ></div>
+        </form>
+        <p class="hint">
+          key from WEBMCP_VAULT_KEY or local input; nothing leaves this machine
+        </p>
+      </section>
+    </div>
+
+    <div class="app-shell hidden" id="appView">
+      <div class="app">
+        <header class="bar">
+          <div class="brand">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              aria-hidden="true"
+            >
+              <rect
+                x="4"
+                y="10"
+                width="16"
+                height="10"
+                rx="2"
+                stroke="currentColor"
+                stroke-width="1.6"
+              ></rect>
+              <path
+                d="M8 10V7a4 4 0 0 1 8 0"
+                stroke="currentColor"
+                stroke-width="1.6"
+              ></path>
+              <circle cx="12" cy="15" r="1.4" fill="currentColor"></circle>
+            </svg>
+            <h1>WebMCP Vault</h1>
+            <span class="path">~/.webmcp/vault</span>
+          </div>
+          <div class="bar-right">
+            <span class="count" id="itemCount"><b>0</b> items</span>
+            <div
+              class="status"
+              id="status"
+              role="status"
+              aria-live="polite"
+            ></div>
+            <button class="btn sm ghost" id="lockButton" type="button">
+              <svg
+                class="btn-icon"
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+              >
+                <rect x="5" y="10" width="14" height="10" rx="2"></rect>
+                <path d="M8 10V7a4 4 0 0 1 8 0v3"></path>
+              </svg>
+              Lock
+            </button>
+          </div>
+        </header>
+
+        <main class="main">
+          <aside class="vault-sidebar" aria-label="Vaults">
+            <div class="vault-sidebar-head">
+              <h2>Vaults</h2>
+              <div class="head-actions">
+                <button
+                  class="icon-button"
+                  id="newVaultButton"
+                  type="button"
+                  aria-label="Create vault"
+                  title="Create vault"
+                >
+                  <svg
+                    class="btn-icon"
+                    aria-hidden="true"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                  >
+                    <path d="M12 5v14M5 12h14"></path>
+                  </svg>
+                </button>
+                <button
+                  class="icon-button"
+                  id="toggleSidebarButton"
+                  type="button"
+                  aria-label="Toggle sidebar"
+                  title="Toggle sidebar (⌘B)"
+                >
+                  <svg
+                    class="btn-icon"
+                    aria-hidden="true"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                  >
+                    <rect x="3" y="3" width="18" height="18" rx="2"></rect>
+                    <path d="M9 3v18"></path>
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <ul class="vault-list" id="vaultList"></ul>
+            <div class="vault-sidebar-foot">
+              <button
+                class="btn sm ghost"
+                id="editVaultButton"
+                type="button"
+                disabled
+              >
+                Edit
+              </button>
+              <button
+                class="btn sm danger"
+                id="deleteVaultButton"
+                type="button"
+                disabled
+              >
+                Delete
+              </button>
+            </div>
+          </aside>
+
+          <aside class="rail" aria-label="Saved logins">
+            <div class="rail-top">
+              <input
+                class="search"
+                id="search"
+                type="search"
+                autocomplete="off"
+                aria-label="Search saved logins"
+                placeholder="Search title, user, or site"
+              />
+            </div>
+            <ul class="list" id="itemList"></ul>
+            <div class="rail-foot">
+              <button class="btn sm primary" id="newButton" type="button" aria-label="New" title="New">
+                <svg class="btn-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14"></path></svg>
+              </button>
+              <button class="btn sm ghost" id="importButton" type="button" aria-label="Import CSV" title="Import CSV">
+                <svg class="btn-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M12 15V3m0 0L7 8m5-5 5 5M5 13v6h14v-6"></path></svg>
+              </button>
+              <button class="btn sm ghost" id="backupButton" type="button" aria-label="Backup" title="Backup">
+                <svg class="btn-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M12 3v12m0 0 5-5m-5 5-5-5M5 14v5h14v-5"></path></svg>
+              </button>
+              <button class="btn sm ghost" id="demoButton" type="button" aria-label="Load demo" title="Load demo">
+                <svg class="btn-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="m12 3 .9 4.1L17 8l-4.1.9L12 13l-.9-4.1L7 8l4.1-.9L12 3ZM5.5 14l.5 2.5L8.5 17 6 17.5 5.5 20 5 17.5 2.5 17 5 16.5 5.5 14Zm13 1 .6 2.4 2.4.6-2.4.6-.6 2.4-.6-2.4-2.4-.6 2.4-.6.6-2.4Z"></path></svg>
+              </button>
+              <input id="csvFile" type="file" accept=".csv,text/csv" class="hidden" />
+            </div>
+          </aside>
+
+          <section class="detail view-mode" aria-labelledby="detailTitle">
+            <div class="detail-scroll">
+            <span class="eyebrow" id="detailEyebrow">New login</span
+            ><span
+              class="dirty-badge edit-only"
+              id="dirtyBadge"
+              aria-live="polite"
+              >• Unsaved</span
+            >
+            <h2 id="detailTitle">New Login</h2>
+            <form id="itemForm" class="grid">
+              <div class="field wide">
+                <label for="vaultSelect">Vault</label>
+                <span
+                  class="view-field view-only"
+                  id="vaultViewField"
+                  role="button"
+                  tabindex="0"
+                  aria-label="Copy vault name"
+                ></span>
+                <select
+                  class="edit-only"
+                  id="vaultSelect"
+                  required
+                  aria-describedby="vaultSelectHint"
+                ></select>
+                <span class="hint edit-only" id="vaultSelectHint"
+                  >Moving an item changes which vault contains it.</span
+                >
+              </div>
+              <div class="field edit-only">
+                <label for="title">Title</label>
+                <input id="title" autocomplete="off" required maxlength="200" />
+              </div>
+              <div class="field">
+                <label for="web">Website</label>
+                <span
+                  class="view-field view-only"
+                  id="webViewField"
+                  role="button"
+                  tabindex="0"
+                  aria-label="Click to copy or open website"
+                ></span>
+                <input
+                  class="mono edit-only"
+                  id="web"
+                  autocomplete="url"
+                  maxlength="2048"
+                />
+              </div>
+              <div class="field">
+                <label for="username">Username</label>
+                <span
+                  class="view-field view-only"
+                  id="usernameViewField"
+                  role="button"
+                  tabindex="0"
+                  aria-label="Click to copy username"
+                  ><span class="view-hint">Click to copy</span></span
+                >
+                <input
+                  class="mono edit-only"
+                  id="username"
+                  autocomplete="username"
+                  maxlength="512"
+                />
+              </div>
+              <div class="field">
+                <label for="password">Password</label>
+                <span
+                  class="view-field masked view-only"
+                  id="passwordViewField"
+                  role="button"
+                  tabindex="0"
+                  aria-label="Click to copy password"
+                  ><span class="view-hint">Click to copy</span></span
+                >
+                <div class="secret-input edit-only">
+                  <input
+                    class="mono"
+                    id="password"
+                    type="password"
+                    autocomplete="new-password"
+                    maxlength="8192"
+                  />
+                  <button
+                    class="linkbtn"
+                    id="passwordRevealButton"
+                    type="button"
+                    disabled
+                  >
+                    Reveal
+                  </button>
+                </div>
+              </div>
+
+              <div class="totp hidden" id="totpBlock">
+                <div class="ring" aria-hidden="true">
+                  <svg width="64" height="64" viewBox="0 0 64 64">
+                    <circle
+                      cx="32"
+                      cy="32"
+                      r="28"
+                      fill="none"
+                      stroke="var(--live-weak)"
+                      stroke-width="4"
+                    ></circle>
+                    <circle
+                      class="progress"
+                      id="totpRingProgress"
+                      cx="32"
+                      cy="32"
+                      r="28"
+                      fill="none"
+                      stroke="var(--live)"
+                      stroke-width="4"
+                      stroke-linecap="round"
+                      stroke-dasharray="175.9"
+                      stroke-dashoffset="0"
+                    ></circle>
+                  </svg>
+                  <span class="seconds" id="totpRingSeconds">30</span>
+                </div>
+                <div class="totp-main">
+                  <span class="eyebrow">One-time code</span>
+                  <span class="totp-code" id="totpCode">------</span>
+                  <span class="totp-sub"
+                    >expires in <b id="totpSeconds">30s</b></span
+                  >
+                </div>
+                <button
+                  class="btn sm ghost totp-copy"
+                  id="copyTotpButton"
+                  type="button"
+                >
+                  <svg
+                    class="btn-icon"
+                    aria-hidden="true"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                  >
+                    <rect x="9" y="9" width="10" height="10" rx="2"></rect>
+                    <path
+                      d="M15 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h3"
+                    ></path>
+                  </svg>
+                  Copy
+                </button>
+              </div>
+
+              <div class="field wide edit-only">
+                <label for="otpSecret">TOTP secret</label>
+                <div class="secret-input">
+                  <input
+                    class="mono"
+                    id="otpSecret"
+                    type="password"
+                    autocomplete="off"
+                    maxlength="4096"
+                  />
+                  <button
+                    class="linkbtn"
+                    id="otpSecretRevealButton"
+                    type="button"
+                    disabled
+                  >
+                    Reveal
+                  </button>
+                </div>
+              </div>
+              <div class="field wide">
+                <label for="note">Note</label>
+                <span
+                  class="view-field masked view-only"
+                  id="noteViewField"
+                  role="button"
+                  tabindex="0"
+                  aria-label="Click to copy note"
+                  ><span class="view-hint">Click to copy</span></span
+                >
+                <div class="secret-input edit-only">
+                  <textarea class="mono" id="note" maxlength="20000"></textarea>
+                  <button
+                    class="linkbtn"
+                    id="noteRevealButton"
+                    type="button"
+                    disabled
+                  >
+                    Reveal
+                  </button>
+                </div>
+              </div>
+
+            </form>
+            </div><!-- /.detail-scroll -->
+            <div class="detail-actions">
+              <button class="btn primary view-only" type="button" id="editButton">
+                <svg class="btn-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path><path d="m15 5 4 4"></path></svg>
+                Edit
+              </button>
+              <button class="btn primary edit-only" type="button" id="submitButton">
+                <svg class="btn-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="m5 12 4 4L19 6"></path></svg>
+                Save
+              </button>
+              <button class="btn ghost edit-only" type="button" id="cancelEditButton">Cancel</button>
+              <button class="btn ghost edit-only" type="button" id="revealAllButton" disabled>
+                <svg class="btn-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"></path><circle cx="12" cy="12" r="2.5"></circle></svg>
+                Reveal all
+              </button>
+              <button class="btn danger" type="button" id="deleteButton" disabled>
+                <svg class="btn-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M4 7h16m-10 4v5m4-5v5M9 7l1-3h4l1 3m-9 0 1 13h10l1-13"></path></svg>
+                Delete
+              </button>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <dialog
+      class="csv-preview-dialog"
+      id="csvPreviewDialog"
+      aria-labelledby="csvPreviewTitle"
+    >
+      <div class="csv-preview-body">
+        <span class="eyebrow">CSV import</span>
+        <h2 id="csvPreviewTitle">Review import</h2>
+        <p class="csv-preview-summary" id="csvPreviewSummary" role="status"></p>
+        <ul class="csv-preview-list" id="csvPreviewList"></ul>
+        <div class="csv-preview-actions">
+          <button class="btn ghost" id="cancelCsvImportButton" type="button">
+            Cancel
+          </button>
+          <button class="btn primary" id="confirmCsvImportButton" type="button">
+            Import
+          </button>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog
+      class="csv-preview-dialog"
+      id="vaultDialog"
+      aria-labelledby="vaultDialogTitle"
+    >
+      <form class="vault-dialog-form" id="vaultForm" method="dialog">
+        <div>
+          <span class="eyebrow">Vault</span>
+          <h2 id="vaultDialogTitle">Create vault</h2>
+        </div>
+        <div class="field">
+          <label for="vaultName">Name</label>
+          <input id="vaultName" required maxlength="100" autocomplete="off" />
+        </div>
+        <div class="field">
+          <label for="vaultDescription">Description</label>
+          <textarea id="vaultDescription" maxlength="500"></textarea>
+        </div>
+        <div class="field">
+          <label for="vaultIcon">Icon</label>
+          <select id="vaultIcon">
+            <option value="folder">Folder</option>
+            <option value="key">Key</option>
+            <option value="briefcase">Briefcase</option>
+            <option value="people">People</option>
+            <option value="archive">Archive</option>
+          </select>
+        </div>
+        <div class="vault-dialog-actions">
+          <button class="btn ghost" id="cancelVaultButton" type="button">
+            Cancel
+          </button>
+          <button class="btn primary" type="submit">Save vault</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script nonce="{{NONCE}}">
+      window.__VAULT_TOKEN__ = {{TOKEN_JSON}};
+    </script>
+    <script type="module" nonce="{{NONCE}}" src="/assets/app/main.js"></script>
+  </body>
+</html>
