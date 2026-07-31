@@ -10,6 +10,15 @@
     <link rel="stylesheet" href="/assets/styles/fields.css" />
     <link rel="stylesheet" href="/assets/styles/components.css" />
     <link rel="stylesheet" href="/assets/styles/responsive.css" />
+    <script nonce="{{NONCE}}">
+      try {
+        var stored = localStorage.getItem('webmcp-vault-theme');
+        document.documentElement.dataset.theme =
+          stored === 'dark' || stored === 'light'
+            ? stored
+            : (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div class="lock-shell" id="unlockView">
@@ -95,6 +104,34 @@
         <p class="hint">
           key from WEBMCP_VAULT_KEY or local input; nothing leaves this machine
         </p>
+        <button
+          class="btn sm ghost"
+          type="button"
+          data-theme-toggle
+          title="Switch to dark theme"
+          aria-label="Switch to dark theme"
+        >
+          <svg
+            class="btn-icon icon-sun"
+            viewBox="0 0 24 24"
+            fill="none"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="12" r="4"></circle>
+            <path
+              d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41m11.32-11.32 1.41-1.41"
+            ></path>
+          </svg>
+          <svg
+            class="btn-icon icon-moon"
+            viewBox="0 0 24 24"
+            fill="none"
+            aria-hidden="true"
+          >
+            <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path>
+          </svg>
+          <span>Theme</span>
+        </button>
       </section>
     </div>
 
@@ -136,6 +173,33 @@
               role="status"
               aria-live="polite"
             ></div>
+            <button
+              class="icon-button"
+              type="button"
+              data-theme-toggle
+              title="Switch to dark theme"
+              aria-label="Switch to dark theme"
+            >
+              <svg
+                class="btn-icon icon-sun"
+                viewBox="0 0 24 24"
+                fill="none"
+                aria-hidden="true"
+              >
+                <circle cx="12" cy="12" r="4"></circle>
+                <path
+                  d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41m11.32-11.32 1.41-1.41"
+                ></path>
+              </svg>
+              <svg
+                class="btn-icon icon-moon"
+                viewBox="0 0 24 24"
+                fill="none"
+                aria-hidden="true"
+              >
+                <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path>
+              </svg>
+            </button>
             <button class="btn sm ghost" id="lockButton" type="button">
               <svg
                 class="btn-icon"
