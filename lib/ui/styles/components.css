@@ -7,7 +7,7 @@
   padding: 0 var(--s4);
   border: var(--border);
   border-radius: var(--r-md);
-  background: #ffffff;
+  background: var(--btn-face);
   color: var(--ink);
   font-weight: var(--fw-strong);
   cursor: pointer;
@@ -30,21 +30,21 @@
 .btn.primary {
   border-color: var(--ink);
   background: var(--ink);
-  color: #ffffff;
+  color: var(--on-solid);
 }
 .btn.primary:hover {
-  background: #000000;
+  background: var(--solid-hover);
 }
 .btn.ghost {
   background: transparent;
 }
 .btn.danger {
-  border-color: #e3b7ae;
+  border-color: var(--danger-line);
   background: transparent;
   color: var(--danger);
 }
 .btn.danger:hover {
-  background: #f7ece9;
+  background: var(--danger-wash);
 }
 .btn.sm {
   min-height: 32px;
@@ -85,7 +85,7 @@ textarea:disabled {
   gap: var(--s2);
 }
 .csv-preview-dialog::backdrop {
-  background: rgba(26, 27, 30, 0.36);
+  background: var(--backdrop);
 }
 .csv-preview-body {
   padding: var(--s6);
@@ -136,3 +136,33 @@ textarea:disabled {
   gap: var(--s2);
   margin-top: var(--s5);
 }
+
+[data-theme-toggle] .icon-sun {
+  display: none;
+}
+:root[data-theme="dark"] [data-theme-toggle] .icon-moon {
+  display: none;
+}
+:root[data-theme="dark"] [data-theme-toggle] .icon-sun {
+  display: block;
+}
+:root[data-theme="light"] [data-theme-toggle] .icon-sun {
+  display: none;
+}
+:root[data-theme="light"] [data-theme-toggle] .icon-moon {
+  display: block;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) [data-theme-toggle] .icon-moon {
+    display: none;
+  }
+  :root:not([data-theme="light"]) [data-theme-toggle] .icon-sun {
+    display: block;
+  }
+}
+
+.lockcard [data-theme-toggle] {
+  margin-top: var(--s4);
+}
+
