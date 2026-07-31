@@ -191,10 +191,62 @@ test('vault UI can detect an inherited environment unlock key without returning 
 test('vault UI inline script is valid browser JavaScript', () => {
   const template = fs.readFileSync(path.join(ROOT, 'lib', 'ui', 'vault-ui.html'), 'utf8');
   const scripts = [...template.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)];
-  assert.equal(scripts.length, 2);
+  assert.equal(scripts.length, 3);
   assert.doesNotThrow(() => {
-    Function(scripts[0][1].replace('{{TOKEN_JSON}}', JSON.stringify('test-token')));
+    Function(scripts[0][1]);
+    Function(scripts[1][1].replace('{{TOKEN_JSON}}', JSON.stringify('test-token')));
   });
+});
+
+test('vault UI theme management assets, palette sync, and literals verification', async (t) => {
+  const oldHome = process.env.WEBMCP_HOME;
+  process.env.WEBMCP_HOME = tempHome();
+
+  const ui = await startVaultUiServer({ host: '127.0.0.1', port: 0 });
+  t.after(() => {
+    ui.server.close();
+    if (oldHome === undefined) delete process.env.WEBMCP_HOME;
+    else process.env.WEBMCP_HOME = oldHome;
+  });
+
+  // 1. Theme asset serves
+  const themeAsset = await fetch(`http://127.0.0.1:${ui.port}/assets/app/theme.js`);
+  assert.equal(themeAsset.status, 200);
+  assert.equal(themeAsset.headers.get('content-type'), 'text/javascript; charset=utf-8');
+  const themeJsText = await themeAsset.text();
+  assert.match(themeJsText, /export function currentTheme/);
+
+  // 2. Toggle is in both views
+  const page = await fetch(ui.url);
+  const html = await page.text();
+  const toggleCount = (html.match(/data-theme-toggle/g) || []).length;
+  assert.equal(toggleCount, 2);
+  assert.match(html, /class="bar-right"[\s\S]*?data-theme-toggle/);
+  assert.match(html, /class="lockcard"[\s\S]*?data-theme-toggle/);
+
+  // 3. Dark palette exists & dark blocks stay in sync
+  const cssAsset = await fetch(`http://127.0.0.1:${ui.port}/assets/styles/tokens.css`);
+  const tokensCss = await cssAsset.text();
+  assert.match(tokensCss, /:root\[data-theme="dark"\]/);
+  assert.match(tokensCss, /@media \(prefers-color-scheme: dark\)/);
+
+  const mediaMatch = tokensCss.match(/@media \(prefers-color-scheme: dark\)\s*\{\s*:root:not\(\[data-theme="light"\]\)\s*\{([\s\S]*?)\}\s*\}/);
+  const themeMatch = tokensCss.match(/:root\[data-theme="dark"\]\s*\{([\s\S]*?)\}/);
+  assert.ok(mediaMatch, 'media block found');
+  assert.ok(themeMatch, 'theme block found');
+
+  const norm = (s) => s.split('\n').map((l) => l.trim()).filter(Boolean).sort().join('\n');
+  assert.equal(norm(mediaMatch[1]), norm(themeMatch[1]));
+
+  // 4. No color literals left in components.css outside var()
+  const compAsset = await fetch(`http://127.0.0.1:${ui.port}/assets/styles/components.css`);
+  const compCss = await compAsset.text();
+  const literalMatches = compCss.match(/#[0-9a-fA-F]{3,8}|rgba?\([^)]+\)/g) || [];
+  assert.deepEqual(literalMatches, []);
+
+  // 5. Light theme unchanged
+  assert.match(tokensCss, /--paper:\s*#edebe6/i);
+  assert.match(tokensCss, /--ink:\s*#1a1b1e/i);
 });
 
 test('vault UI API manages vaults, filters items, and moves items on deletion', async (t) => {

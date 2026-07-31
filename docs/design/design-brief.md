@@ -60,6 +60,14 @@ primary CTA is the reflex that produces generic SaaS pages; a solid near-black
 button on bone reads engineered and premium, and it lets the single amber accent
 mean exactly one thing — *this is live/active*.
 
+### Dark Mode
+
+Dark mode uses warm charcoal tones (the inverse of the bone/greige identity) to preserve the paper < surface elevation hierarchy:
+- Background (`--paper` `#161513`) is darkest-but-one, raised elements (`--surface` `#1e1d1a`) are lighter, and wells (`--sunk` `#121110`) are darkest.
+- Amber (`--live` `#e3a24c`) remains the single accent, meeting 7.66 contrast on surface to read as *lit* against dark fields without turning muddy or overused.
+- Theme selection uses system preference by default, overridable by explicit user toggle, persisted locally without mutating vault envelope state.
+
+
 ### Type — two roles, system stacks (CSP-safe, zero network)
 
 - **Sans** (`system-ui, -apple-system, "Segoe UI", Roboto, …`) — labels, titles,

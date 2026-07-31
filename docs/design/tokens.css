@@ -20,6 +20,59 @@
   --live-weak:#EFE2CC;/* amber wash for the ring track / revealed field tint   */
   --danger:  #A3341F; /* destructive (delete) — used sparingly                 */
   --ok:      #3F6B44; /* confirmations (saved, imported)                       */
+  --btn-face: #ffffff;
+  --on-solid: #ffffff;
+  --solid-hover: #000000;
+  --danger-line: #e3b7ae;
+  --danger-wash: #f7ece9;
+  --backdrop: rgba(26, 27, 30, 0.36);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --paper: #161513;
+    --surface: #1e1d1a;
+    --sunk: #121110;
+    --ink: #edebe6;
+    --muted: #a29c90;
+    --line: #34322c;
+    --live: #e3a24c;
+    --live-weak: #4a3a21;
+    --danger: #e07a63;
+    --ok: #83b98a;
+    --btn-face: #26241f;
+    --on-solid: #161513;
+    --solid-hover: #ffffff;
+    --danger-line: #6a3a31;
+    --danger-wash: #2a1c19;
+    --backdrop: rgba(0, 0, 0, 0.62);
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.5);
+    --shadow-float: 0 12px 40px -12px rgba(0, 0, 0, 0.7);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #161513;
+  --surface: #1e1d1a;
+  --sunk: #121110;
+  --ink: #edebe6;
+  --muted: #a29c90;
+  --line: #34322c;
+  --live: #e3a24c;
+  --live-weak: #4a3a21;
+  --danger: #e07a63;
+  --ok: #83b98a;
+  --btn-face: #26241f;
+  --on-solid: #161513;
+  --solid-hover: #ffffff;
+  --danger-line: #6a3a31;
+  --danger-wash: #2a1c19;
+  --backdrop: rgba(0, 0, 0, 0.62);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-float: 0 12px 40px -12px rgba(0, 0, 0, 0.7);
+}
 
   /* — Type: two roles only. Sans = human chrome. Mono = machine secrets. — */
   --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
