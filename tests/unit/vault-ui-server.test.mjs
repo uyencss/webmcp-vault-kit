@@ -265,4 +265,10 @@ test('vault UI template includes an accessible responsive vault sidebar', async 
 
   const layoutCss = await (await fetch(`http://127.0.0.1:${ui.port}/assets/styles/layout.css`)).text();
   assert.match(layoutCss, /sidebar-collapsed/);
+
+  const mainJs = await (await fetch(`http://127.0.0.1:${ui.port}/assets/app/main.js`)).text();
+  assert.match(mainJs, /boundSelectVault/);
+
+  const vaultsJs = await (await fetch(`http://127.0.0.1:${ui.port}/assets/app/vaults.js`)).text();
+  assert.match(vaultsJs, /onSelectVault/);
 });
