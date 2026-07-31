@@ -39,6 +39,7 @@ test('fillLoginFormWithLease consumes lease fields and returns only a redacted r
     async call(method, params) {
       calls.push({ method, params });
       if (method === 'evaluateJS') {
+        if (params.code.includes('crypto.subtle.digest')) return { result: { tabId: 1, result: { match: true } } };
         return { result: { tabId: 1, result: { x: 12, y: 34, tag: 'input', name: 'email', type: 'text' } } };
       }
       if (method === 'dispatchClick') return { result: { tabId: 1, clicked: true, x: params.x, y: params.y } };
@@ -67,18 +68,20 @@ test('fillLoginFormWithLease consumes lease fields and returns only a redacted r
   assert.equal(receipt.status, 'completed');
   assert.deepEqual(receipt.fields, ['username', 'password']);
   assert.equal(receipt.submitted, true);
-  // One locate+click+type round trip per field, plus one final submit script.
+  // One locate+click+type+verify round trip per field, plus one final submit script.
   assert.deepEqual(calls.map((call) => call.method), [
-    'evaluateJS', 'dispatchClick', 'typeText',
-    'evaluateJS', 'dispatchClick', 'typeText',
+    'evaluateJS', 'dispatchClick', 'typeText', 'evaluateJS',
+    'evaluateJS', 'dispatchClick', 'typeText', 'evaluateJS',
     'evaluateJS',
   ]);
   const evaluateCalls = calls.filter((call) => call.method === 'evaluateJS');
   const typeCalls = calls.filter((call) => call.method === 'typeText');
   // Selectors reach the page as JavaScript source; secrets never do.
   assert.match(evaluateCalls[0].params.code, /#email/);
-  assert.match(evaluateCalls[1].params.code, /#password/);
-  assert.match(evaluateCalls[2].params.code, /form\[data-login\]/);
+  assert.match(evaluateCalls[1].params.code, /#email/);
+  assert.match(evaluateCalls[2].params.code, /#password/);
+  assert.match(evaluateCalls[3].params.code, /#password/);
+  assert.match(evaluateCalls[4].params.code, /form\[data-login\]/);
   for (const call of evaluateCalls) {
     assert.equal(call.params.code.includes('broker-user'), false);
     assert.equal(call.params.code.includes('broker-secret'), false);
@@ -90,6 +93,55 @@ test('fillLoginFormWithLease consumes lease fields and returns only a redacted r
   assert.equal(JSON.stringify(receipt).includes('broker-secret'), false);
   assert.equal(JSON.stringify(receipt).includes('broker-user'), false);
   assert.equal(JSON.stringify(receipt).includes('profile-secret-id'), false);
+});
+
+// `Input.insertText` writes to whatever element holds focus, so a focus change
+// or interfering script can land a secret in a different input than the
+// selector named. Submitting then would send a credential to the wrong field.
+test('fillLoginFormWithLease aborts before submit when a field diverges from what was typed', async () => {
+  const store = createVaultStore({ dataDir: tempHome(), key: 'broker-verify-key' });
+  store.init();
+  const item = store.createItem({
+    title: 'Broker Login', web: 'https://broker-verify.example.test', username: 'real-user', password: 'real-secret',
+  });
+  const lease = store.issueLease({
+    itemId: item.id,
+    receiptDigest: 'receipt-digest',
+    runId: 'run-broker',
+    nodeId: 'node-broker',
+    principalId: 'principal-broker',
+    profileBindingId: 'binding-broker',
+    siteOrigin: 'https://broker-verify.example.test',
+    purpose: 'login',
+    fields: ['username', 'password'],
+    maxUses: 2,
+  });
+  const calls = [];
+  const gateway = {
+    async call(method, params) {
+      calls.push({ method, params });
+      if (method === 'evaluateJS') {
+        if (params.code.includes('crypto.subtle.digest')) return { result: { tabId: 1, result: { match: false } } };
+        return { result: { tabId: 1, result: { x: 1, y: 2, tag: 'input', name: 'email', type: 'text' } } };
+      }
+      return { result: { tabId: 1 } };
+    },
+  };
+
+  await assert.rejects(fillLoginFormWithLease({
+    store,
+    gateway,
+    leaseId: lease.lease.leaseId,
+    token: lease.token,
+    siteOrigin: 'https://broker-verify.example.test',
+    profileBindingId: 'binding-broker',
+    purpose: 'login',
+    submit: { selector: 'form[data-login]' },
+    fields: { username: { selector: '#email' }, password: { selector: '#password' } },
+  }), /gateway fill failed/i);
+
+  // Submit must never be reached once the very first field fails verification.
+  assert.equal(calls.some((call) => call.method === 'evaluateJS' && call.params.code.includes('form[data-login]')), false);
 });
 
 test('fillLoginFormWithLease rejects clipboard, missing selectors, and gateway failures without leaking fields', async () => {

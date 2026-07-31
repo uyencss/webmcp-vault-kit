@@ -232,9 +232,12 @@ globalThis.fetch = async (_url, options = {}) => {
     authorization: options.headers?.authorization,
     body,
   }) + '\\n');
-  const result = body.method === 'evaluateJS'
-    ? { tabId: 1, result: { x: 12, y: 34, tag: 'input', name: null, type: 'text' } }
-    : { tabId: 1, ok: true };
+  const isVerify = body.method === 'evaluateJS' && body.params.code.includes('crypto.subtle.digest');
+  const result = isVerify
+    ? { tabId: 1, result: { match: true } }
+    : body.method === 'evaluateJS'
+      ? { tabId: 1, result: { x: 12, y: 34, tag: 'input', name: null, type: 'text' } }
+      : { tabId: 1, ok: true };
   return new Response(JSON.stringify({ result }), {
     status: 200,
     headers: { 'content-type': 'application/json' },
@@ -272,16 +275,16 @@ globalThis.fetch = async (_url, options = {}) => {
   assert.equal(filled.submitted, false);
   assert.doesNotMatch(JSON.stringify(filled), /broker-secret|broker-user/);
   const calls = fs.readFileSync(fetchLog, 'utf8').trim().split('\n').map((line) => JSON.parse(line));
-  // One locate+click+type round trip per field; no submit was declared.
+  // One locate+click+type+verify round trip per field; no submit was declared.
   assert.deepEqual(calls.map((call) => call.body.method), [
-    'evaluateJS', 'dispatchClick', 'typeText',
-    'evaluateJS', 'dispatchClick', 'typeText',
+    'evaluateJS', 'dispatchClick', 'typeText', 'evaluateJS',
+    'evaluateJS', 'dispatchClick', 'typeText', 'evaluateJS',
   ]);
   assert.ok(calls.every((call) => call.body.profileId === 'profile-broker-fill'));
   const evaluateCalls = calls.filter((call) => call.body.method === 'evaluateJS');
   const typeCalls = calls.filter((call) => call.body.method === 'typeText');
   assert.match(evaluateCalls[0].body.params.code, /input\[name=\\"email\\"\]/);
-  assert.match(evaluateCalls[1].body.params.code, /input\[type=\\"password\\"\]/);
+  assert.match(evaluateCalls[2].body.params.code, /input\[type=\\"password\\"\]/);
   for (const call of evaluateCalls) {
     assert.equal(call.body.params.code.includes('broker-user'), false);
     assert.equal(call.body.params.code.includes('broker-secret'), false);
