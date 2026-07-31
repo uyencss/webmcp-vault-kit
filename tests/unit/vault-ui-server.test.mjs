@@ -119,8 +119,8 @@ test('vault UI serves the Lockbox design with strict CSP and no old teal accent'
   assert.match(csp, /script-src 'nonce-/);
   assert.match(csp, /style-src 'nonce-/);
   assert.match(csp, /connect-src 'self'/);
-  assert.match(html, /--paper:\s+#EDEBE6/);
-  assert.match(html, /--live:\s+#C67A1E/);
+  assert.match(html, /--paper:\s+#EDEBE6/i);
+  assert.match(html, /--live:\s+#C67A1E/i);
   assert.match(html, /class="lockcard"/);
   assert.match(html, /Vault is locked/);
   assert.match(html, /WEBMCP_VAULT_KEY/);
