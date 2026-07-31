@@ -22,6 +22,7 @@
       --fs-label: 11px;
       --fs-meta: 12px;
       --fs-body: 14px;
+      --fs-title: 16px;
       --fs-app: 19px;
       --fs-code: 28px;
       --fw-body: 400;
@@ -197,7 +198,7 @@
     .main {
       display: grid;
       grid-template-columns: 220px 300px minmax(0, 1fr);
-      height: 560px;
+      height: clamp(480px, 68vh, 800px);
     }
     .vault-sidebar,
     .rail,
@@ -590,6 +591,59 @@
       border-top: var(--border);
     }
     .actions .danger { margin-left: auto; }
+    .field-row {
+      width: 100%;
+      display: flex;
+      align-items: flex-start;
+      gap: var(--s2);
+    }
+    .field-row input,
+    .field-row textarea { min-width: 0; flex: 1; }
+    .copy-btn {
+      width: 32px;
+      min-height: 38px;
+      display: inline-grid;
+      place-items: center;
+      padding: 0;
+      border: var(--border);
+      border-radius: var(--r-md);
+      background: var(--surface);
+      color: var(--muted);
+      cursor: pointer;
+      flex: none;
+      transition: color var(--dur-fast) var(--ease);
+    }
+    .copy-btn:hover { color: var(--ink); background: var(--sunk); }
+    .copy-btn.copied { color: var(--ok); }
+    .copy-btn .btn-icon { width: 14px; height: 14px; }
+    .open-btn {
+      min-height: 38px;
+      display: inline-grid;
+      place-items: center;
+      padding: 0 var(--s2);
+      border: var(--border);
+      border-radius: var(--r-md);
+      background: var(--surface);
+      color: var(--muted);
+      font-size: var(--fs-meta);
+      font-weight: var(--fw-strong);
+      cursor: pointer;
+      flex: none;
+      text-decoration: none;
+      transition: color var(--dur-fast) var(--ease);
+    }
+    .open-btn:hover { color: var(--ink); background: var(--sunk); }
+    .open-btn .btn-icon { width: 12px; height: 12px; }
+    .dirty-badge {
+      display: none;
+      margin-left: var(--s2);
+      color: var(--live);
+      font-size: var(--fs-label);
+      font-weight: var(--fw-strong);
+      letter-spacing: var(--tracking-label);
+      text-transform: uppercase;
+    }
+    .dirty-badge.visible { display: inline; }
     .inline-status {
       min-height: 18px;
       margin-top: var(--s3);
@@ -832,7 +886,7 @@
         </aside>
 
         <section class="detail" aria-labelledby="detailTitle">
-          <span class="eyebrow" id="detailEyebrow">New login</span>
+          <span class="eyebrow" id="detailEyebrow">New login</span><span class="dirty-badge" id="dirtyBadge" aria-live="polite">• Unsaved</span>
           <h2 id="detailTitle">New Login</h2>
           <form id="itemForm" class="grid">
             <div class="field wide">
@@ -846,17 +900,33 @@
             </div>
             <div class="field">
               <label for="web">Website</label>
-              <input class="mono" id="web" autocomplete="url" maxlength="2048">
+              <div class="field-row">
+                <input class="mono" id="web" autocomplete="url" maxlength="2048">
+                <button class="copy-btn" id="copyWebButton" type="button" aria-label="Copy website URL" title="Copy URL">
+                  <svg class="btn-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none"><rect x="9" y="9" width="10" height="10" rx="2"></rect><path d="M15 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h3"></path></svg>
+                </button>
+                <button class="open-btn hidden" id="openWebButton" type="button" aria-label="Open website in new tab" title="Open in new tab">
+                  <svg class="btn-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6m4-3h6v6m-11 5L21 3"></path></svg>
+                </button>
+              </div>
             </div>
             <div class="field">
               <label for="username">Username</label>
-              <input class="mono" id="username" autocomplete="username" maxlength="512">
+              <div class="field-row">
+                <input class="mono" id="username" autocomplete="username" maxlength="512">
+                <button class="copy-btn" id="copyUsernameButton" type="button" aria-label="Copy username" title="Copy username">
+                  <svg class="btn-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none"><rect x="9" y="9" width="10" height="10" rx="2"></rect><path d="M15 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h3"></path></svg>
+                </button>
+              </div>
             </div>
             <div class="field">
               <label for="password">Password</label>
               <div class="secret-input">
                 <input class="mono" id="password" type="password" autocomplete="new-password" maxlength="8192">
                 <button class="linkbtn" id="passwordRevealButton" type="button" disabled>Reveal</button>
+                <button class="copy-btn" id="copyPasswordButton" type="button" aria-label="Copy password" title="Copy password">
+                  <svg class="btn-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none"><rect x="9" y="9" width="10" height="10" rx="2"></rect><path d="M15 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h3"></path></svg>
+                </button>
               </div>
             </div>
 
@@ -1063,8 +1133,15 @@
         : state.selectedVaultId;
     }
 
-    function vaultGlyph(icon) {
-      return ({ key: 'K', briefcase: 'W', people: 'G', archive: 'A', folder: 'F' })[icon] || 'F';
+    function vaultGlyphSvg(icon) {
+      const svgs = {
+        folder: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>',
+        key: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m21 2-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.78 7.78 5.5 5.5 0 0 1 7.78-7.78Zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4"></path></svg>',
+        briefcase: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>',
+        people: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>',
+        archive: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="5" rx="1"></rect><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"></path><path d="M10 12h4"></path></svg>',
+      };
+      return svgs[icon] || svgs.folder;
     }
 
     function syncVaultSelect(selectedId = '') {
@@ -1095,7 +1172,11 @@
         if (vault.id === state.selectedVaultId) button.setAttribute('aria-current', 'true');
         const glyph = document.createElement('span');
         glyph.className = 'vault-glyph';
-        glyph.textContent = vault.id === 'all' ? String.fromCharCode(9670) : vaultGlyph(vault.icon);
+        if (vault.id === 'all') {
+          glyph.textContent = String.fromCharCode(9670);
+        } else {
+          glyph.innerHTML = vaultGlyphSvg(vault.icon);
+        }
         const name = document.createElement('span');
         name.className = 'vault-name';
         name.textContent = vault.name;
@@ -1383,6 +1464,8 @@
       el('deleteButton').disabled = !state.selectedId;
       for (const field of secretFields) updateSecretUi(field);
       state.formDirty = false;
+      updateDirtyBadge();
+      updateWebButton();
       updateTotpBlock();
       renderList();
     }
@@ -1546,6 +1629,7 @@
     function markSecretDirty(field) {
       state.dirty[field] = true;
       state.formDirty = true;
+      updateDirtyBadge();
       updateSecretUi(field);
     }
 
@@ -1615,7 +1699,7 @@
       const text = String(value || '');
       if (!text) {
         setStatus(label + ' is empty', 'error');
-        return;
+        return false;
       }
       try {
         if (navigator.clipboard && window.isSecureContext) {
@@ -1624,9 +1708,59 @@
           prompt('Copy ' + label, text);
         }
         setStatus('Copied ' + label, 'success');
+        return true;
       } catch (err) {
         setStatus(err.message || 'Copy failed', 'error');
+        return false;
       }
+    }
+
+    function flashCopied(button) {
+      button.classList.add('copied');
+      const original = button.getAttribute('aria-label');
+      button.setAttribute('aria-label', 'Copied!');
+      button.title = 'Copied!';
+      setTimeout(() => {
+        button.classList.remove('copied');
+        button.setAttribute('aria-label', original);
+        button.title = original;
+      }, 1500);
+    }
+
+    async function copyFieldValue(inputId, label, button) {
+      const value = el(inputId).value;
+      const ok = await copyText(value, label);
+      if (ok && button) flashCopied(button);
+    }
+
+    async function copyPasswordField(button) {
+      if (!state.selectedId) {
+        await copyText(el('password').value, 'password');
+        return;
+      }
+      if (state.revealed.password || state.dirty.password) {
+        const ok = await copyText(el('password').value, 'password');
+        if (ok && button) flashCopied(button);
+        return;
+      }
+      try {
+        const payload = await api(
+          '/items/' + encodeURIComponent(state.selectedId) + '/read?field=password',
+        );
+        const ok = await copyText(String(payload.value || ''), 'password');
+        if (ok && button) flashCopied(button);
+      } catch (err) {
+        setStatus(err.message, 'error');
+      }
+    }
+
+    function updateDirtyBadge() {
+      el('dirtyBadge').classList.toggle('visible', state.formDirty);
+    }
+
+    function updateWebButton() {
+      const url = el('web').value.trim();
+      el('openWebButton').classList.toggle('hidden', !url);
     }
 
     el('unlockForm').addEventListener('submit', async (event) => {
@@ -1821,8 +1955,67 @@
     for (const field of ['vaultSelect', 'title', 'web', 'username']) {
       el(field).addEventListener('input', () => {
         state.formDirty = true;
+        updateDirtyBadge();
+        if (field === 'web') updateWebButton();
       });
     }
+    el('copyUsernameButton').addEventListener('click', () => {
+      copyFieldValue('username', 'username', el('copyUsernameButton'));
+    });
+    el('copyWebButton').addEventListener('click', () => {
+      copyFieldValue('web', 'website URL', el('copyWebButton'));
+    });
+    el('copyPasswordButton').addEventListener('click', () => {
+      copyPasswordField(el('copyPasswordButton'));
+    });
+    el('openWebButton').addEventListener('click', () => {
+      const raw = el('web').value.trim();
+      if (!raw) return;
+      const url = raw.includes('://') ? raw : 'https://' + raw;
+      try { window.open(url, '_blank', 'noopener'); } catch { /* ignore */ }
+    });
+    document.addEventListener('keydown', (event) => {
+      if (el('appView').classList.contains('hidden')) return;
+      const active = document.activeElement;
+      const isInput = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT');
+      const isDialog = active && active.closest('dialog[open]');
+      if ((event.metaKey || event.ctrlKey) && event.key === 'k') {
+        event.preventDefault();
+        el('search').focus();
+        el('search').select();
+        return;
+      }
+      if (event.key === '/' && !isInput && !isDialog) {
+        event.preventDefault();
+        el('search').focus();
+        el('search').select();
+        return;
+      }
+      if (event.key === 'Escape' && active === el('search')) {
+        el('search').value = '';
+        el('search').blur();
+        clearTimeout(state.searchTimer);
+        loadItems().catch((err) => setStatus(err.message, 'error'));
+        return;
+      }
+      if (event.key === 'ArrowDown' && (active === el('search') || active?.closest('#itemList'))) {
+        event.preventDefault();
+        const items = Array.from(document.querySelectorAll('#itemList .item'));
+        if (!items.length) return;
+        const idx = items.indexOf(active);
+        const next = items[idx + 1] || items[0];
+        next?.focus();
+        return;
+      }
+      if (event.key === 'ArrowUp' && active?.closest('#itemList')) {
+        event.preventDefault();
+        const items = Array.from(document.querySelectorAll('#itemList .item'));
+        const idx = items.indexOf(active);
+        if (idx > 0) items[idx - 1]?.focus();
+        else el('search').focus();
+        return;
+      }
+    });
     window.addEventListener('beforeunload', (event) => {
       if (!state.formDirty) return;
       event.preventDefault();
