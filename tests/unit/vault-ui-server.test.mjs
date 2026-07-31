@@ -265,6 +265,7 @@ test('vault UI template includes an accessible responsive vault sidebar', async 
   assert.match(html, /id="vaultList"/);
   assert.match(html, /id="newVaultButton"/);
   assert.match(html, /id="vaultDialog"/);
-  assert.match(html, /id="vaultSelect"/);
+  assert.match(html, /id="toggleSidebarButton"/);
+  assert.match(html, /sidebar-collapsed/);
   assert.match(html, /@media \(max-width:\s*760px\)/);
 });
