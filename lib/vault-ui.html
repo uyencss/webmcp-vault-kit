@@ -591,49 +591,55 @@
       border-top: var(--border);
     }
     .actions .danger { margin-left: auto; }
-    .field-row {
-      width: 100%;
+    /* View/Edit mode toggle */
+    .detail.view-mode .edit-only { display: none !important; }
+    .detail.edit-mode .view-only { display: none !important; }
+    .view-field {
+      min-height: 38px;
       display: flex;
-      align-items: flex-start;
-      gap: var(--s2);
-    }
-    .field-row input,
-    .field-row textarea { min-width: 0; flex: 1; }
-    .copy-btn {
-      width: 32px;
-      min-height: 38px;
-      display: inline-grid;
-      place-items: center;
-      padding: 0;
+      align-items: center;
+      padding: 9px 11px;
       border: var(--border);
       border-radius: var(--r-md);
       background: var(--surface);
-      color: var(--muted);
+      color: var(--ink);
+      font-family: var(--font-mono);
+      font-size: var(--fs-body);
       cursor: pointer;
-      flex: none;
-      transition: color var(--dur-fast) var(--ease);
+      user-select: none;
+      transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
-    .copy-btn:hover { color: var(--ink); background: var(--sunk); }
-    .copy-btn.copied { color: var(--ok); }
-    .copy-btn .btn-icon { width: 14px; height: 14px; }
-    .open-btn {
-      min-height: 38px;
-      display: inline-grid;
-      place-items: center;
-      padding: 0 var(--s2);
-      border: var(--border);
-      border-radius: var(--r-md);
-      background: var(--surface);
+    .view-field:hover { background: var(--sunk); border-color: var(--muted); }
+    .view-field.copied {
+      border-color: var(--ok);
+      background: color-mix(in srgb, var(--ok) 8%, var(--surface));
+    }
+    .view-field.masked {
       color: var(--muted);
+      letter-spacing: 0.06em;
+    }
+    .view-field a {
+      color: var(--live);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      cursor: pointer;
+    }
+    .view-field a:hover { color: var(--ink); }
+    .view-field .view-hint {
+      margin-left: auto;
+      padding-left: var(--s3);
+      color: var(--muted);
+      font-family: var(--font-sans);
       font-size: var(--fs-meta);
-      font-weight: var(--fw-strong);
-      cursor: pointer;
-      flex: none;
-      text-decoration: none;
-      transition: color var(--dur-fast) var(--ease);
+      font-weight: var(--fw-medium);
+      opacity: 0;
+      transition: opacity var(--dur-fast) var(--ease);
     }
-    .open-btn:hover { color: var(--ink); background: var(--sunk); }
-    .open-btn .btn-icon { width: 12px; height: 12px; }
+    .view-field:hover .view-hint { opacity: 1; }
+    .view-field.copied .view-hint { color: var(--ok); opacity: 1; }
     .dirty-badge {
       display: none;
       margin-left: var(--s2);
@@ -885,48 +891,36 @@
           </div>
         </aside>
 
-        <section class="detail" aria-labelledby="detailTitle">
-          <span class="eyebrow" id="detailEyebrow">New login</span><span class="dirty-badge" id="dirtyBadge" aria-live="polite">• Unsaved</span>
+        <section class="detail view-mode" aria-labelledby="detailTitle">
+          <span class="eyebrow" id="detailEyebrow">New login</span><span class="dirty-badge edit-only" id="dirtyBadge" aria-live="polite">• Unsaved</span>
           <h2 id="detailTitle">New Login</h2>
           <form id="itemForm" class="grid">
             <div class="field wide">
               <label for="vaultSelect">Vault</label>
-              <select id="vaultSelect" required aria-describedby="vaultSelectHint"></select>
-              <span class="hint" id="vaultSelectHint">Moving an item changes which vault contains it.</span>
+              <span class="view-field view-only" id="vaultViewField" role="button" tabindex="0" aria-label="Copy vault name"></span>
+              <select class="edit-only" id="vaultSelect" required aria-describedby="vaultSelectHint"></select>
+              <span class="hint edit-only" id="vaultSelectHint">Moving an item changes which vault contains it.</span>
             </div>
-            <div class="field">
+            <div class="field edit-only">
               <label for="title">Title</label>
               <input id="title" autocomplete="off" required maxlength="200">
             </div>
             <div class="field">
               <label for="web">Website</label>
-              <div class="field-row">
-                <input class="mono" id="web" autocomplete="url" maxlength="2048">
-                <button class="copy-btn" id="copyWebButton" type="button" aria-label="Copy website URL" title="Copy URL">
-                  <svg class="btn-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none"><rect x="9" y="9" width="10" height="10" rx="2"></rect><path d="M15 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h3"></path></svg>
-                </button>
-                <button class="open-btn hidden" id="openWebButton" type="button" aria-label="Open website in new tab" title="Open in new tab">
-                  <svg class="btn-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6m4-3h6v6m-11 5L21 3"></path></svg>
-                </button>
-              </div>
+              <span class="view-field view-only" id="webViewField" role="button" tabindex="0" aria-label="Click to copy or open website"></span>
+              <input class="mono edit-only" id="web" autocomplete="url" maxlength="2048">
             </div>
             <div class="field">
               <label for="username">Username</label>
-              <div class="field-row">
-                <input class="mono" id="username" autocomplete="username" maxlength="512">
-                <button class="copy-btn" id="copyUsernameButton" type="button" aria-label="Copy username" title="Copy username">
-                  <svg class="btn-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none"><rect x="9" y="9" width="10" height="10" rx="2"></rect><path d="M15 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h3"></path></svg>
-                </button>
-              </div>
+              <span class="view-field view-only" id="usernameViewField" role="button" tabindex="0" aria-label="Click to copy username"><span class="view-hint">Click to copy</span></span>
+              <input class="mono edit-only" id="username" autocomplete="username" maxlength="512">
             </div>
             <div class="field">
               <label for="password">Password</label>
-              <div class="secret-input">
+              <span class="view-field masked view-only" id="passwordViewField" role="button" tabindex="0" aria-label="Click to copy password"><span class="view-hint">Click to copy</span></span>
+              <div class="secret-input edit-only">
                 <input class="mono" id="password" type="password" autocomplete="new-password" maxlength="8192">
                 <button class="linkbtn" id="passwordRevealButton" type="button" disabled>Reveal</button>
-                <button class="copy-btn" id="copyPasswordButton" type="button" aria-label="Copy password" title="Copy password">
-                  <svg class="btn-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none"><rect x="9" y="9" width="10" height="10" rx="2"></rect><path d="M15 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h3"></path></svg>
-                </button>
               </div>
             </div>
 
@@ -949,7 +943,7 @@
               </button>
             </div>
 
-            <div class="field wide">
+            <div class="field wide edit-only">
               <label for="otpSecret">TOTP secret</label>
               <div class="secret-input">
                 <input class="mono" id="otpSecret" type="password" autocomplete="off" maxlength="4096">
@@ -958,18 +952,24 @@
             </div>
             <div class="field wide">
               <label for="note">Note</label>
-              <div class="secret-input">
+              <span class="view-field masked view-only" id="noteViewField" role="button" tabindex="0" aria-label="Click to copy note"><span class="view-hint">Click to copy</span></span>
+              <div class="secret-input edit-only">
                 <textarea class="mono" id="note" maxlength="20000"></textarea>
                 <button class="linkbtn" id="noteRevealButton" type="button" disabled>Reveal</button>
               </div>
             </div>
 
             <div class="actions">
-              <button class="btn primary" type="submit">
+              <button class="btn primary view-only" type="button" id="editButton">
+                <svg class="btn-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path><path d="m15 5 4 4"></path></svg>
+                Edit
+              </button>
+              <button class="btn primary edit-only" type="submit">
                 <svg class="btn-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="m5 12 4 4L19 6"></path></svg>
                 Save
               </button>
-              <button class="btn ghost" type="button" id="revealAllButton" disabled>
+              <button class="btn ghost edit-only" type="button" id="cancelEditButton">Cancel</button>
+              <button class="btn ghost edit-only" type="button" id="revealAllButton" disabled>
                 <svg class="btn-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"></path><circle cx="12" cy="12" r="2.5"></circle></svg>
                 Reveal all
               </button>
@@ -1051,6 +1051,7 @@
       loadSequence: 0,
       selectionSequence: 0,
       formDirty: false,
+      editMode: false,
       csvImport: null,
     };
     const el = (id) => document.getElementById(id);
@@ -1462,10 +1463,12 @@
       el('detailEyebrow').textContent = state.selectedId ? 'Login' : 'New login';
       el('detailTitle').textContent = item.title || 'New Login';
       el('deleteButton').disabled = !state.selectedId;
+      el('editButton').classList.toggle('hidden', !state.selectedId);
       for (const field of secretFields) updateSecretUi(field);
       state.formDirty = false;
       updateDirtyBadge();
-      updateWebButton();
+      updateViewFields();
+      setEditMode(!state.selectedId);
       updateTotpBlock();
       renderList();
     }
@@ -1715,52 +1718,125 @@
       }
     }
 
-    function flashCopied(button) {
-      button.classList.add('copied');
-      const original = button.getAttribute('aria-label');
-      button.setAttribute('aria-label', 'Copied!');
-      button.title = 'Copied!';
+    function setEditMode(editing) {
+      state.editMode = editing;
+      const detail = document.querySelector('.detail');
+      detail.classList.toggle('view-mode', !editing);
+      detail.classList.toggle('edit-mode', editing);
+      if (editing && state.selectedId) {
+        el('title').focus();
+      }
+    }
+
+    function updateViewFields() {
+      const item = state.selectedItem;
+      const vaultName = el('vaultSelect').selectedOptions[0]?.textContent || '';
+      el('vaultViewField').textContent = vaultName;
+
+      const webUrl = el('web').value || '';
+      const webField = el('webViewField');
+      if (webUrl) {
+        const displayUrl = webUrl.replace(/^https?:\/\//, '');
+        webField.innerHTML = '<a href="' + (webUrl.includes('://') ? webUrl : 'https://' + webUrl) +
+          '" target="_blank" rel="noopener" onclick="event.stopPropagation()">' +
+          displayUrl.replace(/</g, '&lt;') + '</a>' +
+          '<span class="view-hint">Click to copy</span>';
+      } else {
+        webField.innerHTML = '<span style="color:var(--muted)">—</span>';
+      }
+
+      const username = el('username').value || '';
+      const usernameField = el('usernameViewField');
+      const usernameText = username || '—';
+      usernameField.innerHTML = (username ? usernameText.replace(/</g, '&lt;') : '<span style="color:var(--muted)">—</span>') +
+        '<span class="view-hint">Click to copy</span>';
+
+      el('passwordViewField').innerHTML = mask + '<span class="view-hint">Click to copy</span>';
+
+      const note = el('note').value;
+      const noteField = el('noteViewField');
+      if (note && !state.revealed.note) {
+        noteField.innerHTML = mask + '<span class="view-hint">Click to copy</span>';
+      } else if (note && state.revealed.note) {
+        noteField.innerHTML = note.replace(/</g, '&lt;').replace(/\n/g, ' ') +
+          '<span class="view-hint">Click to copy</span>';
+        noteField.classList.remove('masked');
+      } else {
+        noteField.innerHTML = '<span style="color:var(--muted)">—</span>';
+      }
+    }
+
+    function flashViewField(fieldEl) {
+      fieldEl.classList.add('copied');
+      const hints = fieldEl.querySelectorAll('.view-hint');
+      hints.forEach((h) => { h.textContent = 'Copied!'; });
       setTimeout(() => {
-        button.classList.remove('copied');
-        button.setAttribute('aria-label', original);
-        button.title = original;
+        fieldEl.classList.remove('copied');
+        hints.forEach((h) => { h.textContent = 'Click to copy'; });
       }, 1500);
     }
 
-    async function copyFieldValue(inputId, label, button) {
-      const value = el(inputId).value;
+    async function handleViewFieldClick(fieldId) {
+      if (state.editMode) return;
+      if (fieldId === 'password') {
+        if (!state.selectedId) return;
+        if (state.revealed.password || state.dirty.password) {
+          const ok = await copyText(el('password').value, 'password');
+          if (ok) flashViewField(el('passwordViewField'));
+          return;
+        }
+        try {
+          const payload = await api(
+            '/items/' + encodeURIComponent(state.selectedId) + '/read?field=password',
+          );
+          const ok = await copyText(String(payload.value || ''), 'password');
+          if (ok) flashViewField(el('passwordViewField'));
+        } catch (err) {
+          setStatus(err.message, 'error');
+        }
+        return;
+      }
+      if (fieldId === 'note') {
+        if (!state.selectedId) return;
+        if (state.revealed.note || state.dirty.note) {
+          const ok = await copyText(el('note').value, 'note');
+          if (ok) flashViewField(el('noteViewField'));
+          return;
+        }
+        try {
+          const payload = await api(
+            '/items/' + encodeURIComponent(state.selectedId) + '/read?field=note',
+          );
+          const ok = await copyText(String(payload.value || ''), 'note');
+          if (ok) flashViewField(el('noteViewField'));
+        } catch (err) {
+          setStatus(err.message, 'error');
+        }
+        return;
+      }
+      const inputMap = { web: 'web', username: 'username', vault: 'vaultSelect' };
+      const labelMap = { web: 'website URL', username: 'username', vault: 'vault name' };
+      const inputId = inputMap[fieldId];
+      const label = labelMap[fieldId];
+      if (!inputId) return;
+      const value = fieldId === 'vault'
+        ? el('vaultSelect').selectedOptions[0]?.textContent || ''
+        : el(inputId).value;
       const ok = await copyText(value, label);
-      if (ok && button) flashCopied(button);
+      if (ok) {
+        const viewFieldId = fieldId + 'ViewField';
+        flashViewField(el(viewFieldId));
+      }
     }
 
-    async function copyPasswordField(button) {
-      if (!state.selectedId) {
-        await copyText(el('password').value, 'password');
-        return;
-      }
-      if (state.revealed.password || state.dirty.password) {
-        const ok = await copyText(el('password').value, 'password');
-        if (ok && button) flashCopied(button);
-        return;
-      }
-      try {
-        const payload = await api(
-          '/items/' + encodeURIComponent(state.selectedId) + '/read?field=password',
-        );
-        const ok = await copyText(String(payload.value || ''), 'password');
-        if (ok && button) flashCopied(button);
-      } catch (err) {
-        setStatus(err.message, 'error');
-      }
+    function cancelEdit() {
+      if (!state.selectedId) return;
+      if (state.formDirty && !confirm('Discard unsaved changes?')) return;
+      selectItem(state.selectedId).catch((err) => setStatus(err.message, 'error'));
     }
 
     function updateDirtyBadge() {
       el('dirtyBadge').classList.toggle('visible', state.formDirty);
-    }
-
-    function updateWebButton() {
-      const url = el('web').value.trim();
-      el('openWebButton').classList.toggle('hidden', !url);
     }
 
     el('unlockForm').addEventListener('submit', async (event) => {
@@ -1956,29 +2032,47 @@
       el(field).addEventListener('input', () => {
         state.formDirty = true;
         updateDirtyBadge();
-        if (field === 'web') updateWebButton();
       });
     }
-    el('copyUsernameButton').addEventListener('click', () => {
-      copyFieldValue('username', 'username', el('copyUsernameButton'));
+    el('editButton').addEventListener('click', () => {
+      if (state.selectedId) setEditMode(true);
     });
-    el('copyWebButton').addEventListener('click', () => {
-      copyFieldValue('web', 'website URL', el('copyWebButton'));
-    });
-    el('copyPasswordButton').addEventListener('click', () => {
-      copyPasswordField(el('copyPasswordButton'));
-    });
-    el('openWebButton').addEventListener('click', () => {
-      const raw = el('web').value.trim();
-      if (!raw) return;
-      const url = raw.includes('://') ? raw : 'https://' + raw;
-      try { window.open(url, '_blank', 'noopener'); } catch { /* ignore */ }
-    });
+    el('cancelEditButton').addEventListener('click', () => cancelEdit());
+    for (const [fieldId, viewFieldId] of [
+      ['vault', 'vaultViewField'],
+      ['web', 'webViewField'],
+      ['username', 'usernameViewField'],
+      ['password', 'passwordViewField'],
+      ['note', 'noteViewField'],
+    ]) {
+      const handler = () => handleViewFieldClick(fieldId);
+      el(viewFieldId).addEventListener('click', handler);
+      el(viewFieldId).addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handler(); }
+      });
+    }
     document.addEventListener('keydown', (event) => {
       if (el('appView').classList.contains('hidden')) return;
       const active = document.activeElement;
       const isInput = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT');
       const isDialog = active && active.closest('dialog[open]');
+      if ((event.metaKey || event.ctrlKey) && event.key === 'e') {
+        event.preventDefault();
+        if (isDialog) return;
+        if (state.editMode) {
+          cancelEdit();
+        } else if (state.selectedId) {
+          setEditMode(true);
+        }
+        return;
+      }
+      if ((event.metaKey || event.ctrlKey) && event.key === 's') {
+        event.preventDefault();
+        if (state.editMode) {
+          el('itemForm').requestSubmit();
+        }
+        return;
+      }
       if ((event.metaKey || event.ctrlKey) && event.key === 'k') {
         event.preventDefault();
         el('search').focus();
@@ -1991,12 +2085,19 @@
         el('search').select();
         return;
       }
-      if (event.key === 'Escape' && active === el('search')) {
-        el('search').value = '';
-        el('search').blur();
-        clearTimeout(state.searchTimer);
-        loadItems().catch((err) => setStatus(err.message, 'error'));
-        return;
+      if (event.key === 'Escape') {
+        if (state.editMode) {
+          event.preventDefault();
+          cancelEdit();
+          return;
+        }
+        if (active === el('search')) {
+          el('search').value = '';
+          el('search').blur();
+          clearTimeout(state.searchTimer);
+          loadItems().catch((err) => setStatus(err.message, 'error'));
+          return;
+        }
       }
       if (event.key === 'ArrowDown' && (active === el('search') || active?.closest('#itemList'))) {
         event.preventDefault();
