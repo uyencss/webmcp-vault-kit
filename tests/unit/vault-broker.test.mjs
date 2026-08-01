@@ -42,7 +42,7 @@ test('fillLoginFormWithLease consumes lease fields and returns only a redacted r
         if (params.code.includes('crypto.subtle.digest')) return { result: { tabId: 1, result: { match: true } } };
         return { result: { tabId: 1, result: { x: 12, y: 34, tag: 'input', name: 'email', type: 'text' } } };
       }
-      if (method === 'type') return { result: { tabId: 1, typed: String(params.text || '').length } };
+      if (method === 'webmcp.invokeTool') return { result: { tabId: 1, ok: true } };
       return { ok: true };
     },
   };
@@ -67,17 +67,17 @@ test('fillLoginFormWithLease consumes lease fields and returns only a redacted r
   assert.equal(receipt.status, 'completed');
   assert.deepEqual(receipt.fields, ['username', 'password']);
   assert.equal(receipt.submitted, true);
-  // One locate+type+verify round trip per field, plus one final
+  // One locate+form-fill+verify round trip per field, plus one final
   // submit script and stability wait.
   const methodNames = calls.map((call) => call.method);
   assert.deepEqual(methodNames, [
-    'evaluateJS', 'type', 'evaluateJS',
-    'evaluateJS', 'type', 'evaluateJS',
+    'evaluateJS', 'webmcp.invokeTool', 'evaluateJS',
+    'evaluateJS', 'webmcp.invokeTool', 'evaluateJS',
     'evaluateJS', 'waitForStable',
   ]);
   assert.deepEqual(methodNames.slice(-2), ['evaluateJS', 'waitForStable']);
   const evaluateCalls = calls.filter((call) => call.method === 'evaluateJS');
-  const typeCalls = calls.filter((call) => call.method === 'type');
+  const typeCalls = calls.filter((call) => call.method === 'webmcp.invokeTool');
   // Selectors reach the page as JavaScript source; secrets never do.
   assert.match(evaluateCalls[0].params.code, /#email/);
   assert.match(evaluateCalls[1].params.code, /#email/);
@@ -88,9 +88,9 @@ test('fillLoginFormWithLease consumes lease fields and returns only a redacted r
     assert.equal(call.params.code.includes('broker-user'), false);
     assert.equal(call.params.code.includes('broker-secret'), false);
   }
-  // The leased secret is only ever sent as CDP text command parameters,
+  // The leased secret is only ever sent as form-helper command parameters,
   // never as a substring of evaluated page code.
-  assert.deepEqual(typeCalls.map((call) => call.params.text), ['broker-user', 'broker-secret']);
+  assert.deepEqual(typeCalls.map((call) => call.params.input.value), ['broker-user', 'broker-secret']);
   for (const call of calls) assert.equal(call.params.profileId, 'profile-secret-id');
   assert.equal(JSON.stringify(receipt).includes('broker-secret'), false);
   assert.equal(JSON.stringify(receipt).includes('broker-user'), false);
@@ -149,9 +149,10 @@ test('fillLoginFormWithLease can submit with a real click on a declared button',
 
   assert.equal(receipt.submitted, true);
   const methodNames = calls.map((call) => call.method);
-  assert.equal(methodNames.filter((method) => method === 'type').length, 2);
-  assert.deepEqual(methodNames.slice(-2), ['click', 'waitForStable']);
-  assert.deepEqual(calls.at(-2).params, { selector: 'button[type="submit"]', profileId: 'profile-secret-id' });
+  assert.equal(methodNames.filter((method) => method === 'webmcp.invokeTool').length, 2);
+  assert.deepEqual(methodNames.slice(-3), ['evaluateJS', 'dispatchClick', 'waitForStable']);
+  assert.match(calls.at(-3).params.code, /button\[type=\\"submit\\"\]/);
+  assert.deepEqual(calls.at(-2).params, { x: 88, y: 99, profileId: 'profile-secret-id' });
   assert.equal(calls.at(-1).params.profileId, 'profile-secret-id');
   for (const call of calls.filter((entry) => entry.method === 'evaluateJS')) {
     assert.equal(call.params.code.includes('click-user'), false);
