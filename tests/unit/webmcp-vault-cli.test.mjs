@@ -275,14 +275,15 @@ globalThis.fetch = async (_url, options = {}) => {
   assert.equal(filled.submitted, false);
   assert.doesNotMatch(JSON.stringify(filled), /broker-secret|broker-user/);
   const calls = fs.readFileSync(fetchLog, 'utf8').trim().split('\n').map((line) => JSON.parse(line));
-  // One locate+click+type+verify round trip per field; no submit was declared.
-  assert.deepEqual(calls.map((call) => call.body.method), [
-    'evaluateJS', 'dispatchClick', 'typeText', 'evaluateJS',
-    'evaluateJS', 'dispatchClick', 'typeText', 'evaluateJS',
+  // One locate+type+verify round trip per field; no submit was declared.
+  const methodNames = calls.map((call) => call.body.method);
+  assert.deepEqual(methodNames, [
+    'evaluateJS', 'type', 'evaluateJS',
+    'evaluateJS', 'type', 'evaluateJS',
   ]);
   assert.ok(calls.every((call) => call.body.profileId === 'profile-broker-fill'));
   const evaluateCalls = calls.filter((call) => call.body.method === 'evaluateJS');
-  const typeCalls = calls.filter((call) => call.body.method === 'typeText');
+  const typeCalls = calls.filter((call) => call.body.method === 'type');
   assert.match(evaluateCalls[0].body.params.code, /input\[name=\\"email\\"\]/);
   assert.match(evaluateCalls[2].body.params.code, /input\[type=\\"password\\"\]/);
   for (const call of evaluateCalls) {
@@ -290,8 +291,8 @@ globalThis.fetch = async (_url, options = {}) => {
     assert.equal(call.body.params.code.includes('broker-secret'), false);
     assert.equal(Object.hasOwn(call.body.params, 'text'), false);
   }
-  // Secrets travel only as typeText command parameters (CDP Input.insertText),
-  // never serialized into page JavaScript.
+  // Secrets travel only as CDP text command parameters, never serialized into
+  // page JavaScript.
   assert.deepEqual(typeCalls.map((call) => call.body.params.text), ['broker-user', 'broker-secret']);
   assert.ok(calls.every((call) => call.authorization === 'Bearer gateway-token'));
 
