@@ -72,7 +72,7 @@ test('fillLoginFormWithLease consumes lease fields and returns only a redacted r
   assert.deepEqual(calls.map((call) => call.method), [
     'evaluateJS', 'dispatchClick', 'typeText', 'evaluateJS',
     'evaluateJS', 'dispatchClick', 'typeText', 'evaluateJS',
-    'evaluateJS',
+    'evaluateJS', 'waitForStable',
   ]);
   const evaluateCalls = calls.filter((call) => call.method === 'evaluateJS');
   const typeCalls = calls.filter((call) => call.method === 'typeText');
@@ -93,6 +93,70 @@ test('fillLoginFormWithLease consumes lease fields and returns only a redacted r
   assert.equal(JSON.stringify(receipt).includes('broker-secret'), false);
   assert.equal(JSON.stringify(receipt).includes('broker-user'), false);
   assert.equal(JSON.stringify(receipt).includes('profile-secret-id'), false);
+});
+
+test('fillLoginFormWithLease can submit with a real click on a declared button', async () => {
+  const store = createVaultStore({ dataDir: tempHome(), key: 'broker-click-key' });
+  store.init();
+  const item = store.createItem({
+    title: 'Broker Login',
+    web: 'https://broker-click.example.test/login',
+    username: 'click-user',
+    password: 'click-secret',
+  });
+  const lease = store.issueLease({
+    itemId: item.id,
+    receiptDigest: 'receipt-digest',
+    runId: 'run-broker',
+    nodeId: 'node-broker',
+    principalId: 'principal-broker',
+    profileBindingId: 'binding-broker',
+    siteOrigin: 'https://broker-click.example.test/login',
+    purpose: 'login',
+    fields: ['username', 'password'],
+    maxUses: 2,
+  });
+  const calls = [];
+  const gateway = {
+    async call(method, params) {
+      calls.push({ method, params });
+      if (method === 'evaluateJS') {
+        if (params.code.includes('crypto.subtle.digest')) return { result: { result: { match: true } } };
+        if (params.code.includes('button[type=\\"submit\\"]')) return { result: { result: { x: 88, y: 99, tag: 'button', type: 'submit' } } };
+        return { result: { result: { x: 12, y: 34, tag: 'input', name: 'email', type: 'text' } } };
+      }
+      return { result: { ok: true } };
+    },
+  };
+
+  const receipt = await fillLoginFormWithLease({
+    store,
+    gateway,
+    leaseId: lease.lease.leaseId,
+    token: lease.token,
+    siteOrigin: 'https://broker-click.example.test',
+    profileBindingId: 'binding-broker',
+    purpose: 'login',
+    profileId: 'profile-secret-id',
+    submit: { selector: 'button[type="submit"]', mode: 'click' },
+    fields: {
+      username: { selector: '#email' },
+      password: { selector: '#password' },
+    },
+  });
+
+  assert.equal(receipt.submitted, true);
+  assert.deepEqual(calls.map((call) => call.method), [
+    'evaluateJS', 'dispatchClick', 'typeText', 'evaluateJS',
+    'evaluateJS', 'dispatchClick', 'typeText', 'evaluateJS',
+    'evaluateJS', 'dispatchClick', 'waitForStable',
+  ]);
+  assert.deepEqual(calls.at(-2).params, { x: 88, y: 99, profileId: 'profile-secret-id' });
+  assert.equal(calls.at(-1).params.profileId, 'profile-secret-id');
+  for (const call of calls.filter((entry) => entry.method === 'evaluateJS')) {
+    assert.equal(call.params.code.includes('click-user'), false);
+    assert.equal(call.params.code.includes('click-secret'), false);
+  }
 });
 
 // `Input.insertText` writes to whatever element holds focus, so a focus change
