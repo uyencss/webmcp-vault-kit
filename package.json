@@ -35,8 +35,8 @@
   "scripts": {
     "ui": "node bin/webmcp-vault.mjs ui",
     "test:ui": "node tests/unit/vault-ui-server.test.mjs",
-    "test": "node tests/unit/approval-receipt.test.mjs && node tests/unit/vault-broker.test.mjs && node tests/unit/vault-store.test.mjs && node tests/unit/webmcp-vault-cli.test.mjs && node tests/unit/vault-ui-server.test.mjs && node tests/unit/vault-csv-import.test.mjs && node tests/unit/vault-package.test.mjs",
-    "test:coverage": "node --experimental-test-coverage --test tests/unit/approval-receipt.test.mjs tests/unit/vault-broker.test.mjs tests/unit/vault-store.test.mjs tests/unit/webmcp-vault-cli.test.mjs tests/unit/vault-ui-server.test.mjs tests/unit/vault-csv-import.test.mjs tests/unit/vault-package.test.mjs"
+    "test": "node tests/unit/approval-receipt.test.mjs && node tests/unit/vault-broker.test.mjs && node tests/unit/vault-store.test.mjs && node tests/unit/vault-leases.test.mjs && node tests/unit/vault-typed.test.mjs && node tests/unit/webmcp-vault-cli.test.mjs && node tests/unit/vault-ui-server.test.mjs && node tests/unit/vault-csv-import.test.mjs && node tests/unit/vault-envfile.test.mjs && node tests/unit/vault-package.test.mjs",
+    "test:coverage": "node --experimental-test-coverage --test tests/unit/approval-receipt.test.mjs tests/unit/vault-broker.test.mjs tests/unit/vault-store.test.mjs tests/unit/vault-leases.test.mjs tests/unit/vault-typed.test.mjs tests/unit/webmcp-vault-cli.test.mjs tests/unit/vault-ui-server.test.mjs tests/unit/vault-csv-import.test.mjs tests/unit/vault-envfile.test.mjs tests/unit/vault-package.test.mjs"
   },
   "engines": {
     "node": ">=18"

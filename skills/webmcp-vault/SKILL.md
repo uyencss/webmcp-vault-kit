@@ -1,6 +1,6 @@
 ---
 name: webmcp-vault
-description: Resolve and read credentials from the local encrypted WebMCP vault. Use when an agent needs a stored username, password, one-time password/TOTP, website, title, or note for a browser automation task, via the `webmcp-vault` CLI (or the `webmcp vault` bridge in the browser-automation kit).
+description: Resolve and read credentials from the local encrypted WebMCP vault. Use when an agent needs a stored username, password, one-time password/TOTP, website, title, or note for a browser automation task, or a typed credential (API token, SSH key, env var) for a headless Bash/API workflow step, via the `webmcp-vault` CLI (or the `webmcp vault` bridge in the browser-automation kit).
 ---
 
 # WebMCP Vault
@@ -118,6 +118,69 @@ When the UI server inherits a configured key, its lock screen provides a
 one-click configured-key unlock without exposing that key to browser storage.
 CSV import displays a redacted preview and requires confirmation before writing.
 
+## Typed Credentials (API Token, SSH Key, Env Bundle)
+
+Beyond website logins, the vault also stores `api_token`, `ssh_key`, and `env`
+items. Each holds a `fields[]` list instead of the login columns; every field
+has an explicit `secret` flag. These types are meant for automation (Bash/API
+workflow steps), not browser autofill.
+
+Read one named field the same way as a login field:
+
+```bash
+webmcp vault read <item-id> token --json          # api_token
+webmcp vault read <item-id> private_key --json     # ssh_key
+webmcp vault read <item-id> DATABASE_URL --json    # env (case-sensitive key)
+```
+
+`env` field names are matched case-sensitively (env vars are case-sensitive);
+`api_token`/`ssh_key` field names fall back to a case-insensitive match if the
+exact name isn't found. `list`/`get` without `--reveal` redact every field to
+`{ name, secret, hasValue }` — never a value.
+
+Create an `api_token` or `ssh_key` item with `create --stdin-json`, the same
+command used for logins. Piping JSON keeps a multi-line PEM's newlines intact:
+
+```bash
+printf '%s' '{"type":"api_token","title":"OpenAI prod","fields":[{"name":"token","value":"sk-...","secret":true},{"name":"scopes","value":"files,responses","secret":false}]}' \
+  | webmcp vault create --stdin-json --json
+
+printf '%s' '{"type":"ssh_key","title":"deploy host","fields":[{"name":"private_key","value":"-----BEGIN OPENSSH PRIVATE KEY-----\n...\n-----END OPENSSH PRIVATE KEY-----","secret":true},{"name":"host","value":"deploy.example.com","secret":false}]}' \
+  | webmcp vault create --stdin-json --json
+```
+
+`api_token` requires a secret `token` field; `ssh_key` requires a secret
+`private_key` field. `type` cannot change after creation.
+
+Import a whole `.env` file as one `env` item (comments, blank lines, an
+optional `export ` prefix, and quoted values are all supported; every parsed
+key defaults to `secret: true`):
+
+```bash
+webmcp vault env-import ./app.env --title "prod env" --preview --json   # dry-run preview first
+webmcp vault env-import ./app.env --title "prod env" --json             # commit
+webmcp vault env-import ./app.env --title "prod env" --project my-app --json  # tag a non-secret projectId field
+webmcp vault env-import ./app.env --title "prod env" --vault work --json     # target a specific vault
+```
+
+`--preview` never writes to the vault and never prints a value — only field
+names and presence. `--project <id>` adds a non-secret `projectId` field to
+the created item; it is not read out of the `.env` file's own content.
+
+Lease a typed secret field under a signed approval, then use it (no
+`--web`/`siteOrigin` needed — typed secrets are not origin-scoped):
+
+```bash
+printf '%s' '{"itemId":"<item-id>","fields":["token"],"purpose":"deploy","profileBindingId":"<binding-id>","runId":"<run-id>","nodeId":"<node-id>","principalId":"<principal-id>","receiptDigest":"<digest>"}' \
+  | webmcp vault lease issue --stdin-json --json
+
+webmcp vault lease read --lease-id <lease-id> --token <lease-token> --field token \
+  --profile-binding-id <binding-id> --purpose deploy --json
+```
+
+The lease only authorizes a field the item actually declares `secret: true`;
+a non-secret or undeclared field is rejected at issue time.
+
 ## Vault Folder Management
 
 The vault organizes items into named folders (inspired by 1Password/Apple
@@ -188,6 +251,10 @@ before changing the active vault and reports only redacted key-strength buckets.
   `--stdin-json`, `--input-json`, or the local UI.
 - If a query matches multiple items, resolve by website, vault folder, or ask
   for the intended account instead of guessing.
-- When importing CSV, always `--preview` first before committing the import.
+- When importing CSV or a `.env` file, always `--preview` first before
+  committing the import.
+- SSH keys, API tokens, and env values are for automation (Bash/API steps),
+  not browser autofill; resolve them with `read`/`lease read`, never expect
+  them to fill a form field.
 - Keep resolved secret values scoped to the immediate browser action; never
   persist them in run history, workflow artifacts, or log files.

@@ -58,6 +58,7 @@ Usage:
   webmcp-vault create (--stdin-json | --input-json <file>) [--vault <vault-id>] [--json]
   webmcp-vault update <id-or-query> (--stdin-json | --input-json <file>) [--vault <vault-id>] [--json]
   webmcp-vault import <file.csv> [--preview] [--vault <vault-id>] [--json]
+  webmcp-vault env-import <file.env> --title <title> [--vault <vault-id>] [--project <id>] [--preview] [--json]
   webmcp-vault backup [--output <file>] [--force] [--json]
   webmcp-vault rotate-key --new-key-file <file> [--backup-output <file>] [--force-backup] [--json]
   webmcp-vault restore <backup.enc.json> --force [--json]
@@ -93,7 +94,21 @@ Secure input examples:
 
   webmcp-vault read --web https://github.com password --json
   webmcp-vault list --vault personal --json
-  webmcp-vault create-vault --name Work --icon briefcase --json`);
+  webmcp-vault create-vault --name Work --icon briefcase --json
+
+Typed credential recipes (api_token, ssh_key, env — see docs/ARCHITECTURE.md):
+  printf '{"type":"api_token","title":"OpenAI prod","fields":[{"name":"token","value":"sk-...","secret":true}]}' \\
+    | webmcp-vault create --stdin-json --json
+  webmcp-vault read "OpenAI prod" token
+
+  # ssh_key: pipe JSON so a multi-line PEM travels intact (newlines preserved).
+  printf '{"type":"ssh_key","title":"deploy host","fields":[{"name":"private_key","value":"-----BEGIN OPENSSH PRIVATE KEY-----\\n...\\n-----END OPENSSH PRIVATE KEY-----","secret":true},{"name":"host","value":"deploy.example.com","secret":false}]}' \\
+    | webmcp-vault create --stdin-json --json
+  webmcp-vault read "deploy host" private_key
+
+  webmcp-vault env-import app.env --title "prod env" --project my-app --preview --json
+  webmcp-vault env-import app.env --title "prod env" --project my-app --json
+  webmcp-vault read "prod env" DATABASE_URL`);
 }
 
 function loopbackGatewayApi(value = 'http://127.0.0.1:7865/api') {
@@ -282,6 +297,39 @@ async function run(args) {
       json,
       `Imported ${summary.createdCount} item(s), skipped ${summary.skipped} duplicate(s)${summary.errors.length ? `, ${summary.errors.length} error(s)` : ''}.`,
     );
+    return;
+  }
+
+  if (subcommand === 'env-import') {
+    const filePath = positional[0];
+    if (!filePath) {
+      throw new Error('Usage: webmcp-vault env-import <file.env> --title <title> [--vault <vault-id>] [--project <id>] [--preview] [--json]');
+    }
+    const title = flags.title && flags.title !== true ? String(flags.title) : '';
+    if (!title) throw new Error('env-import requires --title <title>.');
+    const projectId = flags.project && flags.project !== true ? String(flags.project) : undefined;
+    const text = readFileSync(resolve(process.cwd(), filePath), 'utf8');
+    const { parseEnvFile, redactEnvImportPreview } = requireFromBin(resolve(ROOT, 'lib', 'vault', 'envfile.js'));
+    const { item, errors } = parseEnvFile(text, { title, projectId });
+    if (errors.length > 0) {
+      printJsonOrHuman({ errors }, json, `env-import failed: ${errors.map((entry) => entry.error).join('; ')}`);
+      process.exitCode = 1;
+      return;
+    }
+    if (flags.vault) item.vaultId = String(flags.vault);
+    if (flags.preview) {
+      const preview = redactEnvImportPreview(item);
+      printJsonOrHuman(preview, json, `Preview: "${preview.title}" with ${preview.fields.length} field(s).`);
+      return;
+    }
+    const summary = store.importItems([item]);
+    if (summary.errors.length > 0) {
+      printJsonOrHuman(summary, json, `env-import failed: ${summary.errors.map((entry) => entry.error).join('; ')}`);
+      process.exitCode = 1;
+      return;
+    }
+    const created = summary.created[0];
+    printJsonOrHuman({ item: created }, json, `Created vault item ${created.id} from ${filePath}`);
     return;
   }
 

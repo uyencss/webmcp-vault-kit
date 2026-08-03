@@ -324,3 +324,106 @@ test('vault UI template includes an accessible responsive vault sidebar', async 
   const vaultsJs = await (await fetch(`http://127.0.0.1:${ui.port}/assets/app/vaults.js`)).text();
   assert.match(vaultsJs, /onSelectVault/);
 });
+
+test('vault UI Phase 3: type selector and dynamic typed-fields region are served', async (t) => {
+  const oldHome = process.env.WEBMCP_HOME;
+  process.env.WEBMCP_HOME = tempHome();
+  const ui = await startVaultUiServer({ host: '127.0.0.1', port: 0 });
+  t.after(() => {
+    ui.server.close();
+    if (oldHome === undefined) delete process.env.WEBMCP_HOME;
+    else process.env.WEBMCP_HOME = oldHome;
+  });
+
+  const html = await (await fetch(ui.url)).text();
+  assert.match(html, /id="typeField"/);
+  assert.match(html, /<select id="itemType">/);
+  assert.match(html, /<option value="login">Login<\/option>/);
+  assert.match(html, /<option value="api_token">API token<\/option>/);
+  assert.match(html, /<option value="ssh_key">SSH key<\/option>/);
+  assert.match(html, /<option value="env">Env bundle<\/option>/);
+  assert.match(html, /Type cannot be changed after an item is created\./);
+  assert.match(html, /id="typedFieldsSection"/);
+  assert.match(html, /id="fieldsList"/);
+  assert.match(html, /id="addFieldButton"/);
+  // The existing login-only fields must still be present, just marked so
+  // they can be hidden for non-login types.
+  assert.match(html, /class="field type-login-field"[\s\S]*?id="webViewField"/);
+
+  const configJs = await (await fetch(`http://127.0.0.1:${ui.port}/assets/app/config.js`)).text();
+  assert.match(configJs, /export const typeTemplates/);
+  assert.match(configJs, /export const typeLabels/);
+  assert.match(configJs, /api_token/);
+  assert.match(configJs, /ssh_key/);
+
+  const controllerJs = await (await fetch(`http://127.0.0.1:${ui.port}/assets/app/controller.js`)).text();
+  assert.match(controllerJs, /renderTypedFieldRows/);
+  assert.match(controllerJs, /formPayload/);
+
+  const viewFieldsJs = await (await fetch(`http://127.0.0.1:${ui.port}/assets/app/view-fields.js`)).text();
+  assert.match(viewFieldsJs, /buildTypedFieldViewNode/);
+
+  const secretsJs = await (await fetch(`http://127.0.0.1:${ui.port}/assets/app/secrets.js`)).text();
+  assert.match(secretsJs, /revealTypedField/);
+
+  const itemListJs = await (await fetch(`http://127.0.0.1:${ui.port}/assets/app/item-list.js`)).text();
+  assert.match(itemListJs, /item-type-badge/);
+});
+
+test('vault UI Phase 3: typed items round-trip through the UI API without leaking secrets, login items unchanged', async (t) => {
+  const oldHome = process.env.WEBMCP_HOME;
+  process.env.WEBMCP_HOME = tempHome();
+  const ui = await startVaultUiServer({ host: '127.0.0.1', port: 0 });
+  t.after(() => {
+    ui.server.close();
+    if (oldHome === undefined) delete process.env.WEBMCP_HOME;
+    else process.env.WEBMCP_HOME = oldHome;
+  });
+
+  const headers = {
+    'Content-Type': 'application/json',
+    'x-webmcp-vault-token': ui.token,
+    'x-webmcp-vault-key': 'phase3-ui-test-key',
+  };
+  const base = `http://127.0.0.1:${ui.port}/api`;
+  await fetch(`${base}/init`, { method: 'POST', headers });
+
+  const created = await (await fetch(`${base}/items`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      type: 'api_token',
+      title: 'UI Token',
+      fields: [
+        { name: 'token', value: 'sk-ui-secret', secret: true },
+        { name: 'scopes', value: 'files', secret: false },
+      ],
+    }),
+  })).json();
+  assert.equal(created.item.type, 'api_token');
+  assert.deepEqual(created.item.fields, [
+    { name: 'token', secret: true, hasValue: true },
+    { name: 'scopes', secret: false, hasValue: true },
+  ]);
+
+  const listed = await (await fetch(`${base}/items`, { headers })).json();
+  assert.equal(listed.count, 1);
+  assert.equal(JSON.stringify(listed).includes('sk-ui-secret'), false);
+
+  const revealed = await (await fetch(
+    `${base}/items/${created.item.id}/read?field=token`,
+    { headers },
+  )).json();
+  assert.equal(revealed.value, 'sk-ui-secret');
+
+  // Login items keep their existing redacted shape (additive `type` only).
+  const loginCreated = await (await fetch(`${base}/items`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ title: 'UI Login Unchanged', web: 'https://ui2.example.test', username: 'u2', password: 'p2' }),
+  })).json();
+  assert.equal(loginCreated.item.type, 'login');
+  assert.equal(Object.hasOwn(loginCreated.item, 'fields'), false);
+  assert.equal(Object.hasOwn(loginCreated.item, 'password'), false);
+  assert.equal(loginCreated.item.hasPassword, true);
+});

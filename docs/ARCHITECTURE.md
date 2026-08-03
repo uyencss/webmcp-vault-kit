@@ -20,7 +20,8 @@ packages/webmcp-vault-kit/
 │   ├── envelope.js             # scrypt KDF, AES-256-GCM vault envelope crypto
 │   ├── totp.js                 # RFC 6238 TOTP calculation & Base32 decoding
 │   ├── model.js                # String/item normalization, redaction, search & item resolution
-│   ├── csv.js                  # CSV parser, header alias mapping, import planning
+│   ├── csv.js                  # CSV parser, header alias mapping, import planning (login items only)
+│   ├── envfile.js              # `.env` parser → a single `type:'env'` item input (D6)
 │   ├── leases.js               # Scoped short-lived credential lease store & lifecycle API
 │   └── backup.js               # Verified backup creation, key rotation, and safe restore
 ├── lib/ui-server.js            # Local token-gated web UI server and REST API
@@ -96,6 +97,16 @@ bridges.
 Read commands are scriptable with `--json`. Write commands accept JSON via
 stdin or files so secrets are not placed in shell arguments.
 
+Typed credentials are created the same way as any other item —
+`create --stdin-json` with a `type` and `fields[]` — since a multi-line PEM or
+a token string travels intact through JSON on stdin. There is no separate
+create subcommand for `api_token`/`ssh_key`. `env` bundles additionally get a
+dedicated importer: `webmcp-vault env-import <file.env> --title <t> [--vault
+<id>] [--project <id>] [--preview]` parses a `.env`-style file
+(`lib/vault/envfile.js`) into one `type:'env'` item and either previews it
+(redacted — field names and presence only, never values) or creates it via
+the same `store.importItems` path CSV import uses.
+
 ### UI Server
 
 `startVaultUiServer()` starts a local HTTP server that serves:
@@ -122,7 +133,11 @@ without revealing secret fields. Deleting a populated vault requires a valid
 
 ## Data Model
 
-The decrypted vault payload is versioned:
+The decrypted vault payload is versioned. Every item has a `type` (`login`,
+`api_token`, `ssh_key`, or `env`); a missing `type` hydrates to `login`. Login
+items keep their original flat shape untouched — the autofill path, the
+browser-kit bridge, and existing leases do not change. Every other type stores
+its data in a generic `fields[]` bag instead:
 
 ```json
 {
@@ -144,6 +159,7 @@ The decrypted vault payload is versioned:
     {
       "id": "uuid",
       "vaultId": "personal",
+      "type": "login",
       "title": "GitHub",
       "web": "https://github.com",
       "username": "user@example.com",
@@ -152,19 +168,90 @@ The decrypted vault payload is versioned:
       "note": "optional note",
       "createdAt": "ISO timestamp",
       "updatedAt": "ISO timestamp"
+    },
+    {
+      "id": "uuid",
+      "vaultId": "personal",
+      "type": "api_token",
+      "title": "OpenAI prod",
+      "fields": [
+        { "name": "token", "value": "sk-...", "secret": true },
+        { "name": "scopes", "value": "files,responses", "secret": false }
+      ],
+      "createdAt": "ISO timestamp",
+      "updatedAt": "ISO timestamp"
     }
   ]
 }
 ```
 
-List and resolve operations return redacted item metadata by default:
+### Typed items (`api_token`, `ssh_key`, `env`)
+
+Each field object is `{ name, value, secret }` (`lib/vault/model.js`):
+
+- `name` — required, unique within the item (case-sensitive). `env` items
+  restrict names to `^[A-Za-z_][A-Za-z0-9_]*$` (shell-safe env var names,
+  case-sensitive lookup); other typed items allow
+  `^[A-Za-z_][A-Za-z0-9_.-]*$`. Max 128 characters.
+- `value` — a string; secret values are stored untrimmed. Non-secret values
+  cap at 4096 characters, secret values at 32768 (enough for an encrypted
+  RSA‑8192 PEM plus passphrase).
+- `secret` — required boolean; governs redaction and lease eligibility.
+
+An item holds at most 256 fields. `api_token` requires a secret `token`
+field; `ssh_key` requires a secret `private_key` field; `env` requires at
+least one field (every parsed key defaults `secret: true`). These per-type
+requirements are template/validation hints only — an `env` item can hold any
+keys beyond that.
+
+`type` is immutable after creation (`normalizeItemInput` rejects a `type`
+change on update).
+
+### Redaction / reveal
+
+List and resolve operations return redacted item metadata by default. For
+`login` items this is unchanged:
 
 - `hasPassword`
 - `hasOtp`
 - `hasNote`
 
-Sensitive values are returned only by `readField()` or `getItem(..., { reveal:
-true })`.
+For typed items, `redactItem` adds a `fields` array with presence only, never
+a value:
+
+```json
+"fields": [{ "name": "token", "secret": true, "hasValue": true }]
+```
+
+Sensitive values are returned only by `readField()` / `read <id> <field>`, or
+`getItem(..., { reveal: true })` / `get <id> --reveal`, which for typed items
+returns `fields: [{ name, secret, value }]`.
+
+`readFieldFromItem(item, field)` keeps the exact current login field mapping
+(`username`, `password`, `otp`, `note`, `web`, `title`, ...). For typed items
+it looks the name up in `fields[]`: `env` uses an exact, case-sensitive match
+(env vars are case-sensitive); `api_token`/`ssh_key` try an exact match, then
+fall back to a case-insensitive one. An unknown field throws, same as today.
+
+Search (`itemMatchesSearch`/`resolveItem`) extends its haystack with `type`
+and any **non-secret** field value; secret values are never searchable.
+
+### Storage migration (v1 → v2, lazy write)
+
+`decryptVault` accepts payload `version ∈ {1, 2}`. On load, any item missing a
+`type` is stamped `type: 'login'` in memory (existing login items are left
+otherwise untouched). This migration is **lazy on write**: `encryptVault`
+computes `payloadVersion(vault)` — `2` if any item is typed (has a `type`
+other than `'login'`, or a `fields` array), else `1` — and stamps
+`vault.version` with that value immediately before serializing.
+`emptyVault()` still starts at `version: 1`.
+
+Net effect: a login-only vault is read and re-written as `version: 1` and
+stays readable by an older binary. A vault becomes `version: 2` only once it
+holds its first typed item. This matters because the vault-kit ships as
+multiple physical copies (source, the installer bundle snapshot, and the
+desktop app's `file:` dependency) — a freshly-installed node running an older
+binary must not choke on a v2 file it has never seen a typed item for.
 
 Vault names are unique case-insensitively. Every item must reference an
 existing vault, and the default vault cannot be deleted. Legacy version-1
@@ -221,11 +308,20 @@ Controls:
 - Inter-process writer lock with stale-lock recovery to prevent lost updates.
 - CLI writes via stdin/file instead of sensitive command flags.
 - UI token gate plus `no-store`, strict CSP (`script-src 'self' 'nonce-...'`, `style-src 'self'`), `X-Frame-Options`, and loopback default.
-- CSV preview responses exclude password, TOTP seed, and note values.
+- CSV and `.env` import preview responses exclude every secret value —
+  presence flags only.
 - Vault and item identifiers are validated before writes; deleting a populated
   vault requires an explicit, existing destination.
 - TOTP codes generated on demand; seed secrets are not needed for normal login
   flows.
+- Typed secrets (`api_token`/`ssh_key`/`env`) resolve for automation through
+  the lease-free `read <id> <field>` path (unlocked by the vault key) — the
+  same path a headless Bash/API workflow step uses. A signed-approval lease
+  can also be issued over one named secret field of a typed item; unlike a
+  `login` lease, `siteOrigin` is optional there (typed secrets are not
+  origin-scoped — see Lease Scoping below), but the field must still be one
+  of the item's declared `secret: true` fields, re-checked against the item's
+  *current* fields on every use.
 
 Known limits:
 
@@ -235,6 +331,32 @@ Known limits:
 - The UI REST API should not be exposed directly to untrusted networks.
 - Backup retention and off-device replication are user-managed; snapshots use
   the same unlock key as the source vault.
+
+## Lease Scoping
+
+`lib/vault/leases.js` issues short-lived, signed-approval-backed credential
+leases (`issueLease`/`useLease`/`revokeLease`). Scoping differs by item type:
+
+- **`login`** — unchanged. `siteOrigin` is required (derived from
+  `input.siteOrigin || item.web`); lease `fields` are drawn from the closed
+  set `{username, password, otp}` via `canonicalLeaseField` (`user`→`username`,
+  `totp`→`otp`); `useLease` re-checks the origin on every use.
+- **`api_token` / `ssh_key` / `env`** — `siteOrigin` is optional (D7): when
+  omitted, the lease binds on `purpose` + `profileBindingId` + `field` only;
+  when supplied, it is still validated and re-checked exactly like a login
+  lease. Lease `fields` must be literal names drawn from the item's declared
+  **secret** fields (no alias canonicalization) — a non-secret or undeclared
+  field is rejected at issue time, and `useLease` re-validates the field
+  against the item's *current* secret fields (in case the item was edited
+  after the lease was issued). Env least-privilege (D3): a lease names the
+  specific keys it needs; there is no "lease the whole bundle" shortcut, and
+  the existing `maxUses` cap of 10 still applies.
+
+`lib/broker.js` (lease-driven DOM autofill) only ever handles `login` leases —
+SSH keys, tokens, and env values do not autofill into a page. Their automation
+path is the lease-free `read <id> <field>` (the common case) or `lease
+read`/`lease use`, which return the value to the caller instead of filling a
+form.
 
 ## Backup and Restore
 
@@ -299,6 +421,13 @@ Current unit coverage should continue to exercise:
 - UI token gate, asset routing, CSP headers, and REST flow.
 - Vault CRUD, item filtering/moves, and default-vault invariants.
 - CSV import parsing, Bitwarden headers, and dedupe.
+- Typed item create/read/update, redaction, and v1→v2 migration
+  (`vault-typed.test.mjs`).
+- Typed leases: no-`siteOrigin` issue/use, rejecting non-secret/undeclared
+  fields (`vault-leases.test.mjs`).
+- `.env` parsing (comments, `export`, quoting, invalid/duplicate keys), the
+  `env-import` CLI end-to-end, and a multi-line `private_key` round-tripping
+  byte-for-byte through `create --stdin-json` (`vault-envfile.test.mjs`).
 
 Future integration tests should cover:
 

@@ -356,11 +356,21 @@
                   >Moving an item changes which vault contains it.</span
                 >
               </div>
+              <div class="field edit-only" id="typeField">
+                <label for="itemType">Type</label>
+                <select id="itemType">
+                  <option value="login">Login</option>
+                  <option value="api_token">API token</option>
+                  <option value="ssh_key">SSH key</option>
+                  <option value="env">Env bundle</option>
+                </select>
+                <span class="hint edit-only">Type cannot be changed after an item is created.</span>
+              </div>
               <div class="field edit-only">
                 <label for="title">Title</label>
                 <input id="title" autocomplete="off" required maxlength="200" />
               </div>
-              <div class="field">
+              <div class="field type-login-field">
                 <label for="web">Website</label>
                 <span
                   class="view-field view-only"
@@ -376,7 +386,7 @@
                   maxlength="2048"
                 />
               </div>
-              <div class="field">
+              <div class="field type-login-field">
                 <label for="username">Username</label>
                 <span
                   class="view-field view-only"
@@ -393,7 +403,7 @@
                   maxlength="512"
                 />
               </div>
-              <div class="field">
+              <div class="field type-login-field">
                 <label for="password">Password</label>
                 <span
                   class="view-field masked view-only"
@@ -422,7 +432,7 @@
                 </div>
               </div>
 
-              <div class="totp hidden" id="totpBlock">
+              <div class="totp hidden type-login-field" id="totpBlock">
                 <div class="ring" aria-hidden="true">
                   <svg width="64" height="64" viewBox="0 0 64 64">
                     <circle
@@ -476,7 +486,7 @@
                 </button>
               </div>
 
-              <div class="field wide edit-only">
+              <div class="field wide edit-only type-login-field">
                 <label for="otpSecret">TOTP secret</label>
                 <div class="secret-input">
                   <input
@@ -496,7 +506,7 @@
                   </button>
                 </div>
               </div>
-              <div class="field wide">
+              <div class="field wide type-login-field">
                 <label for="note">Note</label>
                 <span
                   class="view-field masked view-only"
@@ -517,6 +527,15 @@
                     Reveal
                   </button>
                 </div>
+              </div>
+
+              <div class="field wide hidden" id="typedFieldsSection">
+                <label>Fields</label>
+                <div class="fields-list" id="fieldsList"></div>
+                <button class="btn sm ghost edit-only" type="button" id="addFieldButton">
+                  <svg class="btn-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14"></path></svg>
+                  Add field
+                </button>
               </div>
 
             </form>
