@@ -77,10 +77,12 @@ label {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--s4);
+  align-items: start;
 }
 .field {
   min-width: 0;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 6px;
 }
 .field .hint {
@@ -94,12 +96,15 @@ input,
 select,
 textarea {
   width: 100%;
-  min-height: 38px;
   padding: 9px 11px;
   border: var(--border);
   border-radius: var(--r-md);
   background: var(--surface);
   color: var(--ink);
+}
+input,
+select {
+  height: 38px;
 }
 textarea {
   min-height: 84px;
@@ -286,3 +291,188 @@ textarea {
   overflow-wrap: anywhere;
   text-align: left;
 }
+
+/* Dynamic Typed Fields Section */
+#typedFieldsSection {
+  margin-top: var(--s2);
+}
+
+.fields-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  margin-top: var(--s2);
+  margin-bottom: var(--s3);
+  width: 100%;
+}
+
+/* Single-row dynamic field container */
+.field-row {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: var(--s2);
+  width: 100%;
+  padding: 6px var(--s2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
+}
+
+.field-row:hover {
+  background: color-mix(in srgb, var(--sunk) 20%, var(--surface));
+  border-color: var(--line);
+}
+
+/* Secret/Metadata icon toggle button */
+.field-secret-toggle {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-sm);
+  border: none;
+  background: var(--sunk);
+  color: var(--muted);
+  padding: 0;
+  cursor: pointer;
+  transition: all var(--dur-fast) var(--ease);
+}
+
+.field-secret-toggle.is-secret {
+  color: var(--live);
+  background: var(--live-weak);
+}
+
+.field-secret-toggle.is-metadata {
+  color: var(--muted);
+  background: var(--sunk);
+}
+
+.field-secret-toggle:hover {
+  filter: brightness(0.96);
+  transform: translateY(-1px);
+}
+
+.detail.view-mode .field-secret-toggle {
+  cursor: default;
+  pointer-events: none;
+}
+
+/* Field label text in view mode */
+.field-label-text {
+  flex: 0 0 140px;
+  max-width: 160px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-body);
+  font-weight: var(--fw-strong);
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Field name input in edit mode */
+.field-name-input {
+  flex: 0 0 140px;
+  max-width: 160px;
+  height: 32px;
+  min-height: 32px;
+  padding: 5px var(--s2);
+  border: none;
+  border-radius: var(--r-sm);
+  background: var(--sunk);
+  font-size: var(--fs-body);
+  font-weight: var(--fw-strong);
+  color: var(--ink);
+}
+
+.field-name-input:focus {
+  outline: var(--focus);
+  outline-offset: -1px;
+}
+
+/* Field value wrapper in edit mode */
+.field-value-wrap {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.field-value-input {
+  width: 100%;
+  height: 32px;
+  min-height: 32px;
+  padding: 5px var(--s2);
+  border: none;
+  border-radius: var(--r-sm);
+  background: color-mix(in srgb, var(--sunk) 40%, var(--surface));
+  font-size: var(--fs-body);
+  color: var(--ink);
+}
+
+.field-value-input:focus {
+  outline: var(--focus);
+  outline-offset: -1px;
+}
+
+/* View field in view mode inside a row */
+.field-row .view-field {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  min-height: 32px;
+  padding: 5px var(--s2);
+  border: none;
+  border-radius: var(--r-sm);
+  background: color-mix(in srgb, var(--sunk) 40%, var(--surface));
+  font-size: var(--fs-body);
+}
+
+/* Action icon buttons placed at the right end of the line */
+.field-actions {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.field-actions .icon-button {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-sm);
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all var(--dur-fast) var(--ease);
+}
+
+.field-actions .icon-button:hover:not(:disabled) {
+  background: var(--sunk);
+  color: var(--ink);
+}
+
+.field-actions .icon-button.danger-hover:hover:not(:disabled) {
+  background: var(--danger-wash);
+  color: var(--danger);
+}
+
+.field-actions .icon-button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+#addFieldButton {
+  margin-top: var(--s1);
+}
+

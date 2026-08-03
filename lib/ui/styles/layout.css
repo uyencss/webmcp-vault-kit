@@ -180,6 +180,32 @@
   font-family: var(--font-mono);
   font-size: var(--fs-meta);
 }
+.item-type-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: var(--r-sm);
+  background: var(--sunk);
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: var(--fw-strong);
+  letter-spacing: 0.04em;
+}
+.item-type-badge svg {
+  flex: none;
+}
+.item-type-api_token {
+  background: color-mix(in srgb, var(--live) 18%, var(--sunk));
+  color: var(--live);
+}
+.item-type-ssh_key {
+  background: color-mix(in srgb, var(--ok) 18%, var(--sunk));
+  color: var(--ok);
+}
+.item-type-env {
+  background: color-mix(in srgb, var(--ink) 12%, var(--sunk));
+}
 .vault-sidebar-foot {
   display: flex;
   gap: var(--s2);
