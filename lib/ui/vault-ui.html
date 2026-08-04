@@ -310,8 +310,9 @@
             </div>
             <ul class="list" id="itemList"></ul>
             <div class="rail-foot">
-              <button class="btn sm primary" id="newButton" type="button" aria-label="New" title="New">
+              <button class="btn sm primary rail-new-btn" id="newButton" type="button" aria-label="New item" title="New item">
                 <svg class="btn-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14"></path></svg>
+                <span class="btn-label">New item</span>
               </button>
               <button class="btn sm ghost" id="importButton" type="button" aria-label="Import CSV" title="Import CSV">
                 <svg class="btn-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M12 15V3m0 0L7 8m5-5 5 5M5 13v6h14v-6"></path></svg>
@@ -370,7 +371,7 @@
                 <label for="title">Title</label>
                 <input id="title" autocomplete="off" required maxlength="200" />
               </div>
-              <div class="field type-login-field">
+              <div class="field wide type-login-field">
                 <label for="web">Website</label>
                 <span
                   class="view-field view-only"
@@ -541,6 +542,12 @@
             </form>
             </div><!-- /.detail-scroll -->
             <div class="detail-actions">
+              <div
+                class="inline-status detail-status"
+                id="detailStatus"
+                role="status"
+                aria-live="polite"
+              ></div>
               <button class="btn primary view-only" type="button" id="editButton">
                 <svg class="btn-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path><path d="m15 5 4 4"></path></svg>
                 Edit
@@ -551,7 +558,7 @@
               </button>
               <button class="btn ghost edit-only" type="button" id="cancelEditButton">Cancel</button>
               <button class="btn ghost edit-only" type="button" id="revealAllButton" disabled>
-                <svg class="btn-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"></path><circle cx="12" cy="12" r="2.5"></circle></svg>
+                <svg class="btn-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6Z"></path><circle cx="12" cy="12" r="2.5"></circle></svg>
                 Reveal all
               </button>
               <button class="btn danger" type="button" id="deleteButton" disabled>
@@ -563,6 +570,26 @@
         </main>
       </div>
     </div>
+
+    <dialog
+      class="csv-preview-dialog"
+      id="confirmDialog"
+      aria-labelledby="confirmDialogTitle"
+    >
+      <div class="csv-preview-body">
+        <span class="eyebrow" id="confirmDialogEyebrow">Confirm action</span>
+        <h2 id="confirmDialogTitle">Are you sure?</h2>
+        <p class="csv-preview-summary" id="confirmDialogMessage"></p>
+        <div class="csv-preview-actions">
+          <button class="btn ghost" id="cancelConfirmButton" type="button">
+            Cancel
+          </button>
+          <button class="btn primary" id="actionConfirmButton" type="button">
+            Confirm
+          </button>
+        </div>
+      </div>
+    </dialog>
 
     <dialog
       class="csv-preview-dialog"

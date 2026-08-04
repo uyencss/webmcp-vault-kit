@@ -214,13 +214,13 @@ textarea {
   display: none !important;
 }
 .view-field {
-  min-height: 38px;
+  min-height: 32px;
   display: flex;
   align-items: center;
-  padding: 9px 11px;
-  border: var(--border);
+  padding: 6px 8px;
+  border: 1px solid transparent;
   border-radius: var(--r-md);
-  background: var(--surface);
+  background: transparent;
   color: var(--ink);
   font-family: var(--font-mono);
   font-size: var(--fs-body);
@@ -236,6 +236,10 @@ textarea {
 .view-field:hover {
   background: var(--sunk);
   border-color: var(--muted);
+}
+.view-field:focus-visible {
+  outline: var(--focus);
+  outline-offset: var(--focus-offset);
 }
 .view-field.copied {
   border-color: var(--ok);
@@ -291,6 +295,28 @@ textarea {
   overflow-wrap: anywhere;
   text-align: left;
 }
+.detail-status {
+  width: 100%;
+  margin-top: 0;
+  margin-bottom: var(--s2);
+  display: none;
+}
+.detail-status[data-kind="error"] {
+  display: block;
+  color: var(--danger);
+  background: var(--danger-wash);
+  border: 1px solid var(--danger-line);
+  padding: var(--s2) var(--s3);
+  border-radius: var(--r-md);
+}
+.detail-status[data-kind="success"] {
+  display: block;
+  color: var(--ok);
+  background: color-mix(in srgb, var(--ok) 12%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--ok) 30%, var(--surface));
+  padding: var(--s2) var(--s3);
+  border-radius: var(--r-md);
+}
 
 /* Dynamic Typed Fields Section */
 #typedFieldsSection {
@@ -323,6 +349,20 @@ textarea {
 .field-row:hover {
   background: color-mix(in srgb, var(--sunk) 20%, var(--surface));
   border-color: var(--line);
+}
+
+/* Flatten dynamic fields in view mode */
+.detail.view-mode .field-row {
+  border-color: transparent;
+  background: transparent;
+  padding-left: 0;
+  padding-right: 0;
+}
+.detail.view-mode .field-row:hover {
+  background: transparent;
+}
+.detail.view-mode .field-row .view-field {
+  background: transparent;
 }
 
 /* Secret/Metadata icon toggle button */
