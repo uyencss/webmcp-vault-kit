@@ -66,13 +66,59 @@ label {
   letter-spacing: var(--tracking-label);
   text-transform: uppercase;
 }
+
+.detail-hero {
+  margin-bottom: var(--s4);
+  padding-bottom: var(--s3);
+  border-bottom: 1px solid var(--line);
+}
+
+.detail-hero-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+}
+
 .detail h2 {
-  margin: 2px 0 var(--s5);
+  margin: 4px 0 0;
   overflow-wrap: anywhere;
   font-size: 22px;
   font-weight: var(--fw-strong);
   line-height: 1.2;
+  color: var(--ink);
 }
+
+/* Minimal information layout - no heavy card outlines */
+.detail-card {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+  margin-bottom: 0;
+  box-shadow: none;
+}
+
+.detail-card-header {
+  display: none;
+}
+
+.field-label-with-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--muted);
+  font-size: var(--fs-label);
+  font-weight: var(--fw-strong);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+
+.field-label-with-icon svg {
+  flex: none;
+  opacity: 0.65;
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -107,7 +153,7 @@ select {
   height: 38px;
 }
 textarea {
-  min-height: 84px;
+  min-height: 72px;
   resize: vertical;
 }
 .secret-input {
@@ -214,13 +260,15 @@ textarea {
   display: none !important;
 }
 .view-field {
-  min-height: 32px;
+  min-height: 38px;
   display: flex;
   align-items: center;
-  padding: 6px 8px;
-  border: 1px solid transparent;
+  justify-content: space-between;
+  gap: var(--s2);
+  padding: 7px var(--s3);
+  border: 1px solid var(--line);
   border-radius: var(--r-md);
-  background: transparent;
+  background: var(--sunk);
   color: var(--ink);
   font-family: var(--font-mono);
   font-size: var(--fs-body);
@@ -228,14 +276,15 @@ textarea {
   user-select: none;
   transition:
     background var(--dur-fast) var(--ease),
-    border-color var(--dur-fast) var(--ease);
+    border-color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .view-field:hover {
-  background: var(--sunk);
-  border-color: var(--muted);
+  background: color-mix(in srgb, var(--sunk) 60%, var(--surface));
+  border-color: color-mix(in srgb, var(--live) 40%, var(--line));
 }
 .view-field:focus-visible {
   outline: var(--focus);
@@ -243,7 +292,7 @@ textarea {
 }
 .view-field.copied {
   border-color: var(--ok);
-  background: color-mix(in srgb, var(--ok) 8%, var(--surface));
+  background: color-mix(in srgb, var(--ok) 12%, var(--surface));
 }
 .view-field.masked {
   color: var(--muted);
@@ -260,20 +309,33 @@ textarea {
 }
 .view-field .view-hint {
   margin-left: auto;
-  padding-left: var(--s3);
+  padding-left: var(--s2);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   color: var(--muted);
   font-family: var(--font-sans);
   font-size: var(--fs-meta);
   font-weight: var(--fw-medium);
-  opacity: 0;
-  transition: opacity var(--dur-fast) var(--ease);
+  opacity: 0.7;
+  transition: opacity var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+  flex: none;
 }
 .view-field:hover .view-hint {
   opacity: 1;
+  color: var(--ink);
 }
 .view-field.copied .view-hint {
   color: var(--ok);
   opacity: 1;
+}
+
+#noteViewField {
+  min-height: 72px;
+  align-items: flex-start;
+  white-space: pre-wrap;
+  word-break: break-word;
+  padding: 10px var(--s3);
 }
 .dirty-badge {
   display: none;

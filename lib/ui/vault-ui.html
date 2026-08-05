@@ -329,17 +329,25 @@
 
           <section class="detail view-mode" aria-labelledby="detailTitle">
             <div class="detail-scroll">
-            <span class="eyebrow" id="detailEyebrow">New login</span
-            ><span
-              class="dirty-badge edit-only"
-              id="dirtyBadge"
-              aria-live="polite"
-              >• Unsaved</span
-            >
-            <h2 id="detailTitle">New Login</h2>
+            <header class="detail-hero">
+              <div class="detail-hero-meta">
+                <span class="eyebrow" id="detailEyebrow">New login</span>
+                <span
+                  class="dirty-badge edit-only"
+                  id="dirtyBadge"
+                  aria-live="polite"
+                  >• Unsaved</span
+                >
+              </div>
+              <h2 id="detailTitle">New Login</h2>
+            </header>
+
             <form id="itemForm" class="grid">
               <div class="field wide">
-                <label for="vaultSelect">Vault</label>
+                <label for="vaultSelect" class="field-label-with-icon">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                  <span>Vault</span>
+                </label>
                 <span
                   class="view-field view-only"
                   id="vaultViewField"
@@ -358,7 +366,10 @@
                 >
               </div>
               <div class="field edit-only" id="typeField">
-                <label for="itemType">Type</label>
+                <label for="itemType" class="field-label-with-icon">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+                  <span>Type</span>
+                </label>
                 <select id="itemType">
                   <option value="login">Login</option>
                   <option value="api_token">API token</option>
@@ -368,11 +379,17 @@
                 <span class="hint edit-only">Type cannot be changed after an item is created.</span>
               </div>
               <div class="field edit-only">
-                <label for="title">Title</label>
+                <label for="title" class="field-label-with-icon">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                  <span>Title</span>
+                </label>
                 <input id="title" autocomplete="off" required maxlength="200" />
               </div>
-              <div class="field wide type-login-field">
-                <label for="web">Website</label>
+              <div class="field type-login-field">
+                <label for="web" class="field-label-with-icon">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                  <span>Website</span>
+                </label>
                 <span
                   class="view-field view-only"
                   id="webViewField"
@@ -388,7 +405,10 @@
                 />
               </div>
               <div class="field type-login-field">
-                <label for="username">Username</label>
+                <label for="username" class="field-label-with-icon">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                  <span>Username</span>
+                </label>
                 <span
                   class="view-field view-only"
                   id="usernameViewField"
@@ -405,7 +425,10 @@
                 />
               </div>
               <div class="field type-login-field">
-                <label for="password">Password</label>
+                <label for="password" class="field-label-with-icon">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                  <span>Password</span>
+                </label>
                 <span
                   class="view-field masked view-only"
                   id="passwordViewField"
@@ -488,7 +511,10 @@
               </div>
 
               <div class="field wide edit-only type-login-field">
-                <label for="otpSecret">TOTP secret</label>
+                <label for="otpSecret" class="field-label-with-icon">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  <span>TOTP Secret</span>
+                </label>
                 <div class="secret-input">
                   <input
                     class="mono"
@@ -507,8 +533,24 @@
                   </button>
                 </div>
               </div>
-              <div class="field wide type-login-field">
-                <label for="note">Note</label>
+
+              <div class="field wide hidden" id="typedFieldsSection">
+                <label class="field-label-with-icon">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+                  <span>Fields</span>
+                </label>
+                <div class="fields-list" id="fieldsList"></div>
+                <button class="btn sm ghost edit-only" type="button" id="addFieldButton">
+                  <svg class="btn-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14"></path></svg>
+                  Add field
+                </button>
+              </div>
+
+              <div class="field wide type-login-field" id="noteCard">
+                <label for="note" class="field-label-with-icon">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                  <span>Note</span>
+                </label>
                 <span
                   class="view-field masked view-only"
                   id="noteViewField"
@@ -518,7 +560,7 @@
                   ><span class="view-hint">Click to copy</span></span
                 >
                 <div class="secret-input edit-only">
-                  <textarea class="mono" id="note" maxlength="20000"></textarea>
+                  <textarea class="mono" id="note" rows="3" maxlength="20000"></textarea>
                   <button
                     class="linkbtn"
                     id="noteRevealButton"
@@ -528,15 +570,6 @@
                     Reveal
                   </button>
                 </div>
-              </div>
-
-              <div class="field wide hidden" id="typedFieldsSection">
-                <label>Fields</label>
-                <div class="fields-list" id="fieldsList"></div>
-                <button class="btn sm ghost edit-only" type="button" id="addFieldButton">
-                  <svg class="btn-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14"></path></svg>
-                  Add field
-                </button>
               </div>
 
             </form>
