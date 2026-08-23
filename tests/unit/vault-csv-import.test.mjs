@@ -45,10 +45,13 @@ test('importItems creates rows, skips duplicates, and stays encrypted', () => {
   const store = createVaultStore({ dataDir, key: 'import-key' });
   store.init();
 
+  const githubPassword = 'vault-import-github-password-2026-08-23-7f4d2a';
+  const gmailPassword = 'vault-import-gmail-password-2026-08-23-91c8be';
+
   const csv = [
     'title,web,username,password',
-    'GitHub,https://github.com,octo,pw1',
-    'Gmail,https://mail.google.com,alice,pw2',
+    `GitHub,https://github.com,octo,${githubPassword}`,
+    `Gmail,https://mail.google.com,alice,${gmailPassword}`,
   ].join('\n');
 
   const first = store.importItems(csvToItems(csv));
@@ -62,10 +65,16 @@ test('importItems creates rows, skips duplicates, and stays encrypted', () => {
   assert.equal(second.skipped, 2);
 
   assert.equal(store.listItems().length, 2);
-  assert.equal(store.readField('octo', 'password'), 'pw1');
+  assert.equal(store.readField('octo', 'password'), githubPassword);
 
   const rawFile = fs.readFileSync(path.join(dataDir, 'vault', 'credentials.enc.json'), 'utf8');
-  assert.equal(rawFile.includes('pw1'), false);
+  const envelope = JSON.parse(rawFile);
+  assert.equal(envelope.version, 1);
+  assert.equal(envelope.cipher, 'aes-256-gcm');
+  assert.equal(typeof envelope.data, 'string');
+  assert.ok(envelope.data.length > 0);
+  assert.equal(rawFile.includes(githubPassword), false);
+  assert.equal(rawFile.includes(gmailPassword), false);
 });
 
 test('previewImport reports importable CSV metadata without exposing secrets', () => {
