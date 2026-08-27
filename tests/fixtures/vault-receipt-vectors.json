@@ -1,0 +1,197 @@
+{
+  "schema": "vault-receipt-vectors/1",
+  "description": "A1 fixture-only credential operation receipt vectors. Redacted receipts only; no secret values, no raw profile paths. Synthetic digests.",
+  "valid": [
+    {
+      "name": "fill completed metadata-only redacted",
+      "receipt": {
+        "schema": "webmcp-credential-operation-receipt/1",
+        "grantId": "grant_syn_001",
+        "operation": "fill",
+        "status": "completed",
+        "purpose": "login",
+        "fields": ["username", "password"],
+        "scopeDigest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "delivered": true,
+        "submitted": true,
+        "secretReturned": false,
+        "exposure": {
+          "mode": "metadata-only",
+          "transcriptExposure": "denied",
+          "destinationDigest": null
+        },
+        "clipboardUsed": false,
+        "postcondition": {
+          "status": "pending",
+          "evidenceRef": null
+        },
+        "startedAt": "2026-08-27T00:00:00.000Z",
+        "completedAt": "2026-08-27T00:00:01.000Z",
+        "errorCode": null,
+        "revokeReason": null
+      },
+      "expectValid": true,
+      "canaryMarker": "canary_pw_syn_9f3d_001",
+      "assertNoLeak": true
+    },
+    {
+      "name": "read scoped-values ephemeral redacted receipt",
+      "receipt": {
+        "schema": "webmcp-credential-operation-receipt/1",
+        "grantId": "grant_syn_002",
+        "operation": "read",
+        "status": "completed",
+        "purpose": "api-access",
+        "fields": ["token"],
+        "scopeDigest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+        "delivered": true,
+        "submitted": false,
+        "secretReturned": true,
+        "exposure": {
+          "mode": "scoped-values",
+          "transcriptExposure": "denied",
+          "destinationDigest": null
+        },
+        "clipboardUsed": false,
+        "postcondition": null,
+        "startedAt": "2026-08-27T01:00:00.000Z",
+        "completedAt": "2026-08-27T01:00:00.500Z",
+        "errorCode": null,
+        "revokeReason": null
+      },
+      "expectValid": true,
+      "canaryMarker": "canary_token_syn_a4e2_002",
+      "assertNoLeak": true,
+      "notes": "value delivered via ephemeral channel; receipt itself contains no value"
+    },
+    {
+      "name": "export protected destination redacted",
+      "receipt": {
+        "schema": "webmcp-credential-operation-receipt/1",
+        "grantId": "grant_syn_003",
+        "operation": "export",
+        "status": "completed",
+        "purpose": "ssh-access",
+        "fields": ["private_key"],
+        "scopeDigest": "sha256:aaaaaaaabbbbbbbbccccccccddddddddeeeeeeeeffffffff1111111122222222",
+        "delivered": true,
+        "submitted": false,
+        "secretReturned": false,
+        "exposure": {
+          "mode": "export",
+          "transcriptExposure": "denied",
+          "destinationDigest": "sha256:9999888877776666555544443333222211110000aaaabbbbccccddddeeeeffff"
+        },
+        "clipboardUsed": false,
+        "postcondition": null,
+        "startedAt": "2026-08-27T02:00:00.000Z",
+        "completedAt": "2026-08-27T02:00:01.000Z",
+        "errorCode": null,
+        "revokeReason": null
+      },
+      "expectValid": true,
+      "canaryMarker": "canary_ssh_syn_7c1b_003"
+    },
+    {
+      "name": "revoke idempotent terminal",
+      "receipt": {
+        "schema": "webmcp-credential-operation-receipt/1",
+        "grantId": "grant_syn_001",
+        "operation": "revoke",
+        "status": "revoked",
+        "purpose": "login",
+        "fields": ["username", "password"],
+        "scopeDigest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "delivered": false,
+        "submitted": false,
+        "secretReturned": false,
+        "exposure": {
+          "mode": "metadata-only",
+          "transcriptExposure": "denied",
+          "destinationDigest": null
+        },
+        "clipboardUsed": false,
+        "postcondition": null,
+        "startedAt": "2026-08-27T00:03:00.000Z",
+        "completedAt": "2026-08-27T00:03:00.100Z",
+        "errorCode": null,
+        "revokeReason": "profile-released"
+      },
+      "expectValid": true
+    }
+  ],
+  "invalid": [
+    {
+      "name": "receipt must not contain secret value leak",
+      "receipt": {
+        "schema": "webmcp-credential-operation-receipt/1",
+        "grantId": "grant_syn_001",
+        "operation": "fill",
+        "status": "completed",
+        "purpose": "login",
+        "fields": ["username", "password"],
+        "scopeDigest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "delivered": true,
+        "submitted": true,
+        "secretReturned": false,
+        "exposure": {
+          "mode": "metadata-only",
+          "transcriptExposure": "denied",
+          "destinationDigest": null
+        },
+        "clipboardUsed": false,
+        "postcondition": null,
+        "startedAt": "2026-08-27T00:00:00.000Z",
+        "completedAt": "2026-08-27T00:00:01.000Z",
+        "errorCode": null,
+        "revokeReason": null
+      },
+      "injectExtra": {
+        "value": "canary_pw_syn_9f3d_leak"
+      },
+      "expectValid": false,
+      "expectedCode": "CREDENTIAL_SECRET_EXPOSURE_DETECTED",
+      "notes": "extra 'value' field would leak secret; receipt must never contain it"
+    },
+    {
+      "name": "receipt must not contain raw profile path",
+      "receipt": {
+        "schema": "webmcp-credential-operation-receipt/1",
+        "grantId": "grant_syn_001",
+        "operation": "fill",
+        "status": "completed",
+        "purpose": "login",
+        "fields": ["username"],
+        "scopeDigest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "delivered": true,
+        "submitted": false,
+        "secretReturned": false,
+        "exposure": {
+          "mode": "metadata-only",
+          "transcriptExposure": "denied",
+          "destinationDigest": null
+        },
+        "clipboardUsed": false,
+        "postcondition": null,
+        "startedAt": "2026-08-27T00:00:00.000Z",
+        "completedAt": "2026-08-27T00:00:01.000Z",
+        "errorCode": null,
+        "revokeReason": null
+      },
+      "injectExtra": {
+        "profilePath": "/tmp/synthetic_profile_001/Default"
+      },
+      "expectValid": false,
+      "expectedCode": "CREDENTIAL_SECRET_EXPOSURE_DETECTED"
+    }
+  ],
+  "canaryScan": {
+    "description": "Synthetic markers used for leak scanning; must never appear in receipt JSON, logs, or redacted projections.",
+    "markers": [
+      "canary_pw_syn_9f3d_001",
+      "canary_token_syn_a4e2_002",
+      "canary_ssh_syn_7c1b_003",
+      "canary_pw_syn_9f3d_leak"
+    ]
+  }
+}
