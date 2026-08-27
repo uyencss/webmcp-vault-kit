@@ -1,17 +1,21 @@
 {
   "schema": "vault-receipt-vectors/1",
-  "description": "A1 fixture-only credential operation receipt vectors. Redacted receipts only; no secret values, no raw profile paths. Synthetic digests.",
+  "description": "A1 fixture-only credential operation receipt vectors — D1 JCS LF, domain webmcp-digest-v1:tool-receipt, synthetic prefixed hex IDs, no placeholders, no secret leak.",
+  "domainLabel": "webmcp-digest-v1:tool-receipt",
   "valid": [
     {
       "name": "fill completed metadata-only redacted",
       "receipt": {
         "schema": "webmcp-credential-operation-receipt/1",
-        "grantId": "grant_syn_001",
+        "grantId": "grant_deadbeef01234567",
         "operation": "fill",
         "status": "completed",
         "purpose": "login",
-        "fields": ["username", "password"],
-        "scopeDigest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "fields": [
+          "username",
+          "password"
+        ],
+        "scopeDigest": "sha256:06df333c5648506701de5f13789beb5e91853ae018ccc2f427f69cb05d041f27",
         "delivered": true,
         "submitted": true,
         "secretReturned": false,
@@ -30,20 +34,52 @@
         "errorCode": null,
         "revokeReason": null
       },
+      "projection": {
+        "schema": "webmcp-credential-operation-receipt/1",
+        "grantId": "grant_deadbeef01234567",
+        "operation": "fill",
+        "status": "completed",
+        "purpose": "login",
+        "fields": [
+          "username",
+          "password"
+        ],
+        "scopeDigest": "sha256:06df333c5648506701de5f13789beb5e91853ae018ccc2f427f69cb05d041f27",
+        "delivered": true,
+        "submitted": true,
+        "secretReturned": false,
+        "exposure": {
+          "mode": "metadata-only",
+          "transcriptExposure": "denied",
+          "destinationDigest": null
+        },
+        "clipboardUsed": false,
+        "postcondition": {
+          "status": "pending",
+          "evidenceRef": null
+        },
+        "errorCode": null,
+        "revokeReason": null
+      },
+      "canonical": "{\"clipboardUsed\":false,\"delivered\":true,\"errorCode\":null,\"exposure\":{\"destinationDigest\":null,\"mode\":\"metadata-only\",\"transcriptExposure\":\"denied\"},\"fields\":[\"username\",\"password\"],\"grantId\":\"grant_deadbeef01234567\",\"operation\":\"fill\",\"postcondition\":{\"evidenceRef\":null,\"status\":\"pending\"},\"purpose\":\"login\",\"revokeReason\":null,\"schema\":\"webmcp-credential-operation-receipt/1\",\"scopeDigest\":\"sha256:06df333c5648506701de5f13789beb5e91853ae018ccc2f427f69cb05d041f27\",\"secretReturned\":false,\"status\":\"completed\",\"submitted\":true}",
+      "domainLabel": "webmcp-digest-v1:tool-receipt",
+      "receiptDigest": "sha256:712f904c35f095e71d7defa0fd8a0aa491d25e8e6c06a4e2f812f8105fde97d7",
       "expectValid": true,
-      "canaryMarker": "canary_pw_syn_9f3d_001",
+      "canaryMarker": "canary_pw_deadbeef001",
       "assertNoLeak": true
     },
     {
       "name": "read scoped-values ephemeral redacted receipt",
       "receipt": {
         "schema": "webmcp-credential-operation-receipt/1",
-        "grantId": "grant_syn_002",
+        "grantId": "grant_deadbeef01234568",
         "operation": "read",
         "status": "completed",
         "purpose": "api-access",
-        "fields": ["token"],
-        "scopeDigest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+        "fields": [
+          "token"
+        ],
+        "scopeDigest": "sha256:c74a6096fe6a9a9d2148988af272fa98ec02b7ad1dbc85ef8c3bb1a9b98ddc31",
         "delivered": true,
         "submitted": false,
         "secretReturned": true,
@@ -59,28 +95,56 @@
         "errorCode": null,
         "revokeReason": null
       },
+      "projection": {
+        "schema": "webmcp-credential-operation-receipt/1",
+        "grantId": "grant_deadbeef01234568",
+        "operation": "read",
+        "status": "completed",
+        "purpose": "api-access",
+        "fields": [
+          "token"
+        ],
+        "scopeDigest": "sha256:c74a6096fe6a9a9d2148988af272fa98ec02b7ad1dbc85ef8c3bb1a9b98ddc31",
+        "delivered": true,
+        "submitted": false,
+        "secretReturned": true,
+        "exposure": {
+          "mode": "scoped-values",
+          "transcriptExposure": "denied",
+          "destinationDigest": null
+        },
+        "clipboardUsed": false,
+        "postcondition": null,
+        "errorCode": null,
+        "revokeReason": null
+      },
+      "canonical": "{\"clipboardUsed\":false,\"delivered\":true,\"errorCode\":null,\"exposure\":{\"destinationDigest\":null,\"mode\":\"scoped-values\",\"transcriptExposure\":\"denied\"},\"fields\":[\"token\"],\"grantId\":\"grant_deadbeef01234568\",\"operation\":\"read\",\"postcondition\":null,\"purpose\":\"api-access\",\"revokeReason\":null,\"schema\":\"webmcp-credential-operation-receipt/1\",\"scopeDigest\":\"sha256:c74a6096fe6a9a9d2148988af272fa98ec02b7ad1dbc85ef8c3bb1a9b98ddc31\",\"secretReturned\":true,\"status\":\"completed\",\"submitted\":false}",
+      "domainLabel": "webmcp-digest-v1:tool-receipt",
+      "receiptDigest": "sha256:ac133ad87772e45ed6bca2d8e6b20d2444da03dffeb0044f16f5a4e27d1f48d5",
       "expectValid": true,
-      "canaryMarker": "canary_token_syn_a4e2_002",
+      "canaryMarker": "canary_token_deadbeef002",
       "assertNoLeak": true,
-      "notes": "value delivered via ephemeral channel; receipt itself contains no value"
+      "notes": "value delivered via ephemeral channel; receipt itself contains no value; D1 verified"
     },
     {
       "name": "export protected destination redacted",
       "receipt": {
         "schema": "webmcp-credential-operation-receipt/1",
-        "grantId": "grant_syn_003",
+        "grantId": "grant_deadbeef01234569",
         "operation": "export",
         "status": "completed",
         "purpose": "ssh-access",
-        "fields": ["private_key"],
-        "scopeDigest": "sha256:aaaaaaaabbbbbbbbccccccccddddddddeeeeeeeeffffffff1111111122222222",
+        "fields": [
+          "private_key"
+        ],
+        "scopeDigest": "sha256:13304dd0b506ff85dd449a1fe42df79a3b53a23caf802566ba5d6a5ad05fa7c6",
         "delivered": true,
         "submitted": false,
         "secretReturned": false,
         "exposure": {
           "mode": "export",
           "transcriptExposure": "denied",
-          "destinationDigest": "sha256:9999888877776666555544443333222211110000aaaabbbbccccddddeeeeffff"
+          "destinationDigest": "sha256:53212f79620f97453ce366fb1b59e4027746c8d85432e713429e4c07a24f7fc5"
         },
         "clipboardUsed": false,
         "postcondition": null,
@@ -89,19 +153,48 @@
         "errorCode": null,
         "revokeReason": null
       },
+      "projection": {
+        "schema": "webmcp-credential-operation-receipt/1",
+        "grantId": "grant_deadbeef01234569",
+        "operation": "export",
+        "status": "completed",
+        "purpose": "ssh-access",
+        "fields": [
+          "private_key"
+        ],
+        "scopeDigest": "sha256:13304dd0b506ff85dd449a1fe42df79a3b53a23caf802566ba5d6a5ad05fa7c6",
+        "delivered": true,
+        "submitted": false,
+        "secretReturned": false,
+        "exposure": {
+          "mode": "export",
+          "transcriptExposure": "denied",
+          "destinationDigest": "sha256:53212f79620f97453ce366fb1b59e4027746c8d85432e713429e4c07a24f7fc5"
+        },
+        "clipboardUsed": false,
+        "postcondition": null,
+        "errorCode": null,
+        "revokeReason": null
+      },
+      "canonical": "{\"clipboardUsed\":false,\"delivered\":true,\"errorCode\":null,\"exposure\":{\"destinationDigest\":\"sha256:53212f79620f97453ce366fb1b59e4027746c8d85432e713429e4c07a24f7fc5\",\"mode\":\"export\",\"transcriptExposure\":\"denied\"},\"fields\":[\"private_key\"],\"grantId\":\"grant_deadbeef01234569\",\"operation\":\"export\",\"postcondition\":null,\"purpose\":\"ssh-access\",\"revokeReason\":null,\"schema\":\"webmcp-credential-operation-receipt/1\",\"scopeDigest\":\"sha256:13304dd0b506ff85dd449a1fe42df79a3b53a23caf802566ba5d6a5ad05fa7c6\",\"secretReturned\":false,\"status\":\"completed\",\"submitted\":false}",
+      "domainLabel": "webmcp-digest-v1:tool-receipt",
+      "receiptDigest": "sha256:40aaba8377b6aad4ed1fe15601ba27c7e4420a3a62c6561f445b74afbc4d626f",
       "expectValid": true,
-      "canaryMarker": "canary_ssh_syn_7c1b_003"
+      "canaryMarker": "canary_ssh_deadbeef003"
     },
     {
       "name": "revoke idempotent terminal",
       "receipt": {
         "schema": "webmcp-credential-operation-receipt/1",
-        "grantId": "grant_syn_001",
+        "grantId": "grant_deadbeef01234567",
         "operation": "revoke",
         "status": "revoked",
         "purpose": "login",
-        "fields": ["username", "password"],
-        "scopeDigest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "fields": [
+          "username",
+          "password"
+        ],
+        "scopeDigest": "sha256:06df333c5648506701de5f13789beb5e91853ae018ccc2f427f69cb05d041f27",
         "delivered": false,
         "submitted": false,
         "secretReturned": false,
@@ -117,53 +210,18 @@
         "errorCode": null,
         "revokeReason": "profile-released"
       },
-      "expectValid": true
-    }
-  ],
-  "invalid": [
-    {
-      "name": "receipt must not contain secret value leak",
-      "receipt": {
+      "projection": {
         "schema": "webmcp-credential-operation-receipt/1",
-        "grantId": "grant_syn_001",
-        "operation": "fill",
-        "status": "completed",
+        "grantId": "grant_deadbeef01234567",
+        "operation": "revoke",
+        "status": "revoked",
         "purpose": "login",
-        "fields": ["username", "password"],
-        "scopeDigest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
-        "delivered": true,
-        "submitted": true,
-        "secretReturned": false,
-        "exposure": {
-          "mode": "metadata-only",
-          "transcriptExposure": "denied",
-          "destinationDigest": null
-        },
-        "clipboardUsed": false,
-        "postcondition": null,
-        "startedAt": "2026-08-27T00:00:00.000Z",
-        "completedAt": "2026-08-27T00:00:01.000Z",
-        "errorCode": null,
-        "revokeReason": null
-      },
-      "injectExtra": {
-        "value": "canary_pw_syn_9f3d_leak"
-      },
-      "expectValid": false,
-      "expectedCode": "CREDENTIAL_SECRET_EXPOSURE_DETECTED",
-      "notes": "extra 'value' field would leak secret; receipt must never contain it"
-    },
-    {
-      "name": "receipt must not contain raw profile path",
-      "receipt": {
-        "schema": "webmcp-credential-operation-receipt/1",
-        "grantId": "grant_syn_001",
-        "operation": "fill",
-        "status": "completed",
-        "purpose": "login",
-        "fields": ["username"],
-        "scopeDigest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
-        "delivered": true,
+        "fields": [
+          "username",
+          "password"
+        ],
+        "scopeDigest": "sha256:06df333c5648506701de5f13789beb5e91853ae018ccc2f427f69cb05d041f27",
+        "delivered": false,
         "submitted": false,
         "secretReturned": false,
         "exposure": {
@@ -173,11 +231,236 @@
         },
         "clipboardUsed": false,
         "postcondition": null,
+        "errorCode": null,
+        "revokeReason": "profile-released"
+      },
+      "canonical": "{\"clipboardUsed\":false,\"delivered\":false,\"errorCode\":null,\"exposure\":{\"destinationDigest\":null,\"mode\":\"metadata-only\",\"transcriptExposure\":\"denied\"},\"fields\":[\"username\",\"password\"],\"grantId\":\"grant_deadbeef01234567\",\"operation\":\"revoke\",\"postcondition\":null,\"purpose\":\"login\",\"revokeReason\":\"profile-released\",\"schema\":\"webmcp-credential-operation-receipt/1\",\"scopeDigest\":\"sha256:06df333c5648506701de5f13789beb5e91853ae018ccc2f427f69cb05d041f27\",\"secretReturned\":false,\"status\":\"revoked\",\"submitted\":false}",
+      "domainLabel": "webmcp-digest-v1:tool-receipt",
+      "receiptDigest": "sha256:972b65f65f74743b6e8d5f55485eac5974e19e27076e704c58ebf6bcbdfe4828",
+      "expectValid": true
+    },
+    {
+      "name": "mutation proof — receipt purpose change changes digest",
+      "baseReceipt": {
+        "schema": "webmcp-credential-operation-receipt/1",
+        "grantId": "grant_deadbeef01234567",
+        "operation": "fill",
+        "status": "completed",
+        "purpose": "login",
+        "fields": [
+          "username",
+          "password"
+        ],
+        "scopeDigest": "sha256:06df333c5648506701de5f13789beb5e91853ae018ccc2f427f69cb05d041f27",
+        "delivered": true,
+        "submitted": true,
+        "secretReturned": false,
+        "exposure": {
+          "mode": "metadata-only",
+          "transcriptExposure": "denied",
+          "destinationDigest": null
+        },
+        "clipboardUsed": false,
+        "postcondition": {
+          "status": "pending",
+          "evidenceRef": null
+        },
         "startedAt": "2026-08-27T00:00:00.000Z",
         "completedAt": "2026-08-27T00:00:01.000Z",
         "errorCode": null,
         "revokeReason": null
       },
+      "baseProjection": {
+        "schema": "webmcp-credential-operation-receipt/1",
+        "grantId": "grant_deadbeef01234567",
+        "operation": "fill",
+        "status": "completed",
+        "purpose": "login",
+        "fields": [
+          "username",
+          "password"
+        ],
+        "scopeDigest": "sha256:06df333c5648506701de5f13789beb5e91853ae018ccc2f427f69cb05d041f27",
+        "delivered": true,
+        "submitted": true,
+        "secretReturned": false,
+        "exposure": {
+          "mode": "metadata-only",
+          "transcriptExposure": "denied",
+          "destinationDigest": null
+        },
+        "clipboardUsed": false,
+        "postcondition": {
+          "status": "pending",
+          "evidenceRef": null
+        },
+        "errorCode": null,
+        "revokeReason": null
+      },
+      "baseCanonical": "{\"clipboardUsed\":false,\"delivered\":true,\"errorCode\":null,\"exposure\":{\"destinationDigest\":null,\"mode\":\"metadata-only\",\"transcriptExposure\":\"denied\"},\"fields\":[\"username\",\"password\"],\"grantId\":\"grant_deadbeef01234567\",\"operation\":\"fill\",\"postcondition\":{\"evidenceRef\":null,\"status\":\"pending\"},\"purpose\":\"login\",\"revokeReason\":null,\"schema\":\"webmcp-credential-operation-receipt/1\",\"scopeDigest\":\"sha256:06df333c5648506701de5f13789beb5e91853ae018ccc2f427f69cb05d041f27\",\"secretReturned\":false,\"status\":\"completed\",\"submitted\":true}",
+      "baseDigest": "sha256:712f904c35f095e71d7defa0fd8a0aa491d25e8e6c06a4e2f812f8105fde97d7",
+      "mutatedProjection": {
+        "schema": "webmcp-credential-operation-receipt/1",
+        "grantId": "grant_deadbeef01234567",
+        "operation": "fill",
+        "status": "completed",
+        "purpose": "payment",
+        "fields": [
+          "username",
+          "password"
+        ],
+        "scopeDigest": "sha256:06df333c5648506701de5f13789beb5e91853ae018ccc2f427f69cb05d041f27",
+        "delivered": true,
+        "submitted": true,
+        "secretReturned": false,
+        "exposure": {
+          "mode": "metadata-only",
+          "transcriptExposure": "denied",
+          "destinationDigest": null
+        },
+        "clipboardUsed": false,
+        "postcondition": {
+          "status": "pending",
+          "evidenceRef": null
+        },
+        "errorCode": null,
+        "revokeReason": null
+      },
+      "mutatedCanonical": "{\"clipboardUsed\":false,\"delivered\":true,\"errorCode\":null,\"exposure\":{\"destinationDigest\":null,\"mode\":\"metadata-only\",\"transcriptExposure\":\"denied\"},\"fields\":[\"username\",\"password\"],\"grantId\":\"grant_deadbeef01234567\",\"operation\":\"fill\",\"postcondition\":{\"evidenceRef\":null,\"status\":\"pending\"},\"purpose\":\"payment\",\"revokeReason\":null,\"schema\":\"webmcp-credential-operation-receipt/1\",\"scopeDigest\":\"sha256:06df333c5648506701de5f13789beb5e91853ae018ccc2f427f69cb05d041f27\",\"secretReturned\":false,\"status\":\"completed\",\"submitted\":true}",
+      "mutatedDigest": "sha256:6fc73fcab0014a3f8c2b3a9421ffb474241adba3c556704786780d305daa6db1",
+      "digestsDiffer": true,
+      "expectValid": true,
+      "notes": "Changing protected field purpose must change receiptDigest"
+    }
+  ],
+  "invalid": [
+    {
+      "name": "receipt must not contain secret value leak",
+      "receipt": {
+        "schema": "webmcp-credential-operation-receipt/1",
+        "grantId": "grant_deadbeef01234567",
+        "operation": "fill",
+        "status": "completed",
+        "purpose": "login",
+        "fields": [
+          "username",
+          "password"
+        ],
+        "scopeDigest": "sha256:06df333c5648506701de5f13789beb5e91853ae018ccc2f427f69cb05d041f27",
+        "delivered": true,
+        "submitted": true,
+        "secretReturned": false,
+        "exposure": {
+          "mode": "metadata-only",
+          "transcriptExposure": "denied",
+          "destinationDigest": null
+        },
+        "clipboardUsed": false,
+        "postcondition": {
+          "status": "pending",
+          "evidenceRef": null
+        },
+        "startedAt": "2026-08-27T00:00:00.000Z",
+        "completedAt": "2026-08-27T00:00:01.000Z",
+        "errorCode": null,
+        "revokeReason": null
+      },
+      "projection": {
+        "schema": "webmcp-credential-operation-receipt/1",
+        "grantId": "grant_deadbeef01234567",
+        "operation": "fill",
+        "status": "completed",
+        "purpose": "login",
+        "fields": [
+          "username",
+          "password"
+        ],
+        "scopeDigest": "sha256:06df333c5648506701de5f13789beb5e91853ae018ccc2f427f69cb05d041f27",
+        "delivered": true,
+        "submitted": true,
+        "secretReturned": false,
+        "exposure": {
+          "mode": "metadata-only",
+          "transcriptExposure": "denied",
+          "destinationDigest": null
+        },
+        "clipboardUsed": false,
+        "postcondition": {
+          "status": "pending",
+          "evidenceRef": null
+        },
+        "errorCode": null,
+        "revokeReason": null
+      },
+      "canonical": "{\"clipboardUsed\":false,\"delivered\":true,\"errorCode\":null,\"exposure\":{\"destinationDigest\":null,\"mode\":\"metadata-only\",\"transcriptExposure\":\"denied\"},\"fields\":[\"username\",\"password\"],\"grantId\":\"grant_deadbeef01234567\",\"operation\":\"fill\",\"postcondition\":{\"evidenceRef\":null,\"status\":\"pending\"},\"purpose\":\"login\",\"revokeReason\":null,\"schema\":\"webmcp-credential-operation-receipt/1\",\"scopeDigest\":\"sha256:06df333c5648506701de5f13789beb5e91853ae018ccc2f427f69cb05d041f27\",\"secretReturned\":false,\"status\":\"completed\",\"submitted\":true}",
+      "domainLabel": "webmcp-digest-v1:tool-receipt",
+      "receiptDigest": "sha256:712f904c35f095e71d7defa0fd8a0aa491d25e8e6c06a4e2f812f8105fde97d7",
+      "injectExtra": {
+        "value": "canary_pw_deadbeef_leak"
+      },
+      "expectValid": false,
+      "expectedCode": "CREDENTIAL_SECRET_EXPOSURE_DETECTED",
+      "notes": "extra 'value' field would leak secret; receipt must never contain it"
+    },
+    {
+      "name": "receipt must not contain raw profile path",
+      "receipt": {
+        "schema": "webmcp-credential-operation-receipt/1",
+        "grantId": "grant_deadbeef01234567",
+        "operation": "fill",
+        "status": "completed",
+        "purpose": "login",
+        "fields": [
+          "username"
+        ],
+        "scopeDigest": "sha256:06df333c5648506701de5f13789beb5e91853ae018ccc2f427f69cb05d041f27",
+        "delivered": true,
+        "submitted": true,
+        "secretReturned": false,
+        "exposure": {
+          "mode": "metadata-only",
+          "transcriptExposure": "denied",
+          "destinationDigest": null
+        },
+        "clipboardUsed": false,
+        "postcondition": {
+          "status": "pending",
+          "evidenceRef": null
+        },
+        "startedAt": "2026-08-27T00:00:00.000Z",
+        "completedAt": "2026-08-27T00:00:01.000Z",
+        "errorCode": null,
+        "revokeReason": null
+      },
+      "projection": {
+        "schema": "webmcp-credential-operation-receipt/1",
+        "grantId": "grant_deadbeef01234567",
+        "operation": "fill",
+        "status": "completed",
+        "purpose": "login",
+        "fields": [
+          "username"
+        ],
+        "scopeDigest": "sha256:06df333c5648506701de5f13789beb5e91853ae018ccc2f427f69cb05d041f27",
+        "delivered": true,
+        "submitted": true,
+        "secretReturned": false,
+        "exposure": {
+          "mode": "metadata-only",
+          "transcriptExposure": "denied",
+          "destinationDigest": null
+        },
+        "clipboardUsed": false,
+        "postcondition": {
+          "status": "pending",
+          "evidenceRef": null
+        },
+        "errorCode": null,
+        "revokeReason": null
+      },
+      "canonical": "{\"clipboardUsed\":false,\"delivered\":true,\"errorCode\":null,\"exposure\":{\"destinationDigest\":null,\"mode\":\"metadata-only\",\"transcriptExposure\":\"denied\"},\"fields\":[\"username\"],\"grantId\":\"grant_deadbeef01234567\",\"operation\":\"fill\",\"postcondition\":{\"evidenceRef\":null,\"status\":\"pending\"},\"purpose\":\"login\",\"revokeReason\":null,\"schema\":\"webmcp-credential-operation-receipt/1\",\"scopeDigest\":\"sha256:06df333c5648506701de5f13789beb5e91853ae018ccc2f427f69cb05d041f27\",\"secretReturned\":false,\"status\":\"completed\",\"submitted\":true}",
+      "domainLabel": "webmcp-digest-v1:tool-receipt",
+      "receiptDigest": "sha256:eefe2eddf6a2e07b95ec1809fde371eba589363384917314c36be003bdd80f8f",
       "injectExtra": {
         "profilePath": "/tmp/synthetic_profile_001/Default"
       },
@@ -188,10 +471,10 @@
   "canaryScan": {
     "description": "Synthetic markers used for leak scanning; must never appear in receipt JSON, logs, or redacted projections.",
     "markers": [
-      "canary_pw_syn_9f3d_001",
-      "canary_token_syn_a4e2_002",
-      "canary_ssh_syn_7c1b_003",
-      "canary_pw_syn_9f3d_leak"
+      "canary_pw_deadbeef001",
+      "canary_token_deadbeef002",
+      "canary_ssh_deadbeef003",
+      "canary_pw_deadbeef_leak"
     ]
   }
 }
