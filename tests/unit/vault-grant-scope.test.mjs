@@ -5,10 +5,23 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { createRequire } from 'node:module';
+import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
 const { createVaultStore } = require('../../lib/store.js');
+
+const PINNED_RUNNER_COMMIT = 'd34f36ad8f43631aa78ecd0e4f72815165cfb047';
+const PINNED_RUNNER_TREE = 'f0496c8a788424dd233f00de1d6518e84a66a72e';
+const RUNNER_REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../webmcp-automation-runner');
+
+function runnerGitShow(relativePath) {
+  return execFileSync('git', ['-C', RUNNER_REPO, 'show', `${PINNED_RUNNER_COMMIT}:${relativePath}`], { encoding: 'utf8' });
+}
+
+function runnerGitRevParseTree(commit) {
+  return execFileSync('git', ['-C', RUNNER_REPO, 'rev-parse', `${commit}^{tree}`], { encoding: 'utf8' }).trim();
+}
 
 function tempHome() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'webmcp-vault-grant-scope-'));
@@ -110,14 +123,97 @@ test('A1 fixtures and grant schema are well-formed (must pass)', () => {
   assert.equal(raw.includes('grant_syn_'), false, 'old grant_syn_ IDs must be replaced with hex');
   assert.equal(raw.includes('/Users/'), false, 'fixture leaks real path');
   assert.equal(raw.includes('broker-secret'), false);
-  // Claim-digest parity — must exist and be byte-identical to Runner
+  // Claim-digest parity — immutable Runner commit via git show, pinned commit/tree verification
   const claimPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../fixtures/claim-digest-vectors.json');
   assert.ok(fs.existsSync(claimPath), 'claim-digest-vectors.json must exist');
-  const runnerClaimPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../webmcp-automation-runner/tests/fixtures/claim-digest-vectors.json');
-  if (fs.existsSync(runnerClaimPath)) {
-    const a = fs.readFileSync(claimPath, 'utf8');
-    const b = fs.readFileSync(runnerClaimPath, 'utf8');
-    assert.equal(a, b, 'claim-digest-vectors.json must be byte-identical to Runner');
+  // Verify pinned Runner commit and tree via read-only child-process calls (not dirty checkout)
+  const pinnedTree = runnerGitRevParseTree(PINNED_RUNNER_COMMIT);
+  assert.equal(pinnedTree, PINNED_RUNNER_TREE, `Runner pinned commit tree must be ${PINNED_RUNNER_TREE}, got ${pinnedTree}`);
+  const pinnedCommit = execFileSync('git', ['-C', RUNNER_REPO, 'rev-parse', PINNED_RUNNER_COMMIT], { encoding: 'utf8' }).trim();
+  assert.equal(pinnedCommit, PINNED_RUNNER_COMMIT, `Runner pinned commit must be ${PINNED_RUNNER_COMMIT}`);
+  const canonicalRaw = runnerGitShow('tests/fixtures/claim-digest-vectors.json');
+  const localRaw = fs.readFileSync(claimPath, 'utf8');
+  assert.equal(localRaw, canonicalRaw, 'claim-digest-vectors.json must be byte-identical to Runner commit d34f36ad8f43631aa78ecd0e4f72815165cfb047');
+  const expectedHash = 'd6389a590f749df3a464669c415fc1d5ff45ccc2f2c224dc87f4a3f4914524eb';
+  const actualHash = crypto.createHash('sha256').update(localRaw, 'utf8').digest('hex');
+  assert.equal(actualHash, expectedHash, `claim-digest-vectors.json SHA-256 must be ${expectedHash}`);
+  // Validate canonical shared claim fixture as valid strict JSON, exactly 4 vectors
+  let claimFixture;
+  assert.doesNotThrow(() => {
+    claimFixture = JSON.parse(localRaw);
+  }, 'claim-digest-vectors.json must be valid strict JSON');
+  assert.equal(claimFixture.schema, 'webmcp-fixture-vectors/1', 'claim fixture schema must be webmcp-fixture-vectors/1');
+  assert.equal(claimFixture.contract, 'webmcp-runner-claim/1', 'claim contract must be webmcp-runner-claim/1');
+  assert.ok(Array.isArray(claimFixture.vectors), 'claim vectors must be array');
+  assert.equal(claimFixture.vectors.length, 4, 'claim fixture must contain exactly 4 vectors');
+  // Validate no placeholder primary digests in raw claim fixture
+  assert.equal(localRaw.includes('sha256:aaaa'), false, 'placeholder aaaa must be absent in claim fixture');
+  assert.equal(localRaw.includes('sha256:bbbb'), false, 'placeholder bbbb must be absent in claim fixture');
+  assert.equal(localRaw.includes('sha256:' + '0'.repeat(64)), false, 'placeholder zero digest must be absent');
+  assert.equal(localRaw.includes('sha256:' + 'a'.repeat(64)), false, 'placeholder a*64 must be absent');
+  assert.equal(localRaw.includes('sha256:' + 'f'.repeat(64)), false, 'placeholder f*64 must be absent');
+  assert.equal(localRaw.includes('/Users/'), false, 'claim fixture must not leak real path');
+  assert.equal(localRaw.includes('broker-secret'), false, 'claim fixture must not leak secret');
+  // Per-vector deep validation: D1 framing, exclusions, synthetic IDs, mutation divergence, placeholder check
+  const expectedExclusions = ['claimDigest', 'claimToken', 'createdAt', 'claimedAt'];
+  const hex16 = '[0-9a-f]{16}';
+  const synthRun = new RegExp(`^run_${hex16}$`);
+  const synthWorkspace = new RegExp(`^workspace_${hex16}$`);
+  const synthProject = new RegExp(`^project_${hex16}$`);
+  const synthBinding = new RegExp(`^binding_${hex16}$`);
+  for (const vec of claimFixture.vectors) {
+    assert.equal(vec.contractId, 'webmcp-runner-claim/1', `contractId must be webmcp-runner-claim/1 for ${vec.name}`);
+    assert.equal(vec.domainLabel, 'webmcp-digest-v1:claim', `domainLabel must be webmcp-digest-v1:claim for ${vec.name}`);
+    assert.equal(vec.domainSeparation, 'webmcp-digest-v1:claim', `domainSeparation must be webmcp-digest-v1:claim for ${vec.name}`);
+    assert.deepEqual(vec.excludedFromDigest, expectedExclusions, `excludedFromDigest must be exact [claimDigest, claimToken, createdAt, claimedAt] for ${vec.name}`);
+    assert.ok(vec.protectedProjection, `protectedProjection missing for ${vec.name}`);
+    assert.ok(vec.value, `value missing for ${vec.name}`);
+    assert.ok(vec.mutation, `mutation missing for ${vec.name}`);
+    // Strict synthetic IDs — prefixed lowercase hex 16
+    assert.match(vec.protectedProjection.runId, synthRun, `runId synthetic strict for ${vec.name}`);
+    assert.match(vec.protectedProjection.workspaceId, synthWorkspace, `workspaceId synthetic strict for ${vec.name}`);
+    assert.match(vec.protectedProjection.projectId, synthProject, `projectId synthetic strict for ${vec.name}`);
+    assert.match(vec.protectedProjection.bindingId, synthBinding, `bindingId synthetic strict for ${vec.name}`);
+    assert.equal(vec.value.runId, vec.protectedProjection.runId, `value.runId must mirror protectedProjection for ${vec.name}`);
+    assert.equal(vec.value.workspaceId, vec.protectedProjection.workspaceId, `value.workspaceId must mirror for ${vec.name}`);
+    assert.equal(vec.value.projectId, vec.protectedProjection.projectId, `value.projectId must mirror for ${vec.name}`);
+    assert.equal(vec.value.bindingId, vec.protectedProjection.bindingId, `value.bindingId must mirror for ${vec.name}`);
+    // Placeholder primary digests must not appear; all digests strict sha256
+    for (const field of ['sourceDigest', 'revisionDigest', 'runbookDigest', 'requestDigest', 'inputBindingsDigest', 'bindingDigest']) {
+      const d = vec.protectedProjection[field];
+      assert.match(d, sha256, `${field} must be sha256 hex for ${vec.name}`);
+      assert.equal(d.includes('aaaa'), false, `placeholder aaaa in ${field} for ${vec.name}`);
+      assert.equal(d.includes('bbbb'), false, `placeholder bbbb in ${field} for ${vec.name}`);
+      assert.notEqual(d, 'sha256:' + '0'.repeat(64), `placeholder zero digest in ${field} for ${vec.name}`);
+      assert.notEqual(d, 'sha256:' + 'a'.repeat(64), `placeholder a*64 in ${field} for ${vec.name}`);
+      assert.notEqual(d, 'sha256:' + 'f'.repeat(64), `placeholder f*64 in ${field} for ${vec.name}`);
+    }
+    if (vec.protectedProjection.approvalDigest !== null) {
+      assert.match(vec.protectedProjection.approvalDigest, sha256, `approvalDigest must be sha256 for ${vec.name}`);
+      assert.notEqual(vec.protectedProjection.approvalDigest, 'sha256:' + '0'.repeat(64));
+    }
+    assert.match(vec.digest, sha256, `digest must be sha256 for ${vec.name}`);
+    assert.match(vec.value.claimDigest, sha256, `value.claimDigest must be sha256 for ${vec.name}`);
+    assert.equal(vec.value.claimDigest, vec.digest, `value.claimDigest must equal digest for ${vec.name}`);
+    // Exact D1 domain label/framing: RFC8785 JCS UTF-8, domainLabel + LF + canonical
+    const recomputed = digestLF(vec.domainLabel, vec.protectedProjection);
+    assert.equal(vec.canonical, recomputed.canonical, `canonical mismatch for ${vec.name}: expected JCS`);
+    assert.equal(vec.digest, recomputed.digest, `digest mismatch for ${vec.name}: expected D1 framing domainLabel LF canonical`);
+    assert.equal(vec.value.claimDigest, recomputed.digest, `value.claimDigest must equal D1 recomputed for ${vec.name}`);
+    // Canonical must be valid JCS (no whitespace, sorted keys) — already validated via recomputed canonical equality
+    assert.equal(typeof vec.canonical, 'string');
+    // Mutation digest divergence: must differ and recomputes correctly
+    assert.equal(vec.mutation.digestsDiffer, true, `mutation digestsDiffer must be true for ${vec.name}`);
+    assert.notEqual(vec.mutation.digest, vec.digest, `mutation digest must diverge for ${vec.name}`);
+    const mutRecomputed = digestLF(vec.domainLabel, vec.mutation.protectedProjection);
+    assert.equal(vec.mutation.canonical, mutRecomputed.canonical, `mutation canonical mismatch for ${vec.name}`);
+    assert.equal(vec.mutation.digest, mutRecomputed.digest, `mutation digest mismatch for ${vec.name}`);
+    // Placeholder check for mutation as well
+    for (const field of ['sourceDigest', 'revisionDigest', 'runbookDigest', 'requestDigest', 'inputBindingsDigest', 'bindingDigest']) {
+      if (vec.mutation.protectedProjection[field]) {
+        assert.notEqual(vec.mutation.protectedProjection[field], 'sha256:' + '0'.repeat(64));
+      }
+    }
   }
 });
 
