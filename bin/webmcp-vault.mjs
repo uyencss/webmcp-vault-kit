@@ -65,7 +65,7 @@ Usage:
   webmcp-vault delete <id-or-query> --confirm [--json]
   webmcp-vault lease issue (--stdin-json | --input-json <file>) [--json]
   webmcp-vault lease read --lease-id <id> --token <token> --field <field> --site-origin <origin> --profile-binding-id <id> --purpose <purpose> [--json]
-  webmcp-vault lease fill (--stdin-json | --input-json <file>) [--gateway-url <loopback-url>] [--gateway-token <token>] [--json]
+  webmcp-vault lease fill (--stdin-json | --input-json <file>) [--gateway-url <loopback-url>] [--gateway-token <token>] [--permit-file <file>] [--json]
   webmcp-vault lease revoke --lease-id <id> [--reason timeout|cancelled|profile-released|auth-completed|operator] [--json]
   webmcp-vault list-vaults [--json]
   webmcp-vault create-vault --name <name> [--description <text>] [--icon <icon>] [--json]
@@ -87,6 +87,7 @@ Environment:
   WEBMCP_VAULT_NEW_KEY    Replacement key for rotate-key (prefer NEW_KEY_FILE)
   WEBMCP_VAULT_NEW_KEY_FILE Read the replacement key from a file
   WEBMCP_HOME             Data dir (default ~/.webmcp); vault at vault/credentials.enc.json
+  WEBMCP_PERMIT_FILE        Permit JSON file attached as top-level permit to broker fill gateway calls (or --permit-file)
 
 Secure input examples:
   printf '{"title":"GitHub","web":"https://github.com","username":"me","password":"..."}' \\
@@ -120,7 +121,7 @@ function loopbackGatewayApi(value = 'http://127.0.0.1:7865/api') {
   return url.href;
 }
 
-function createHttpGateway({ gatewayUrl, token }) {
+function createHttpGateway({ gatewayUrl, token, permit }) {
   const url = loopbackGatewayApi(gatewayUrl);
   return {
     async call(method, params = {}) {
@@ -135,15 +136,89 @@ function createHttpGateway({ gatewayUrl, token }) {
           method,
           params: toolParams,
           ...(profileId ? { profileId } : {}),
+          ...(permit !== undefined ? { permit } : {}),
         }),
       });
       const body = await response.json().catch(() => null);
       if (!response.ok || body?.error) {
-        throw new Error(typeof body?.error === 'string' ? body.error : 'Gateway call failed.');
+        throw typedGatewayError(body?.error, { status: response.status, reason: body?.reason });
       }
       return body;
     },
   };
+}
+
+// Preserve the typed gateway error `code` on the thrown error (with the code
+// in the message) instead of flattening an object error to 'Gateway call
+// failed.'. The real gateway returns string-form denials
+// ({ error: "PROFILE_FENCE_REQUIRED", reason: "PROFILE_FENCE_REQUIRED" });
+// older shapes carry an object ({ error: { code, message } }). Both decode
+// to `error.code` so broker.js rethrowTyped() propagates coded errors
+// end-to-end instead of wrapping them as `gateway fill failed…`.
+const GATEWAY_CODE_RE = /^[A-Z][A-Z0-9_]{2,}$/;
+function typedGatewayError(gatewayErrorPayload, context = {}) {
+  let code;
+  let detail;
+  if (gatewayErrorPayload && typeof gatewayErrorPayload === 'object') {
+    code = typeof gatewayErrorPayload.code === 'string' ? gatewayErrorPayload.code : undefined;
+    detail = code && gatewayErrorPayload.message
+      ? `${code}: ${gatewayErrorPayload.message}`
+      : (code ?? JSON.stringify(gatewayErrorPayload));
+  } else if (typeof gatewayErrorPayload === 'string' && GATEWAY_CODE_RE.test(gatewayErrorPayload.trim())) {
+    code = gatewayErrorPayload.trim();
+    detail = code;
+  } else {
+    const fallback = typeof context?.reason === 'string' && GATEWAY_CODE_RE.test(context.reason.trim())
+      ? context.reason.trim()
+      : undefined;
+    code = fallback ?? (Number.isInteger(context?.status) ? `GATEWAY_HTTP_${context.status}` : 'GATEWAY_CALL_FAILED');
+    const raw = typeof gatewayErrorPayload === 'string' && gatewayErrorPayload.trim()
+      ? gatewayErrorPayload.trim()
+      : '';
+    detail = raw && raw !== code ? `${code}: ${raw}` : code;
+  }
+  const error = new Error(typeof detail === 'string' ? detail : JSON.stringify(detail));
+  error.code = code;
+  return error;
+}
+
+// B2 broker permit plumbing: --permit-file <path> wins, WEBMCP_PERMIT_FILE
+// env is the fallback. Flag-present-strict: when --permit-file is passed its
+// value is used verbatim — an empty value (--permit-file=) is a typed
+// WEBMCP_PERMIT_INVALID usage error and never falls through to the env.
+// Unset → undefined (body unchanged). Set-but-broken → typed
+// WEBMCP_PERMIT_INVALID (never silently dropped).
+function resolveBrokerPermit(flags) {
+  if (Object.hasOwn(flags, 'permit-file')) {
+    const flag = flags['permit-file'];
+    if (flag === true || flag === undefined || flag === null || (typeof flag === 'string' && !flag.trim())) {
+      throw permitFailure('Use --permit-file <path> with a permit JSON file path.');
+    }
+    return readPermitFile(flag);
+  }
+  const envFile = process.env.WEBMCP_PERMIT_FILE;
+  if (!envFile) return undefined;
+  return readPermitFile(envFile);
+}
+
+function readPermitFile(permitFile) {
+  let raw;
+  try {
+    raw = readFileSync(resolve(process.cwd(), String(permitFile)), 'utf8');
+  } catch (error) {
+    throw permitFailure(`permit file is unreadable (${permitFile}): ${error?.message ?? error}`);
+  }
+  try {
+    return JSON.parse(raw);
+  } catch (error) {
+    throw permitFailure(`permit file holds invalid JSON (${permitFile}): ${error?.message ?? error}`);
+  }
+}
+
+function permitFailure(message) {
+  const error = new Error(`WEBMCP_PERMIT_INVALID: ${message}`);
+  error.code = 'WEBMCP_PERMIT_INVALID';
+  return error;
 }
 
 function printHuman(payload, fallback = '') {
@@ -426,6 +501,7 @@ async function run(args) {
         gateway: createHttpGateway({
           gatewayUrl: flags['gateway-url'] || process.env.WEBMCP_GATEWAY_URL || 'http://127.0.0.1:7865/api',
           token: flags['gateway-token'] === true ? null : (flags['gateway-token'] || process.env.WEBMCP_GATEWAY_TOKEN || null),
+          permit: resolveBrokerPermit(flags),
         }),
       });
       printJsonOrHuman(payload, json, `Filled ${payload.fields.length} field(s) for ${payload.purpose}.`);
