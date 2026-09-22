@@ -9,7 +9,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/uyencss/web-automation-extension.git"
+    "url": "git+https://github.com/uyencss/webmcp-vault-kit.git"
   },
   "bin": {
     "webmcp-vault": "bin/webmcp-vault.mjs"
