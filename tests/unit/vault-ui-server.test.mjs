@@ -342,7 +342,7 @@ test('vault UI Phase 3: type selector and dynamic typed-fields region are served
   assert.match(html, /<option value="api_token">API token<\/option>/);
   assert.match(html, /<option value="ssh_key">SSH key<\/option>/);
   assert.match(html, /<option value="env">Env bundle<\/option>/);
-  assert.match(html, /Type cannot be changed after an item is created\./);
+  assert.match(html, /Choose type \(Login, API token, SSH key, Env bundle\)\./);
   assert.match(html, /id="typedFieldsSection"/);
   assert.match(html, /id="fieldsList"/);
   assert.match(html, /id="addFieldButton"/);

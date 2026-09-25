@@ -228,22 +228,24 @@ test('typed field validation enforces charset, uniqueness, secret flag, and size
   assert.throws(() => normalizeItemInput({ type: 'bogus', title: 'Unknown type' }), /Unsupported item type/);
 });
 
-test('item type cannot be changed after creation', () => {
+test('item type can be changed on update', () => {
   const dataDir = tempHome();
-  const store = createVaultStore({ dataDir, key: 'type-immutable-key' });
+  const store = createVaultStore({ dataDir, key: 'type-mutable-key' });
   store.init();
-  const login = store.createItem({ title: 'Immutable login', username: 'u' });
-  assert.throws(() => store.updateItem(login.id, {
+  const login = store.createItem({ title: 'Mutable login', username: 'u', password: 'p' });
+  const updatedToToken = store.updateItem(login.id, {
     type: 'api_token',
-    fields: [{ name: 'token', value: 'x', secret: true }],
-  }), /type cannot be changed/);
-
-  const token = store.createItem({
-    type: 'api_token',
-    title: 'Immutable token',
     fields: [{ name: 'token', value: 'x', secret: true }],
   });
-  assert.throws(() => store.updateItem(token.id, { type: 'login' }), /type cannot be changed/);
+  assert.strictEqual(updatedToToken.type, 'api_token');
+
+  const updatedBackToLogin = store.updateItem(login.id, {
+    type: 'login',
+    username: 'u2',
+    password: 'p2',
+  });
+  assert.strictEqual(updatedBackToLogin.type, 'login');
+  assert.strictEqual(store.readField(login.id, 'password'), 'p2');
 });
 
 test('redactItem never exposes a typed secret value', () => {
