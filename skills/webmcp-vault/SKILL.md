@@ -15,18 +15,78 @@ installed, use the equivalent standalone form `webmcp-vault <cmd>`.
 
 ## Start Here
 
-Check the CLI and vault state:
+Bootstrap the vault in order: **doctor → init → ui**.
+
+### 1. Check CLI and vault state
 
 ```bash
 command -v webmcp
 webmcp vault doctor --json
 ```
 
-If `doctor` says the vault key is missing, ask the user to provide or configure
-`WEBMCP_VAULT_KEY`/`WEBMCP_VAULT_KEY_FILE`. Do not ask the user to paste the key
-into ordinary chat when a local environment variable or key file can be used.
-The package does not load `.env` files itself; configure the environment of the
-automation/runtime process that runs the command.
+`doctor` returns `initialized` (whether the encrypted store exists), `key`
+(whether a key source is configured and from where), and `unlocked` (whether
+the key can decrypt the store). If the key is missing, configure
+`WEBMCP_VAULT_KEY_FILE` (preferred) or `WEBMCP_VAULT_KEY` as an environment
+variable in the automation/runtime process. Do not ask the user to paste the key
+into ordinary chat. The package does not load `.env` files itself.
+
+### 2. Initialize the encrypted store
+
+If `doctor` reports `initialized: false`, create the vault:
+
+```bash
+WEBMCP_VAULT_KEY_FILE=~/.webmcp/vault/vault.key webmcp vault init --json
+```
+
+This creates `~/.webmcp/vault/credentials.enc.json` with a default **Personal**
+vault folder. If the file already exists, `init` is a no-op (returns
+`created: false`). Pass `--force` to re-initialize an existing store.
+
+### 3. Start the Vault UI server
+
+When a human needs to add, edit, import, or visually manage entries, start the
+local web UI:
+
+```bash
+WEBMCP_VAULT_KEY_FILE=~/.webmcp/vault/vault.key webmcp vault ui --json
+```
+
+The server binds to `http://127.0.0.1:7876` by default and prints a one-time
+token URL (e.g. `http://127.0.0.1:7876/?token=<hex>`). The token is required to
+access the UI and is generated fresh on every startup.
+
+Available flags:
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--host <ip>` | `127.0.0.1` | Bind address (use `0.0.0.0` to expose on LAN) |
+| `--port <number>` | `7876` | Listen port |
+| `--json` | off | Print `{ ok, url, host, port, token }` as JSON |
+
+When the process inherits `WEBMCP_VAULT_KEY` or `WEBMCP_VAULT_KEY_FILE`, the
+lock screen shows a one-click configured-key unlock button. Otherwise the user
+must paste the key manually.
+
+**Running as a background daemon.** The `ui` command is a long-running HTTP
+server. In agent runtimes, start it as a daemon/background task so it stays
+alive while automation continues:
+
+```bash
+# Agent daemon example (Antigravity / Codex)
+WEBMCP_VAULT_KEY_FILE=~/.webmcp/vault/vault.key webmcp vault ui --json &
+```
+
+The server keeps running until the process is killed. Agents should parse the
+JSON output to capture the `url` field for opening in a browser or passing to
+automation tools.
+
+**Bootstrap decision tree (agent shortcut):**
+
+1. Run `webmcp vault doctor --json`.
+2. If `initialized: false` → run `webmcp vault init --json`.
+3. If the UI is needed → run `webmcp vault ui --json` as a background daemon.
+4. Open the printed token URL in a browser or pass it to browser automation.
 
 ## Read Path
 
@@ -108,14 +168,16 @@ The `--preview` flag returns importable/duplicate/error counts and redacted item
 metadata without writing anything to the vault. Always preview first when
 importing large CSV files.
 
-Open the local UI when a human should add, edit, or import (CSV) entries:
+Open the local UI when a human should add, edit, or import (CSV) entries (see
+**Start Here § 3** for full bootstrap and daemon guidance):
 
 ```bash
-webmcp vault ui
+WEBMCP_VAULT_KEY_FILE=~/.webmcp/vault/vault.key webmcp vault ui --json
 ```
 
-When the UI server inherits a configured key, its lock screen provides a
-one-click configured-key unlock without exposing that key to browser storage.
+The command prints a token-secured URL. Every API call from the browser carries
+the token in `X-WebMCP-Vault-Token` and the unlock key in
+`X-WebMCP-Vault-Key`. Secrets never touch `localStorage` or cookies.
 CSV import displays a redacted preview and requires confirmation before writing.
 
 ## Typed Credentials (API Token, SSH Key, Env Bundle)
@@ -150,7 +212,8 @@ printf '%s' '{"type":"ssh_key","title":"deploy host","fields":[{"name":"private_
 ```
 
 `api_token` requires a secret `token` field; `ssh_key` requires a secret
-`private_key` field. `type` cannot change after creation.
+`private_key` field. An item's `type` can be changed on update; the vault
+automatically migrates fields between layouts (login columns ↔ typed `fields[]`).
 
 Import a whole `.env` file as one `env` item (comments, blank lines, an
 optional `export ` prefix, and quoted values are all supported; every parsed
