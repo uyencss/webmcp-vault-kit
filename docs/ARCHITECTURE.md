@@ -238,6 +238,10 @@ Type change would drop fields: <field1>, <field2>
 
 The change is permitted only when the caller explicitly specifies
 `dropFields: true` (CLI: `webmcp-vault update <id> --drop-fields`).
+When `dropFields: true` is used, any secret field mapping to a plaintext/non-secret
+property (e.g. secret `username`, `web`, or `note`) is **discarded** (not converted
+or revealed in plaintext). To preserve its value, migrate it to a secret property
+(such as `password` or `otp_secret`) or rename the field prior to type conversion.
 
 ### Redaction / reveal
 
