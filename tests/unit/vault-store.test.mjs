@@ -18,11 +18,12 @@ const {
 const {
   writeEnvelope,
   readEnvelope,
+  readEnvelopeRaw,
   emptyVault,
   encryptVault,
   MAX_ENVELOPE_BYTES,
 } = require('../../lib/vault/envelope.js');
-const { fileDigest, assertFileUnchanged } = require('../../lib/vault/fs-safe.js');
+const { fileDigest, assertFileUnchanged, sameFilePath } = require('../../lib/vault/fs-safe.js');
 
 function tempHome() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'webmcp-vault-store-'));
@@ -762,5 +763,79 @@ test('integrity: saveVault still succeeds on unchanged file', () => {
   const updated = store.updateItem(item1.id, { title: 'Item 1 Updated' });
   assert.equal(updated.title, 'Item 1 Updated');
 });
+
+test('integrity: readEnvelopeRaw digest matches the parsed bytes', () => {
+  const dir = tempHome();
+  const file = path.join(dir, 'test-envelope-raw.enc.json');
+  const initialEnvelope = encryptVault(emptyVault(), 'secret-key-raw-1234');
+  writeEnvelope(file, initialEnvelope);
+
+  const raw = readEnvelopeRaw(file);
+  assert.ok(raw, 'readEnvelopeRaw must return non-null for existing envelope');
+  assert.ok(Buffer.isBuffer(raw.bytes), 'raw.bytes must be a Buffer');
+
+  const expectedDigest = crypto.createHash('sha256').update(raw.bytes).digest('hex');
+  assert.equal(raw.digest, expectedDigest);
+
+  const parsedFromBytes = JSON.parse(raw.bytes.toString('utf8'));
+  assert.equal(parsedFromBytes.version, raw.envelope.version);
+  assert.equal(raw.envelope.version, 1);
+  assert.equal(raw.envelope.cipher, 'aes-256-gcm');
+});
+
+test('integrity: sameFilePath detects same-inode aliases', () => {
+  const dir = tempHome();
+  const fileX = path.join(dir, 'file-x.txt');
+  fs.writeFileSync(fileX, 'hello world x');
+
+  const fileY = path.join(dir, 'file-y-hardlink.txt');
+  fs.linkSync(fileX, fileY);
+
+  const fileZ = path.join(dir, 'file-z-symlink.txt');
+  fs.symlinkSync(fileX, fileZ);
+
+  const fileOther = path.join(dir, 'file-other.txt');
+  fs.writeFileSync(fileOther, 'different file content');
+
+  assert.equal(sameFilePath(fileX, fileY), true, 'hardlink with same inode must return true');
+  assert.equal(sameFilePath(fileX, fileZ), true, 'symlink pointing to target must return true');
+  assert.equal(sameFilePath(fileX, fileOther), false, 'different files must return false');
+
+  // Case-variant on APFS (macOS default is case-insensitive)
+  const caseVariant = path.join(dir, 'FILE-X.TXT');
+  let isCaseInsensitiveFs = false;
+  try {
+    const statOrig = fs.statSync(fileX);
+    const statUpper = fs.statSync(caseVariant);
+    if (statOrig.dev === statUpper.dev && statOrig.ino === statUpper.ino) {
+      isCaseInsensitiveFs = true;
+    }
+  } catch {
+    // Case-sensitive filesystem (stat failed with ENOENT)
+  }
+
+  if (isCaseInsensitiveFs) {
+    assert.equal(sameFilePath(fileX, caseVariant), true, 'case-variant on case-insensitive FS must return true');
+  }
+});
+
+test('integrity: rotateKey refuses a hardlinked alias of the active vault', () => {
+  const dataDir = tempHome();
+  const store = createVaultStore({ dataDir, key: 'rotate-hardlink-key-1234' });
+  store.init();
+
+  const hardlinkVault = path.join(dataDir, 'alias-vault-hardlink.enc.json');
+  fs.linkSync(store.file, hardlinkVault);
+
+  assert.throws(
+    () => store.rotateKey({
+      newKey: 'new-strong-vault-key-5678-meets-minimum-length-requirement',
+      backupFile: hardlinkVault,
+      forceBackup: true,
+    }),
+    /Backup path must be different from the active vault file\./,
+  );
+});
+
 
 
