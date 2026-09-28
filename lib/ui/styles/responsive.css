@@ -2,11 +2,27 @@
   outline: var(--focus);
   outline-offset: var(--focus-offset);
 }
+.mobile-back-button {
+  display: none !important;
+}
 @media (max-width: 900px) {
   .app-shell {
     min-height: 0;
     display: block;
     padding: var(--s4);
+  }
+  .main.has-selected-item .vault-sidebar,
+  .main.has-selected-item .rail {
+    display: none !important;
+  }
+  .mobile-back-button {
+    display: none !important;
+  }
+  .main.has-selected-item .mobile-back-button {
+    display: inline-flex !important;
+    align-items: center;
+    gap: var(--s1);
+    margin-bottom: var(--s2);
   }
   .bar {
     flex-wrap: wrap;
@@ -80,6 +96,22 @@
   .bar,
   .detail {
     padding: var(--s4);
+  }
+  .field-row {
+    flex-wrap: wrap;
+  }
+  .field-row .field-value-wrap {
+    flex: 1 1 100% !important;
+    width: 100%;
+  }
+  .field-row .view-field {
+    flex: 1 1 100% !important;
+    width: 100%;
+  }
+  .field-row .field-actions {
+    flex: 1 1 100%;
+    display: flex;
+    justify-content: flex-end;
   }
   .lockcard {
     padding: var(--s6);

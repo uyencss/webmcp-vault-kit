@@ -396,9 +396,9 @@ textarea {
 
 /* Single-row dynamic field container */
 .field-row {
-  display: flex !important;
-  flex-direction: row !important;
-  align-items: center !important;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
   gap: var(--s2);
   width: 100%;
   padding: 6px var(--s2);
@@ -520,6 +520,19 @@ textarea {
 .field-value-input:focus {
   outline: var(--focus);
   outline-offset: -1px;
+}
+
+textarea.field-value-input {
+  height: auto;
+  min-height: 72px;
+  resize: vertical;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+textarea.field-value-input.is-secret-masked {
+  -webkit-text-security: disc;
 }
 
 /* View field in view mode inside a row */
