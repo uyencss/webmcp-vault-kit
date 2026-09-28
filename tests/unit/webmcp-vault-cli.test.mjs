@@ -617,6 +617,30 @@ test('integrity: lease fill rejects invalid gateway token values', () => {
   });
   assert.notEqual(resEmpty.status, 0);
   assert.match(resEmpty.stderr, /--gateway-token requires a non-empty token value/);
+
+  const resBare = runVault([
+    'lease', 'fill',
+    '--gateway-token',
+    '--stdin-json',
+    '--json',
+  ], {
+    home,
+    input: JSON.stringify({ leaseId: 'dummy', profileId: 'default' }),
+  });
+  assert.notEqual(resBare.status, 0);
+  assert.match(resBare.stderr, /--gateway-token requires a non-empty token value/);
+
+  const resTrue = runVault([
+    'lease', 'fill',
+    '--gateway-token=true',
+    '--stdin-json',
+    '--json',
+  ], {
+    home,
+    input: JSON.stringify({ leaseId: 'dummy', profileId: 'default' }),
+  });
+  assert.notEqual(resTrue.status, 0);
+  assert.match(resTrue.stderr, /--gateway-token requires a non-empty token value/);
 });
 
 test('integrity: init --force backs up existing vault', () => {
@@ -647,5 +671,27 @@ test('integrity: init --force backs up existing vault', () => {
     listed.items.map((it) => it.id).sort(),
     [item1.id, item2.id].sort(),
   );
+});
+
+test('integrity: non-boolean flag values are not coerced', () => {
+  const home = tempHome();
+  parseJson(runVault(['init', '--json'], { home }));
+
+  const created = parseJson(runVault(['create', '--stdin-json', '--json'], {
+    home,
+    input: JSON.stringify({ title: 'no-problem', username: 'bob' }),
+  }));
+  parseJson(runVault(['create', '--stdin-json', '--json'], {
+    home,
+    input: JSON.stringify({ title: 'yes-indeed', username: 'alice' }),
+  }));
+
+  const listed = parseJson(runVault(['list', '--search', 'no', '--json'], { home }));
+  assert.equal(listed.items.length, 1);
+  assert.equal(listed.items[0].id, created.item.id);
+  assert.equal(listed.items[0].title, 'no-problem');
+
+  const vaultRes = parseJson(runVault(['create-vault', '--name', 'false', '--json'], { home }));
+  assert.equal(vaultRes.vault.name, 'false');
 });
 

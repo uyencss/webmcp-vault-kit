@@ -18,7 +18,19 @@ function getVaultBroker() {
   return requireFromBin(resolve(ROOT, 'lib', 'broker.js'));
 }
 
-function coerceFlagValue(value) {
+const KNOWN_BOOLEAN_FLAGS = new Set([
+  'force',
+  'json',
+  'reveal',
+  'confirm',
+  'preview',
+  'stdin-json',
+  'drop-fields',
+  'force-backup',
+]);
+
+function coerceFlagValue(key, value) {
+  if (!KNOWN_BOOLEAN_FLAGS.has(key)) return value;
   if (value === 'false' || value === '0' || value === 'no') return false;
   if (value === 'true' || value === '1' || value === 'yes') return true;
   return value;
@@ -35,13 +47,14 @@ function parseFlags(args) {
     }
     const eq = arg.indexOf('=');
     if (eq !== -1) {
-      flags[arg.slice(2, eq)] = coerceFlagValue(arg.slice(eq + 1));
+      const key = arg.slice(2, eq);
+      flags[key] = coerceFlagValue(key, arg.slice(eq + 1));
       continue;
     }
     const key = arg.slice(2);
     const next = args[i + 1];
     if (next && !next.startsWith('--')) {
-      flags[key] = coerceFlagValue(next);
+      flags[key] = coerceFlagValue(key, next);
       i += 1;
     } else {
       flags[key] = true;
@@ -211,10 +224,17 @@ function resolveBrokerPermit(flags) {
 function resolveGatewayToken(flags) {
   if (Object.hasOwn(flags, 'gateway-token')) {
     const flag = flags['gateway-token'];
-    if (flag === false || flag === '' || (typeof flag === 'string' && !flag.trim())) {
+    if (
+      flag === true ||
+      flag === false ||
+      flag === 'true' ||
+      flag === 'false' ||
+      flag === '' ||
+      (typeof flag === 'string' && !flag.trim())
+    ) {
       throw new Error('--gateway-token requires a non-empty token value.');
     }
-    return flag === true ? null : String(flag);
+    return String(flag);
   }
   return process.env.WEBMCP_GATEWAY_TOKEN || null;
 }
