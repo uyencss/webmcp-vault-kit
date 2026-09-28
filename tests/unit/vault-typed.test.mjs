@@ -882,6 +882,56 @@ test('integrity: type mapping enforces target limits', () => {
   assert.equal(store.readField(loginAgain.id, 'note'), 'n'.repeat(4000));
 });
 
+test('integrity: legacy duplicate-case fields keep the secret twin on empty update', () => {
+  const dataDir = tempHome();
+  const key = 'legacy-dup-empty-key';
+  const store = createVaultStore({ dataDir, key });
+  store.init();
 
+  const vault = {
+    version: 2,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    vaults: [{
+      id: 'personal',
+      name: 'Personal',
+      description: 'Private credentials stored on this device.',
+      icon: 'key',
+      isDefault: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }],
+    items: [{
+      id: 'legacy-case-item-dup',
+      vaultId: 'personal',
+      type: 'api_token',
+      title: 'Legacy Case Colliding Item',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      fields: [
+        { name: 'Token', value: 'meta', secret: false },
+        { name: 'token', value: 'SECRET', secret: true },
+      ],
+    }],
+  };
 
+  writeEnvelope(store.file, encryptVault(vault, key));
 
+  const updated = store.updateItem('legacy-case-item-dup', {
+    fields: [
+      { name: 'token', value: '', secret: false },
+      { name: 'Token', value: 'meta', secret: false },
+    ],
+  });
+
+  assert.equal(store.readField('legacy-case-item-dup', 'token'), 'SECRET');
+  const tokenField = updated.fields.find((f) => f.name === 'token');
+  assert.ok(tokenField);
+  assert.equal(tokenField.secret, true);
+
+  const revealed = store.getItem('legacy-case-item-dup', { reveal: true });
+  const revealedToken = revealed.fields.find((f) => f.name === 'token');
+  assert.ok(revealedToken);
+  assert.equal(revealedToken.secret, true);
+  assert.equal(revealedToken.value, 'SECRET');
+});
