@@ -10,7 +10,8 @@ import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
 const { createVaultStore } = require('../../lib/store.js');
-const { STALE_LOCK_MS, withFileLock } = require('../../lib/vault/fs-safe.js');
+const { STALE_LOCK_MS, withFileLock, assertActiveLockOwned } = require('../../lib/vault/fs-safe.js');
+const { writeEnvelope, encryptVault } = require('../../lib/vault/envelope.js');
 
 const __filename = fileURLToPath(import.meta.url);
 
@@ -240,4 +241,58 @@ test('integrity: withFileLock fails when its lock was stolen during the callback
       fs.rmSync(dir, { recursive: true, force: true });
     } catch {}
   }
+});
+
+test('integrity: writeEnvelope refuses to write while the owned lock was replaced', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'webmcp-vault-write-lock-'));
+  const store = createVaultStore({ dataDir: dir, key: 'write-lock-key-1234' });
+  store.init();
+
+  const originalBytes = fs.readFileSync(store.file);
+  const originalSha256 = crypto.createHash('sha256').update(originalBytes).digest('hex');
+  const lockFile = `${store.file}.lock`;
+
+  assert.throws(
+    () => {
+      withFileLock(store.file, () => {
+        // Ghi đè lock file bằng nonce lạ
+        fs.writeFileSync(
+          lockFile,
+          JSON.stringify({ pid: process.pid, nonce: 'foreign-nonce', createdAt: new Date().toISOString() }),
+        );
+        const newEnvelope = encryptVault({
+          version: 1,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          vaults: [],
+          items: [{ id: 'stolen', title: 'Should Not Exist', fields: [] }],
+        }, 'write-lock-key-1234');
+
+        writeEnvelope(store.file, newEnvelope);
+      });
+    },
+    /busy with another writer/i,
+  );
+
+  const afterBytes = fs.readFileSync(store.file);
+  const afterSha256 = crypto.createHash('sha256').update(afterBytes).digest('hex');
+  assert.equal(afterSha256, originalSha256, 'Vault file sha256 must remain unchanged');
+});
+
+test('integrity: assertActiveLockOwned is a no-op for non-locked targets', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'webmcp-vault-noop-lock-'));
+  const unlockedFile = path.join(dir, 'unlocked.enc.json');
+  const envelope = encryptVault({
+    version: 1,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    vaults: [],
+    items: [],
+  }, 'noop-lock-key');
+
+  assert.doesNotThrow(() => {
+    assertActiveLockOwned(unlockedFile);
+    writeEnvelope(unlockedFile, envelope);
+  });
+  assert.equal(fs.existsSync(unlockedFile), true);
 });

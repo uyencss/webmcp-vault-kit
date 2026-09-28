@@ -12,6 +12,7 @@ const {
   normalizeItemInput,
   MAX_FIELDS_PER_ITEM,
   FIELD_NAME_MAX_LENGTH,
+  itemMatchesSearch,
 } = require('../../lib/vault/model.js');
 const { writeEnvelope, encryptVault } = require('../../lib/vault/envelope.js');
 
@@ -682,6 +683,68 @@ test('integrity: merged fields cannot exceed 256 entries', () => {
     }),
     /fields cannot exceed 256 entries/i,
   );
+});
+
+test('integrity: mapped carry-over cannot downgrade a secret field', () => {
+  const dataDir = tempHome();
+  const store = createVaultStore({ dataDir, key: 'carry-over-secret-key' });
+  store.init();
+
+  const login = store.createItem({
+    title: 'Secret Login',
+    username: 'alice',
+    password: 'TOPSECRET',
+    note: 'some note',
+  });
+
+  // Convert login -> api_token, providing a Password field with secret: false and empty value
+  store.updateItem(login.id, {
+    type: 'api_token',
+    fields: [
+      { name: 'token', value: 'sk-token-123', secret: true },
+      { name: 'Password', value: '', secret: false },
+    ],
+    dropFields: true,
+  });
+
+  const updated = store.getItem(login.id, { reveal: true });
+  const pwField = updated.fields.find((f) => f.name.toLowerCase() === 'password');
+  assert.ok(pwField, 'password field must exist');
+  assert.equal(pwField.value, 'TOPSECRET');
+  assert.equal(pwField.secret, true, 'carried over password field must have secret: true');
+  assert.equal(itemMatchesSearch(updated, 'TOPSECRET'), false, 'item with carried over secret must not match search');
+});
+
+test('integrity: typed merge keeps old secret flag when filling empty value', () => {
+  const dataDir = tempHome();
+  const store = createVaultStore({ dataDir, key: 'typed-merge-secret-key' });
+  store.init();
+
+  const ssh = store.createItem({
+    type: 'ssh_key',
+    title: 'SSH Item',
+    fields: [
+      { name: 'private_key', value: 'old-secret-privkey', secret: true },
+      { name: 'public_key', value: 'ssh-ed25519 AAA', secret: false },
+    ],
+  });
+
+  // Convert ssh_key -> api_token, providing private_key with empty value and secret: false
+  store.updateItem(ssh.id, {
+    type: 'api_token',
+    fields: [
+      { name: 'token', value: 'sk-token-789', secret: true },
+      { name: 'private_key', value: '', secret: false },
+    ],
+    dropFields: true,
+  });
+
+  const updated = store.getItem(ssh.id, { reveal: true });
+  const privKeyField = updated.fields.find((f) => f.name === 'private_key');
+  assert.ok(privKeyField, 'private_key field must exist');
+  assert.equal(privKeyField.value, 'old-secret-privkey');
+  assert.equal(privKeyField.secret, true, 'carried over private_key must keep secret: true');
+  assert.equal(itemMatchesSearch(updated, 'old-secret-privkey'), false, 'item with carried over secret must not match search');
 });
 
 
