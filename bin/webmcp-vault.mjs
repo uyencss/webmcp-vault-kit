@@ -18,6 +18,12 @@ function getVaultBroker() {
   return requireFromBin(resolve(ROOT, 'lib', 'broker.js'));
 }
 
+function coerceFlagValue(value) {
+  if (value === 'false' || value === '0' || value === 'no') return false;
+  if (value === 'true' || value === '1' || value === 'yes') return true;
+  return value;
+}
+
 function parseFlags(args) {
   const flags = {};
   const positional = [];
@@ -29,13 +35,13 @@ function parseFlags(args) {
     }
     const eq = arg.indexOf('=');
     if (eq !== -1) {
-      flags[arg.slice(2, eq)] = arg.slice(eq + 1);
+      flags[arg.slice(2, eq)] = coerceFlagValue(arg.slice(eq + 1));
       continue;
     }
     const key = arg.slice(2);
     const next = args[i + 1];
     if (next && !next.startsWith('--')) {
-      flags[key] = next;
+      flags[key] = coerceFlagValue(next);
       i += 1;
     } else {
       flags[key] = true;
@@ -43,6 +49,7 @@ function parseFlags(args) {
   }
   return { flags, positional };
 }
+
 
 function printUsage() {
   console.log(`webmcp-vault — local encrypted credential vault
@@ -201,6 +208,18 @@ function resolveBrokerPermit(flags) {
   return readPermitFile(envFile);
 }
 
+function resolveGatewayToken(flags) {
+  if (Object.hasOwn(flags, 'gateway-token')) {
+    const flag = flags['gateway-token'];
+    if (flag === false || flag === '' || (typeof flag === 'string' && !flag.trim())) {
+      throw new Error('--gateway-token requires a non-empty token value.');
+    }
+    return flag === true ? null : String(flag);
+  }
+  return process.env.WEBMCP_GATEWAY_TOKEN || null;
+}
+
+
 function readPermitFile(permitFile) {
   let raw;
   try {
@@ -301,8 +320,11 @@ async function run(args) {
   }
 
   if (subcommand === 'init') {
-    const payload = store.init({ force: Boolean(flags.force) });
-    printJsonOrHuman(payload, json, `Vault initialized at ${payload.file}`);
+    const payload = store.init({ force: flags.force === true });
+    const humanMsg = payload.backupFile
+      ? `Vault initialized at ${payload.file}\nBackup: ${payload.backupFile}`
+      : `Vault initialized at ${payload.file}`;
+    printJsonOrHuman(payload, json, humanMsg);
     return;
   }
 
@@ -321,7 +343,7 @@ async function run(args) {
   if (subcommand === 'get') {
     const identifier = positional[0];
     if (!identifier && !flags.web) throw new Error('Usage: webmcp-vault get <id-or-query> [--web <url>]');
-    const item = store.getItem(identifier || '', { web: flags.web, reveal: Boolean(flags.reveal) });
+    const item = store.getItem(identifier || '', { web: flags.web, reveal: flags.reveal === true });
     printJsonOrHuman({ item }, json);
     return;
   }
@@ -411,7 +433,7 @@ async function run(args) {
   if (subcommand === 'backup') {
     const payload = store.backup({
       file: flags.output ? resolve(process.cwd(), String(flags.output)) : undefined,
-      force: Boolean(flags.force),
+      force: flags.force === true,
     });
     printJsonOrHuman(
       payload,
@@ -425,7 +447,7 @@ async function run(args) {
     const payload = store.rotateKey({
       newKey: readReplacementKey(flags),
       backupFile: flags['backup-output'] ? String(flags['backup-output']) : undefined,
-      forceBackup: Boolean(flags['force-backup']),
+      forceBackup: flags['force-backup'] === true,
     });
     printJsonOrHuman(
       payload,
@@ -437,7 +459,7 @@ async function run(args) {
 
   if (subcommand === 'restore') {
     const backupFile = positional[0];
-    if (!backupFile || !flags.force) {
+    if (!backupFile || flags.force !== true) {
       throw new Error('Usage: webmcp-vault restore <backup.enc.json> --force');
     }
     const payload = store.restoreBackup(resolve(process.cwd(), backupFile), { force: true });
@@ -455,6 +477,7 @@ async function run(args) {
     const input = await readVaultItemInput(flags);
     if (!input) throw new Error('Use --stdin-json or --input-json <file> for vault writes.');
     if (flags.vault) input.vaultId = String(flags.vault);
+    if (flags['drop-fields'] === true) input.dropFields = true;
     const item = store.updateItem(identifier, input);
     printJsonOrHuman({ item }, json, `Updated vault item ${item.id}`);
     return;
@@ -462,7 +485,7 @@ async function run(args) {
 
   if (subcommand === 'delete') {
     const identifier = positional[0];
-    if (!identifier || !flags.confirm) {
+    if (!identifier || flags.confirm !== true) {
       throw new Error('Usage: webmcp-vault delete <id-or-query> --confirm');
     }
     const item = store.deleteItem(identifier);
@@ -492,6 +515,7 @@ async function run(args) {
       return;
     }
     if (action === 'fill') {
+      const token = resolveGatewayToken(flags);
       const input = await readVaultItemInput(flags);
       if (!input) throw new Error('Use --stdin-json or --input-json <file> for lease fill.');
       const { fillLoginFormWithLease } = getVaultBroker();
@@ -500,7 +524,7 @@ async function run(args) {
         store,
         gateway: createHttpGateway({
           gatewayUrl: flags['gateway-url'] || process.env.WEBMCP_GATEWAY_URL || 'http://127.0.0.1:7865/api',
-          token: flags['gateway-token'] === true ? null : (flags['gateway-token'] || process.env.WEBMCP_GATEWAY_TOKEN || null),
+          token,
           permit: resolveBrokerPermit(flags),
         }),
       });
@@ -548,7 +572,7 @@ async function run(args) {
 
   if (subcommand === 'delete-vault') {
     const identifier = positional[0];
-    if (!identifier || !flags.confirm) {
+    if (!identifier || flags.confirm !== true) {
       throw new Error('Usage: webmcp-vault delete-vault <vault-id> [--move-to <vault-id>] --confirm');
     }
     const deleted = store.deleteVault(identifier, {

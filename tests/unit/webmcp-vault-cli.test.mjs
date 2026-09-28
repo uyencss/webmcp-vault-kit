@@ -530,3 +530,122 @@ test('webmcp vault help documents vault folder commands and flags', () => {
   assert.match(result.stdout, /list .*--vault <vault-id>/);
   assert.match(result.stdout, /import .*--vault <vault-id>/);
 });
+
+test('integrity: init --force=false keeps items', () => {
+  const home = tempHome();
+  parseJson(runVault(['init', '--json'], { home }));
+  const created = parseJson(runVault(['create', '--stdin-json', '--json'], {
+    home,
+    input: JSON.stringify({
+      title: 'Persistent Item',
+      web: 'https://example.com/login',
+      username: 'alice',
+      password: 'secret-password-1',
+    }),
+  }));
+
+  const reinit = parseJson(runVault(['init', '--force=false', '--json'], { home }));
+  assert.equal(reinit.ok, true);
+
+  const listed = parseJson(runVault(['list', '--json'], { home }));
+  assert.equal(listed.items.length, 1);
+  assert.equal(listed.items[0].id, created.item.id);
+});
+
+test('integrity: delete --confirm=false does not delete', () => {
+  const home = tempHome();
+  parseJson(runVault(['init', '--json'], { home }));
+  const created = parseJson(runVault(['create', '--stdin-json', '--json'], {
+    home,
+    input: JSON.stringify({
+      title: 'Do Not Delete Item',
+      username: 'bob',
+    }),
+  }));
+
+  const result = runVault(['delete', created.item.id, '--confirm=false', '--json'], { home });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /--confirm/);
+
+  const listed = parseJson(runVault(['list', '--json'], { home }));
+  assert.equal(listed.items.length, 1);
+  assert.equal(listed.items[0].id, created.item.id);
+});
+
+test('integrity: get --reveal=false stays redacted', () => {
+  const home = tempHome();
+  parseJson(runVault(['init', '--json'], { home }));
+  const created = parseJson(runVault(['create', '--stdin-json', '--json'], {
+    home,
+    input: JSON.stringify({
+      title: 'Redacted Login',
+      username: 'agent',
+      password: 'super-secret-password-12345',
+    }),
+  }));
+
+  const got = parseJson(runVault(['get', created.item.id, '--reveal=false', '--json'], { home }));
+  assert.equal(got.item.hasPassword, true);
+  assert.equal(Object.hasOwn(got.item, 'password'), false);
+  assert.doesNotMatch(JSON.stringify(got), /super-secret-password-12345/);
+});
+
+test('integrity: lease fill rejects invalid gateway token values', () => {
+  const home = tempHome();
+  parseJson(runVault(['init', '--json'], { home }));
+
+  const resFalse = runVault([
+    'lease', 'fill',
+    '--gateway-token=false',
+    '--stdin-json',
+    '--json',
+  ], {
+    home,
+    input: JSON.stringify({ leaseId: 'dummy', profileId: 'default' }),
+  });
+  assert.notEqual(resFalse.status, 0);
+  assert.match(resFalse.stderr, /--gateway-token requires a non-empty token value/);
+
+  const resEmpty = runVault([
+    'lease', 'fill',
+    '--gateway-token=',
+    '--stdin-json',
+    '--json',
+  ], {
+    home,
+    input: JSON.stringify({ leaseId: 'dummy', profileId: 'default' }),
+  });
+  assert.notEqual(resEmpty.status, 0);
+  assert.match(resEmpty.stderr, /--gateway-token requires a non-empty token value/);
+});
+
+test('integrity: init --force backs up existing vault', () => {
+  const home = tempHome();
+  parseJson(runVault(['init', '--json'], { home }));
+  const item1 = parseJson(runVault(['create', '--stdin-json', '--json'], {
+    home,
+    input: JSON.stringify({ title: 'Item 1', username: 'user1', password: 'pw1' }),
+  })).item;
+  const item2 = parseJson(runVault(['create', '--stdin-json', '--json'], {
+    home,
+    input: JSON.stringify({ title: 'Item 2', username: 'user2', password: 'pw2' }),
+  })).item;
+
+  const reinit = parseJson(runVault(['init', '--force', '--json'], { home }));
+  assert.equal(reinit.ok, true);
+  assert.ok(reinit.backupFile, 'expected backupFile in reinit result');
+  assert.equal(fs.existsSync(reinit.backupFile), true);
+
+  const emptied = parseJson(runVault(['list', '--json'], { home }));
+  assert.equal(emptied.items.length, 0);
+
+  const restored = parseJson(runVault(['restore', reinit.backupFile, '--force', '--json'], { home }));
+  assert.equal(restored.itemCount, 2);
+  const listed = parseJson(runVault(['list', '--json'], { home }));
+  assert.equal(listed.items.length, 2);
+  assert.deepEqual(
+    listed.items.map((it) => it.id).sort(),
+    [item1.id, item2.id].sort(),
+  );
+});
+
