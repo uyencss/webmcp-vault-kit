@@ -427,3 +427,43 @@ test('vault UI Phase 3: typed items round-trip through the UI API without leakin
   assert.equal(Object.hasOwn(loginCreated.item, 'password'), false);
   assert.equal(loginCreated.item.hasPassword, true);
 });
+
+test('integrity: typed field named OTP reads its stored value', async (t) => {
+  const oldHome = process.env.WEBMCP_HOME;
+  process.env.WEBMCP_HOME = tempHome();
+  const ui = await startVaultUiServer({ host: '127.0.0.1', port: 0 });
+  t.after(() => {
+    ui.server.close();
+    if (oldHome === undefined) delete process.env.WEBMCP_HOME;
+    else process.env.WEBMCP_HOME = oldHome;
+  });
+
+  const headers = {
+    'Content-Type': 'application/json',
+    'x-webmcp-vault-token': ui.token,
+    'x-webmcp-vault-key': 'test-otp-field-key',
+  };
+  const base = `http://127.0.0.1:${ui.port}/api`;
+  await fetch(`${base}/init`, { method: 'POST', headers });
+
+  const created = await (await fetch(`${base}/items`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      type: 'env',
+      title: 'Env with OTP field',
+      fields: [
+        { name: 'OTP', value: 'AUDIT-OTP', secret: false },
+      ],
+    }),
+  })).json();
+
+  const response = await fetch(
+    `${base}/items/${created.item.id}/read?field=OTP`,
+    { headers },
+  );
+  assert.equal(response.status, 200);
+  const data = await response.json();
+  assert.equal(data.value, 'AUDIT-OTP');
+});
+
