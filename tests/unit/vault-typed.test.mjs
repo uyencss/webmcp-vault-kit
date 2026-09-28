@@ -935,3 +935,130 @@ test('integrity: legacy duplicate-case fields keep the secret twin on empty upda
   assert.equal(revealedToken.secret, true);
   assert.equal(revealedToken.value, 'SECRET');
 });
+
+test('integrity: legacy duplicate-case pair rejects a third casing variant', () => {
+  const dataDir = tempHome();
+  const key = 'legacy-dup-third-casing-key';
+  const store = createVaultStore({ dataDir, key });
+  store.init();
+
+  const vault = {
+    version: 2,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    vaults: [{
+      id: 'personal',
+      name: 'Personal',
+      description: 'Private credentials stored on this device.',
+      icon: 'key',
+      isDefault: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }],
+    items: [{
+      id: 'legacy-case-item-dup',
+      vaultId: 'personal',
+      type: 'env',
+      title: 'Legacy Case Colliding Item',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      fields: [
+        { name: 'Token', value: 'meta', secret: false },
+        { name: 'token', value: 'SECRET', secret: true },
+      ],
+    }],
+  };
+
+  writeEnvelope(store.file, encryptVault(vault, key));
+
+  // Third casing variant 'TOKEN' + 'Token' must be rejected
+  assert.throws(
+    () => store.updateItem('legacy-case-item-dup', {
+      fields: [
+        { name: 'TOKEN', value: 'other', secret: false },
+        { name: 'Token', value: 'meta', secret: false },
+      ],
+    }),
+    /is duplicated/
+  );
+
+  // Exact stored pair 'Token' + 'token' is accepted
+  const updated = store.updateItem('legacy-case-item-dup', {
+    fields: [
+      { name: 'Token', value: 'meta-updated', secret: false },
+      { name: 'token', value: 'SECRET', secret: true },
+    ],
+  });
+  assert.equal(updated.fields.length, 2);
+  assert.equal(store.readField('legacy-case-item-dup', 'Token'), 'meta-updated');
+  assert.equal(store.readField('legacy-case-item-dup', 'token'), 'SECRET');
+});
+
+test('integrity: omitting a legacy secret twin requires dropFields', () => {
+  const dataDir = tempHome();
+  const key = 'legacy-dup-omit-twin-key';
+  const store = createVaultStore({ dataDir, key });
+  store.init();
+
+  const vault = {
+    version: 2,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    vaults: [{
+      id: 'personal',
+      name: 'Personal',
+      description: 'Private credentials stored on this device.',
+      icon: 'key',
+      isDefault: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }],
+    items: [{
+      id: 'legacy-case-item-dup',
+      vaultId: 'personal',
+      type: 'env',
+      title: 'Legacy Case Colliding Item',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      fields: [
+        { name: 'Token', value: 'meta', secret: false },
+        { name: 'token', value: 'SECRET', secret: true },
+      ],
+    }],
+  };
+
+  writeEnvelope(store.file, encryptVault(vault, key));
+
+  // 1. Omitting secret twin 'token' throws matching error
+  assert.throws(
+    () => store.updateItem('legacy-case-item-dup', {
+      fields: [
+        { name: 'Token', value: 'meta', secret: false },
+      ],
+    }),
+    (err) => err instanceof Error && err.message === 'Update would drop stored secret fields: token; pass dropFields:true to confirm.'
+  );
+
+  // 2. Sending both succeeds without dropFields flag
+  const bothUpdated = store.updateItem('legacy-case-item-dup', {
+    fields: [
+      { name: 'Token', value: 'meta2', secret: false },
+      { name: 'token', value: 'SECRET2', secret: true },
+    ],
+  });
+  assert.equal(bothUpdated.fields.length, 2);
+  assert.equal(store.readField('legacy-case-item-dup', 'token'), 'SECRET2');
+
+  // 3. With dropFields: true succeeds and 'token' is dropped
+  const dropped = store.updateItem('legacy-case-item-dup', {
+    fields: [
+      { name: 'Token', value: 'meta-only', secret: false },
+    ],
+    dropFields: true,
+  });
+  assert.equal(dropped.fields.length, 1);
+  assert.equal(dropped.fields[0].name, 'Token');
+  assert.equal(store.readField('legacy-case-item-dup', 'Token'), 'meta-only');
+  const revealed = store.getItem('legacy-case-item-dup', { reveal: true });
+  assert.equal(revealed.fields.some((f) => f.name === 'token'), false);
+});
