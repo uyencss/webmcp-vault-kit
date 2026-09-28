@@ -666,4 +666,27 @@ test('integrity: writeEnvelope clamps maxBytes to MAX_ENVELOPE_BYTES', () => {
   );
 });
 
+test('integrity: invalid maxBytes falls back to the default cap', () => {
+  const dir = tempHome();
+  const file = path.join(dir, 'test-invalid-maxbytes.enc.json');
+  const env = encryptVault(emptyVault(), 'test-secret');
+
+  // maxBytes: 'nope', 0 fall back to default cap (MAX_ENVELOPE_BYTES)
+  assert.doesNotThrow(() => {
+    writeEnvelope(file, env, { maxBytes: 'nope' });
+  });
+  const read = readEnvelope(file);
+  assert.equal(read.version, env.version);
+
+  assert.doesNotThrow(() => {
+    writeEnvelope(file, env, { maxBytes: 0 });
+  });
+
+  // Numeric option > 0 still works and restricts writes
+  assert.throws(
+    () => writeEnvelope(file, env, { maxBytes: 10 }),
+    /max 10 bytes/i,
+  );
+});
+
 
