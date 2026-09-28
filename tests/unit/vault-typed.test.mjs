@@ -13,6 +13,7 @@ const {
   MAX_FIELDS_PER_ITEM,
   FIELD_NAME_MAX_LENGTH,
 } = require('../../lib/vault/model.js');
+const { writeEnvelope, encryptVault } = require('../../lib/vault/envelope.js');
 
 function tempHome() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'webmcp-vault-typed-'));
@@ -243,6 +244,7 @@ test('item type can be changed on update', () => {
     type: 'login',
     username: 'u2',
     password: 'p2',
+    dropFields: true,
   });
   assert.strictEqual(updatedBackToLogin.type, 'login');
   assert.strictEqual(store.readField(login.id, 'password'), 'p2');
@@ -350,3 +352,167 @@ test('a v1 fixture with untyped legacy items hydrates to type: login without for
   assert.equal(afterWrite.items[0].type, 'login');
   assert.equal(afterWrite.version, 1);
 });
+
+test('integrity: update without token field is rejected', () => {
+  const dataDir = tempHome();
+  const store = createVaultStore({ dataDir, key: 'c1-token-key' });
+  store.init();
+  const token = store.createItem({
+    type: 'api_token',
+    title: 'OpenAI item',
+    fields: [{ name: 'token', value: 'sk-secret-val', secret: true }],
+  });
+
+  assert.throws(
+    () => store.updateItem(token.id, {
+      fields: [{ name: 'metadata', value: 'meta-value', secret: false }],
+    }),
+    /api_token items require a "token" field\./,
+  );
+});
+
+test('integrity: empty secret value keeps stored value', () => {
+  const dataDir = tempHome();
+  const store = createVaultStore({ dataDir, key: 'c1-secret-retain-key' });
+  store.init();
+  const env = store.createItem({
+    type: 'env',
+    title: 'Audit Env',
+    fields: [{ name: 'API_TOKEN', value: 'AUDIT-1', secret: true }],
+  });
+
+  store.updateItem(env.id, {
+    fields: [{ name: 'API_TOKEN', value: '', secret: true }],
+  });
+
+  assert.equal(store.readField(env.id, 'API_TOKEN'), 'AUDIT-1');
+});
+
+test('integrity: Token and token are duplicates', () => {
+  assert.throws(
+    () => normalizeItemInput({
+      type: 'api_token',
+      title: 'Dup case test',
+      fields: [
+        { name: 'Token', value: 'secret-val-1', secret: true },
+        { name: 'token', value: 'secret-val-2', secret: true },
+      ],
+    }),
+    /fields\[1\]\.name "token" is duplicated\./,
+  );
+});
+
+test('integrity: legacy item with case-colliding fields resolves exact match', () => {
+  const dataDir = tempHome();
+  const key = 'legacy-case-dup-key';
+  const store = createVaultStore({ dataDir, key });
+  store.init();
+
+  const vault = {
+    version: 2,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    vaults: [{
+      id: 'personal',
+      name: 'Personal',
+      description: 'Private credentials stored on this device.',
+      icon: 'key',
+      isDefault: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }],
+    items: [{
+      id: 'legacy-case-item-1',
+      vaultId: 'personal',
+      type: 'api_token',
+      title: 'Legacy Case Colliding Item',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      fields: [
+        { name: 'Token', value: 'VAL_TOKEN_UPPER', secret: true },
+        { name: 'token', value: 'val_token_lower', secret: true },
+      ],
+    }],
+  };
+
+  writeEnvelope(store.file, encryptVault(vault, key));
+
+  assert.equal(store.readField('legacy-case-item-1', 'token'), 'val_token_lower');
+  assert.equal(store.readField('legacy-case-item-1', 'Token'), 'VAL_TOKEN_UPPER');
+});
+
+test('integrity: login→api_token→login keeps username and otp', () => {
+  const dataDir = tempHome();
+  const store = createVaultStore({ dataDir, key: 'c2-roundtrip-key' });
+  store.init();
+  const login = store.createItem({
+    title: 'Roundtrip Test',
+    username: 'my-user',
+    password: 'my-password',
+    otpSecret: 'JBSWY3DPEHPK3PXP',
+  });
+
+  // Convert login -> api_token (providing required token field)
+  store.updateItem(login.id, {
+    type: 'api_token',
+    fields: [{ name: 'token', value: 'sk-c2-token', secret: true }],
+  });
+
+  // Convert api_token -> login with dropFields: true (dropping unmapped token)
+  store.updateItem(login.id, {
+    type: 'login',
+    dropFields: true,
+  });
+
+  assert.equal(store.readField(login.id, 'username'), 'my-user');
+  assert.equal(store.readField(login.id, 'password'), 'my-password');
+  assert.equal(store.readField(login.id, 'otpsecret'), 'JBSWY3DPEHPK3PXP');
+});
+
+test('integrity: lossy type change is rejected', () => {
+  const dataDir = tempHome();
+  const store = createVaultStore({ dataDir, key: 'c2-lossy-key' });
+  store.init();
+  const item = store.createItem({
+    type: 'api_token',
+    title: 'Lossy Token',
+    fields: [
+      { name: 'token', value: 'sk-tok', secret: true },
+      { name: 'key_id', value: 'key-123', secret: false },
+    ],
+  });
+
+  assert.throws(
+    () => store.updateItem(item.id, { type: 'login' }),
+    (err) => {
+      return (
+        err instanceof Error &&
+        err.message.startsWith('Type change would drop fields:') &&
+        err.message.includes('key_id')
+      );
+    },
+  );
+});
+
+test('integrity: lossy type change allowed with dropFields', () => {
+  const dataDir = tempHome();
+  const store = createVaultStore({ dataDir, key: 'c2-drop-allowed-key' });
+  store.init();
+  const item = store.createItem({
+    type: 'api_token',
+    title: 'Lossy Token Allowed',
+    fields: [
+      { name: 'token', value: 'sk-tok', secret: true },
+      { name: 'key_id', value: 'key-123', secret: false },
+    ],
+  });
+
+  const updated = store.updateItem(item.id, { type: 'login', dropFields: true });
+  assert.equal(updated.type, 'login');
+  assert.equal(Object.hasOwn(updated, 'dropFields'), false);
+  const stored = store.getItem(item.id);
+  assert.equal(Object.hasOwn(stored, 'dropFields'), false);
+});
+
+
+

@@ -15,6 +15,11 @@ const {
   canonicalJson,
   publicKeyToPem,
 } = require('../../lib/approval-receipt.js');
+const {
+  writeEnvelope,
+  emptyVault,
+  encryptVault,
+} = require('../../lib/vault/envelope.js');
 
 function tempHome() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'webmcp-vault-store-'));
@@ -569,3 +574,53 @@ test('vault store hydrates legacy items without vault folders into Personal', ()
   store.updateItem(item.id, { title: 'Migrated Login' });
   assert.equal(store.listItems({ vaultId: personal.id })[0].title, 'Migrated Login');
 });
+
+test('integrity: oversized write is refused and old file kept', () => {
+  const dir = tempHome();
+  const file = path.join(dir, 'test.enc.json');
+  const env1 = encryptVault(emptyVault(), 'test-secret');
+
+  writeEnvelope(file, env1);
+  const initialBytes = fs.readFileSync(file);
+  const initialHash = crypto.createHash('sha256').update(initialBytes).digest('hex');
+
+  const env2 = encryptVault(emptyVault(), 'test-secret');
+  assert.throws(
+    () => writeEnvelope(file, env2, { maxBytes: 50 }),
+    /too large|max.*bytes/i,
+  );
+
+  const currentBytes = fs.readFileSync(file);
+  const currentHash = crypto.createHash('sha256').update(currentBytes).digest('hex');
+  assert.equal(currentHash, initialHash);
+  assert.deepEqual(currentBytes, initialBytes);
+});
+
+test('integrity: init with force creates backup before overwriting existing vault', () => {
+  const dataDir = tempHome();
+  const store = createVaultStore({ dataDir, key: 'c6-init-key' });
+  store.init();
+  store.createItem({ title: 'Item 1', password: 'p1' });
+  store.createItem({ title: 'Item 2', password: 'p2' });
+
+  // Normal init without force does not overwrite or backup
+  const noForceResult = store.init({ force: false });
+  assert.equal(noForceResult.created, false);
+  assert.equal(Object.hasOwn(noForceResult, 'backupFile'), false);
+  assert.equal(store.listItems().length, 2);
+
+  // Init with force backups first then re-initializes
+  const forceResult = store.init({ force: true });
+  assert.equal(forceResult.created, true);
+  assert.ok(forceResult.backupFile);
+  assert.equal(fs.existsSync(forceResult.backupFile), true);
+  assert.equal(store.listItems().length, 0);
+
+  // Restore from the backup file retrieves both items
+  const restored = store.restoreBackup(forceResult.backupFile, { force: true });
+  assert.equal(restored.ok, true);
+  assert.equal(restored.itemCount, 2);
+  assert.equal(store.listItems().length, 2);
+});
+
+
