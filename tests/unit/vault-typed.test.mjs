@@ -767,7 +767,8 @@ test('integrity: secret field mapped to a non-secret login prop requires dropFie
 
   const updated = store.updateItem(env.id, { type: 'login', dropFields: true });
   assert.equal(updated.type, 'login');
-  assert.equal(updated.username, 'SYNTH_SECRET');
+  assert.equal(updated.username, '');
+  assert.equal(itemMatchesSearch(updated, 'SYNTH_SECRET'), false);
 
   const env2 = store.createItem({
     type: 'env',
@@ -781,6 +782,106 @@ test('integrity: secret field mapped to a non-secret login prop requires dropFie
   assert.equal(updated2.type, 'login');
   assert.equal(updated2.username, 'alice_plain');
 });
+
+test('integrity: empty secret value keeps stored value even when incoming flag is false', () => {
+  const dataDir = tempHome();
+  const store = createVaultStore({ dataDir, key: 'c1-secret-retain-flag-key' });
+  store.init();
+  const env = store.createItem({
+    type: 'env',
+    title: 'Audit Env Flag',
+    fields: [{ name: 'API_TOKEN', value: 'AUDIT-1', secret: true }],
+  });
+
+  store.updateItem(env.id, {
+    fields: [{ name: 'API_TOKEN', value: '', secret: false }],
+  });
+
+  assert.equal(store.readField(env.id, 'API_TOKEN'), 'AUDIT-1');
+  const stored = store.getItem(env.id, { reveal: true });
+  const field = stored.fields.find((f) => f.name === 'API_TOKEN');
+  assert.ok(field);
+  assert.equal(field.secret, true);
+  assert.equal(field.value, 'AUDIT-1');
+});
+
+test('integrity: empty secret value keeps stored value across name case', () => {
+  const dataDir = tempHome();
+  const store = createVaultStore({ dataDir, key: 'c1-secret-retain-case-key' });
+  store.init();
+  const env = store.createItem({
+    type: 'env',
+    title: 'Audit Env Case',
+    fields: [{ name: 'API_TOKEN', value: 'AUDIT-1', secret: true }],
+  });
+
+  store.updateItem(env.id, {
+    fields: [{ name: 'api_token', value: '', secret: false }],
+  });
+
+  const stored = store.getItem(env.id, { reveal: true });
+  const field = stored.fields.find((f) => f.name.toLowerCase() === 'api_token');
+  assert.ok(field);
+  assert.equal(field.secret, true);
+  assert.equal(field.value, 'AUDIT-1');
+  assert.equal(store.readField(env.id, field.name), 'AUDIT-1');
+});
+
+test('integrity: type mapping enforces target limits', () => {
+  const dataDir = tempHome();
+  const store = createVaultStore({ dataDir, key: 'limits-test-key' });
+  store.init();
+
+  // 1. login with note 5000 chars -> change to api_token -> throw (exceeds 4096)
+  const loginLongNote = store.createItem({
+    title: 'Login Long Note',
+    note: 'n'.repeat(5000),
+  });
+  assert.throws(
+    () => store.updateItem(loginLongNote.id, {
+      type: 'api_token',
+      fields: [{ name: 'token', value: 'sk-longnote', secret: true }],
+    }),
+    /fields\[\d+\]\.value is too long; max 4096 characters\./,
+  );
+
+  // 2. env with secret field 9000 chars named password -> change to login -> throw (exceeds 8192)
+  const envLongPass = store.createItem({
+    type: 'env',
+    title: 'Env Long Pass',
+    fields: [{ name: 'password', value: 'p'.repeat(9000), secret: true }],
+  });
+  assert.throws(
+    () => store.updateItem(envLongPass.id, {
+      type: 'login',
+      dropFields: true,
+    }),
+    /password is too long; max 8192 characters\./,
+  );
+
+  // 3. valid case (note 4000, password 8000) -> success
+  const validLogin = store.createItem({
+    title: 'Valid Limits Login',
+    note: 'n'.repeat(4000),
+    password: 'p'.repeat(8000),
+  });
+  const token = store.updateItem(validLogin.id, {
+    type: 'api_token',
+    fields: [{ name: 'token', value: 'sk-valid', secret: true }],
+  });
+  assert.equal(token.type, 'api_token');
+  assert.equal(store.readField(token.id, 'password'), 'p'.repeat(8000));
+  assert.equal(store.readField(token.id, 'note'), 'n'.repeat(4000));
+
+  const loginAgain = store.updateItem(token.id, {
+    type: 'login',
+    dropFields: true,
+  });
+  assert.equal(loginAgain.type, 'login');
+  assert.equal(store.readField(loginAgain.id, 'password'), 'p'.repeat(8000));
+  assert.equal(store.readField(loginAgain.id, 'note'), 'n'.repeat(4000));
+});
+
 
 
 

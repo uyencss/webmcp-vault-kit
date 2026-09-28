@@ -247,6 +247,9 @@ automatically migrates fields between layouts (login columns ↔ typed `fields[]
   ```bash
   webmcp vault update <id> --drop-fields --stdin-json --json < patch.json
   ```
+  With `--drop-fields` / `dropFields: true`, any secret field mapped to a plaintext
+  property (`username`, `web`, `note`) is **discarded** (not written or revealed in plaintext).
+  To preserve the value, remap or rename it to a secret property (`password`, `otp_secret`) before converting.
 - Updating secret fields (Decision D1): Sending `value: ""` for a secret field
   that currently has a value preserves the stored value. To delete a secret field,
   remove the entire field entry from the `fields` array.
