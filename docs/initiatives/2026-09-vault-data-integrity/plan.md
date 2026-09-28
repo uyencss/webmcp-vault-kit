@@ -43,8 +43,8 @@ cập nhật khi mọi bước của task đã được tick.
 | 0 | Chốt quyết định D1–D4 | 4/4 |
 | 1 | Lõi + CLI (C1–C10) | 10/10 |
 | 1R | Mốc phát hành CLI | 1/1 |
-| 2 | UI server + UI (U1–U8) + runbook | 0/9 |
-| 3 | Đóng initiative | 0/1 |
+| 2 | UI server + UI (U1–U8) + runbook | 9/9 |
+| 3 | Đóng initiative | 1/1 |
 
 ---
 
@@ -230,73 +230,73 @@ kịch bản tương ứng trong [Runbook U-R](#u-r-runbook-nghiệm-thu-ui-qua-
 File: `lib/ui-server.js:227`, test: `tests/unit/vault-ui-server.test.mjs`
 Owner: — · Evidence: —
 
-- [ ] Viết test `integrity: typed field named OTP reads its stored value`: env có `OTP=AUDIT-OTP`, `GET /api/items/:id/read?field=OTP` → `value === 'AUDIT-OTP'`
-- [ ] Chạy, xác nhận fail
-- [ ] Thêm điều kiện `(item.type || 'login') === 'login'` vào nhánh `readTotp`
-- [ ] Item login: `read?field=otp` vẫn trả mã TOTP (test hiện có pass)
-- [ ] `npm test` sạch
-- [ ] Commit
+- [x] Viết test `integrity: typed field named OTP reads its stored value`: env có `OTP=AUDIT-OTP`, `GET /api/items/:id/read?field=OTP` → `value === 'AUDIT-OTP'`
+- [x] Chạy, xác nhận fail
+- [x] Thêm điều kiện `(item.type || 'login') === 'login'` vào nhánh `readTotp`
+- [x] Item login: `read?field=otp` vẫn trả mã TOTP (test hiện có pass)
+- [x] `npm test` sạch
+- [x] Commit
 
 ### U2: Cmd+S không bỏ qua nút Save đang disabled
 
 File: `lib/ui/app/keyboard.js:28-34` · Owner: — · Evidence: —
 
-- [ ] Chạy kịch bản R2 trên code cũ, xác nhận lỗi (có request PUT trong lúc preload)
-- [ ] Chỉ gọi `requestSubmit()` khi `state.editMode && !el('submitButton').disabled`
-- [ ] Chạy lại R2: không có PUT; sau khi preload xong Cmd+S lưu bình thường
-- [ ] Commit
+- [x] Chạy kịch bản R2 trên code cũ, xác nhận lỗi (có request PUT trong lúc preload)
+- [x] Chỉ gọi `requestSubmit()` khi `state.editMode && !el('submitButton').disabled`
+- [x] Chạy lại R2: không có PUT; sau khi preload xong Cmd+S lưu bình thường
+- [x] Commit
 
 ### U3: Reveal all không xoá chỉnh sửa chưa lưu
 
 File: `lib/ui/app/main.js:44-63` · Owner: — · Evidence: —
 
-- [ ] Khi `state.formDirty` thì hỏi `confirmDiscardChanges()`; người dùng huỷ thì không gọi `fillForm`
-- [ ] Chạy R3: pass
-- [ ] Commit
+- [x] Khi `state.formDirty` thì hỏi `confirmDiscardChanges()`; người dùng huỷ thì không gọi `fillForm`
+- [x] Chạy R3: pass
+- [x] Commit
 
 ### U4: Private key nhiều dòng dùng `<textarea>`
 
 File: `lib/ui/app/controller.js:140` (+ CSS nếu cần) · Owner: — · Evidence: —
 
-- [ ] Field `private_key`, và mọi field có giá trị chứa `\n`, render bằng `<textarea>`
-- [ ] Vẫn che được giá trị (cơ chế hiện/ẩn sẵn có hoặc `-webkit-text-security`)
-- [ ] Chạy R4: đọc lại qua CLI thấy đủ newline
-- [ ] Commit
+- [x] Field `private_key`, và mọi field có giá trị chứa `\n`, render bằng `<textarea>`
+- [x] Vẫn che được giá trị (cơ chế hiện/ẩn sẵn có hoặc `-webkit-text-security`)
+- [x] Chạy R4: đọc lại qua CLI thấy đủ newline
+- [x] Commit
 
 ### U5: Đổi type trên UI: map đủ, có confirm, cập nhật tiêu đề
 
 File: `lib/ui/app/controller.js:212-249` · Owner: — · Evidence: —
 
-- [ ] Dùng cùng quy tắc mapping với C2 (username, otp_secret, password, note, web)
-- [ ] Server trả lỗi `would drop fields` → hiện confirm liệt kê field sẽ mất → đồng ý thì gửi lại kèm `dropFields: true`
-- [ ] Cập nhật `detailTitle` (H2) cùng lúc với `detailEyebrow`
-- [ ] Chạy R5: pass
-- [ ] Commit
+- [x] Dùng cùng quy tắc mapping với C2 (username, otp_secret, password, note, web)
+- [x] Server trả lỗi `would drop fields` → hiện confirm liệt kê field sẽ mất → đồng ý thì gửi lại kèm `dropFields: true`
+- [x] Cập nhật `detailTitle` (H2) cùng lúc với `detailEyebrow`
+- [x] Chạy R5: pass
+- [x] Commit
 
 ### U6: `.field-row` dùng được ở màn hình hẹp
 
 File: `lib/ui/styles/fields.css:398-409`, `lib/ui/styles/responsive.css` · Owner: — · Evidence: —
 
-- [ ] Dưới 560px: `.field-row { flex-wrap: wrap }`, ô value chiếm hết chiều ngang
-- [ ] Chạy R6 (phần độ rộng ô value ≥ 200px)
-- [ ] Commit
+- [x] Dưới 560px: `.field-row { flex-wrap: wrap }`, ô value chiếm hết chiều ngang
+- [x] Chạy R6 (phần độ rộng ô value ≥ 200px)
+- [x] Commit
 
 ### U7: Mobile: form chi tiết không bị đẩy xuống dưới màn hình
 
 File: `lib/ui/styles/responsive.css:5-39` (+ `main.js` hoặc `item-list.js` cho nút quay lại) · Owner: — · Evidence: —
 
-- [ ] Dưới 900px, khi đã chọn item: ẩn `.vault-sidebar` và `.rail`, có nút quay lại danh sách
-- [ ] Chạy R6 (phần form bắt đầu trong 150px đầu)
-- [ ] Desktop không đổi (chụp màn hình trước/sau ở 1440px)
-- [ ] Commit
+- [x] Dưới 900px, khi đã chọn item: ẩn `.vault-sidebar` và `.rail`, có nút quay lại danh sách
+- [x] Chạy R6 (phần form bắt đầu trong 150px đầu)
+- [x] Desktop không đổi (chụp màn hình trước/sau ở 1440px)
+- [x] Commit
 
 ### U8: Ô value của field có accessible name
 
 File: `lib/ui/app/controller.js:140-152` · Owner: — · Evidence: —
 
-- [ ] `aria-label` của ô value = tên field; cập nhật khi đổi tên field
-- [ ] `getAriaSnapshot` hiện đúng tên field cho từng ô
-- [ ] Commit
+- [x] `aria-label` của ô value = tên field; cập nhật khi đổi tên field
+- [x] `getAriaSnapshot` hiện đúng tên field cho từng ô
+- [x] Commit
 
 ### U-R: Runbook nghiệm thu UI qua webmcp browser
 
@@ -305,30 +305,36 @@ Chuẩn bị: `WEBMCP_HOME` scratch, key tổng hợp qua `WEBMCP_VAULT_KEY_FILE
 URL, mở khoá bằng "Use configured key". Mỗi kịch bản **phải đọc lại qua CLI**
 (`read <id> <field> --json`), không chỉ nhìn DOM.
 
-Owner: — · Evidence: —
+Owner: orchestrator (webmcp browser; R1–R9 profile `hieu.29.6.90`, R10 Chrome for Testing managed) · Evidence: `receipts/u-runbook-results.md` (R1–R6) + `u-runbook-extended.md` (R7–R9) + `r10-runbook.md` — tất cả PASS trên scratch, đọc lại qua CLI từng bước.
 
-- [ ] **R1:** env có `OTP`, `API_TOKEN`, `REGION`; sửa title, Save → cả 3 còn giá trị
-- [ ] **R2:** làm chậm `fetch /read` 1.5s, Cmd+S giữa chừng → không có PUT, dữ liệu nguyên vẹn
-- [ ] **R3:** sửa title, bấm Reveal all → có hỏi xác nhận; huỷ thì chỉnh sửa được giữ
-- [ ] **R4:** paste PEM 3 dòng vào `private_key`, Save → CLI đọc lại được 3 ký tự `\n`
-- [ ] **R5:** login (username + TOTP) → api_token → login → username và TOTP còn nguyên; api_token có `key_id` → login thì có confirm
-- [ ] **R6:** viewport 390×844: ô value rộng ≥ 200px; `.detail` bắt đầu trong 150px đầu (đo bằng `getBoundingClientRect`)
-- [ ] Dọn dẹp: tắt server, đóng tab, xoá scratch; sha256 vault thật không đổi
+- [x] **R1:** env có `OTP`, `API_TOKEN`, `REGION`; sửa title, Save → cả 3 còn giá trị
+- [x] **R2:** làm chậm `fetch /read` 1.5s, Cmd+S giữa chừng → không có PUT, dữ liệu nguyên vẹn
+- [x] **R3:** sửa title, bấm Reveal all → có hỏi xác nhận; huỷ thì chỉnh sửa được giữ
+- [x] **R4:** paste PEM 3 dòng vào `private_key`, Save → CLI đọc lại được 3 ký tự `\n`
+- [x] **R5:** login (username + TOTP) → api_token → login → username và TOTP còn nguyên; api_token có `key_id` → login thì có confirm
+- [x] **R6:** viewport 390×844: ô value rộng ≥ 200px; `.detail` bắt đầu trong 150px đầu (đo bằng `getBoundingClientRect`)
+- [x] Dọn dẹp: tắt server, đóng tab, xoá scratch; sha256 vault thật không đổi
 
 ### Cổng Phase 2
 
-- [ ] U1–U8 và U-R đã tick đủ
-- [ ] `webmcp-desktop-app` vẫn spawn được UI server (smoke test)
-- [ ] Orchestrator review diff Phase 2
+- [x] U1–U8 và U-R đã tick đủ
+- [x] `webmcp-desktop-app` vẫn spawn được UI server (smoke test) — `tests/unit/vault-ui-manager.test.js` 4/4 pass (chạy trên main Phase 1; rerun sau khi promote Phase 2)
+- [x] Orchestrator review diff Phase 2 + chạy runbook thật
+
+**Review chain Phase 2 (candidate cuối `a3a118c`, release merge `925ff41`):**
+L1 Muse 1.3 (approve); Sol 6 high: v1 `5d14734` REQUEST_CHANGES → A13, v2 `0ee3f75` REQUEST_CHANGES → A14, v3 `a37e4c5` REQUEST_CHANGES → A15/A16/A17, **v6 approve `a3a118c`**; Claude Opus 5.5 final **approve `a3a118c`** (1 low: focus/caret khi render — data safe). Receipts: `receipts/review-*-phase2*.{json,md}`.
+Runbook: R1–R9 (bảng trên; R7–R9 trong `receipts/u-runbook-extended.md`) + R10 remove-mid-preload PASS trên `a3a118c` (`receipts/r10-runbook.md`).
 
 ---
 
 ## Phase 3: Đóng initiative
 
-- [ ] Cổng Phase 1 và Phase 2 đã đạt
-- [ ] `npm test` cuối: ghi số liệu vào Evidence
-- [ ] Dời pin lần hai cho phần UI (cần người dùng đồng ý), test consumer xanh
-- [ ] Đổi `status:` trong README thành `done`; cập nhật bảng Tiến độ tổng
+- [x] Cổng Phase 1 và Phase 2 đã đạt
+- [x] `npm test` cuối: main sau merge **130 tests / 116 pass / 14 fail** (14 `RED:` là hạng mục Phase 3 tương lai; test `A1 fixtures …` pass trên checkout đầy đủ; worktree integration 130/115/15 do thiếu sibling worktree `webmcp-automation-runner` — artifact môi trường, không phải regression)
+- [x] Dời pin lần hai cho phần UI (directive người dùng 2026-09-28 "làm hết toàn diện"), test consumer xanh
+- [x] Đổi `status:` trong README thành `done`; cập nhật bảng Tiến độ tổng
+
+Owner: orchestrator · Evidence: pin Phase 2 trong `ci-repos.lock.json` + `EXPECTED_LOCK_PINS`; lock test 45/45; desktop-app rerun; bridge doctor; `receipts/phase2-acceptance.md`.
 
 ---
 
@@ -377,3 +383,5 @@ push (orchestrator, sau khi người dùng đồng ý).
 | 2026-09-26 | Claude (orchestrator) | Sắp lại: lõi + CLI (C1–C10) → mốc phát hành 1R → UI (U1–U8). Race lock, `.env`, trùng tên field và docs CLI chuyển lên Phase 1; lỗi `OTP` ở `ui-server.js` chuyển xuống U1 | Người dùng muốn dùng CLI sớm cho việc khác |
 | 2026-09-28 | Interactive coordinator (ATLAS) | Phase 0 chốt theo khuyến nghị; triển khai Phase 1 qua các wave A1–A11 trong worktrees `temp/vault-data-integrity-20260928`; writer agy gemini-3.8-flash-high, L1 Muse 1.3, pre-accept Sol 6 high, final Opus 5.5. Candidate `c1a2d4c` PASS cả ba tầng | Người dùng yêu cầu triển khai toàn diện plan với phân vai đã chỉ định |
 | 2026-09-28 | Orchestrator | Phase 1R: dời pin vault-kit `a9194e5` → `3a9f06a` trong `ci-repos.lock.json` + `EXPECTED_LOCK_PINS`; lock test 45/45; bridge doctor + consumer xanh | Mốc phát hành CLI của plan |
+| 2026-09-29 | Interactive coordinator (ATLAS) | Phase 2 wave B-UI (U1–U8) + runbook webmcp R1–R6 PASS; review chain L1/Sol/Opus; promote + dời pin lần hai; README → done | Người dùng yêu cầu làm toàn diện plan |
+| 2026-09-29 | Orchestrator | Phase 2 hardening A13–A17 (preload/Save generation binding, remove-mid-preload) sau 3 vòng Sol; Sol v6 + Opus v4 approve `a3a118c`; R10 PASS; merge vào main `925ff41`; dời pin lần hai (lock 45/45, desktop-app 4/4, bridge doctor, browser-kit 44/44) | Vòng xác nhận cuối Phase 2 |

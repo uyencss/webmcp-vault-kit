@@ -1,9 +1,9 @@
 ---
 title: Vault Data Integrity Hardening
 type: initiative
-status: proposed
+status: done
 created: 2026-09-26
-updated: 2026-09-26
+updated: 2026-09-29
 package: "@gyga-browser/webmcp-vault-kit"
 baseline: a9194e5
 owner: vault-kit lane
