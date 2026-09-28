@@ -38,9 +38,11 @@ browser storage.
 ## CLI
 
 ```bash
-webmcp-vault init
+webmcp-vault init                           # init vault (use --force to reinit with auto-backup)
 printf '{"title":"GitHub","web":"https://github.com","username":"me","password":"..."}' \
   | webmcp-vault create --stdin-json --json
+webmcp-vault update <id> --stdin-json --json  # update item fields
+webmcp-vault update <id> --drop-fields --stdin-json --json # allow type change when unmapped fields would be dropped
 webmcp-vault import ./passwords.csv        # generic or Bitwarden login_* headers
 webmcp-vault backup                         # encrypted snapshot under ~/.webmcp/vault/backups
 webmcp-vault rotate-key --new-key-file /protected/path/new-vault.key
@@ -51,6 +53,24 @@ webmcp-vault ui --host 127.0.0.1 --port 7876
 npm run ui
 npm run test:ui
 ```
+
+### Type conversion and data integrity
+
+- **Type conversion & field mapping**: Items support changing `type` on update
+  (`login`, `api_token`, `ssh_key`, `env`). Compatible fields are mapped
+  automatically across layouts: `username ↔ username`, `password ↔ password`,
+  `otpSecret ↔ otp_secret`, `web ↔ web`, and `note ↔ note`. If a type change
+  would drop unmapped fields with values, the operation is rejected with
+  `Type change would drop fields: …` unless `--drop-fields` (or `dropFields: true`)
+  is provided.
+- **Secret field preservation (Decision D1)**: Sending `value: ""` for a secret
+  field that currently has a value preserves the stored value intact. To remove a
+  secret field, delete the field entry entirely from the fields array.
+- **Envelope size limit (64 MiB)**: Vault envelopes enforce a strict 64 MiB cap;
+  writes exceeding 64 MiB are rejected before touching disk (`writeEnvelope`
+  throws immediately), keeping the existing file intact.
+- **Automatic backup on force init**: `webmcp-vault init --force` automatically
+  creates an encrypted backup snapshot before re-initializing an existing store.
 
 ## Library
 

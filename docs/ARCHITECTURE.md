@@ -204,8 +204,40 @@ least one field (every parsed key defaults `secret: true`). These per-type
 requirements are template/validation hints only — an `env` item can hold any
 keys beyond that.
 
-`type` is immutable after creation (`normalizeItemInput` rejects a `type`
-change on update).
+### Secret field preservation on update (Decision D1)
+
+When updating an item (`updateItem`), sending `value: ""` for a `secret: true`
+field that currently holds a stored value will **preserve the existing stored value**.
+This reflects standard password manager behavior (where blank secret fields indicate
+"keep unchanged") and prevents secret loss from partial updates, UI forms, or
+concurrent saves.
+
+To delete a secret field, clients must remove the entire field entry from the
+`fields` array (xoá cả dòng field) rather than sending an empty string value.
+
+### Type conversion and field mapping
+
+Changing an item's `type` is allowed on update (`updateItem` / CLI `update`).
+When an item changes type (between `login` and typed items, or between different
+typed kinds), data is **mapped** across layouts (`mapTypeFields`):
+
+- `username` ↔ `username` (non-secret)
+- `password` ↔ `password` (secret)
+- `otpSecret` ↔ `otp_secret` (secret)
+- `web` ↔ `web` (non-secret)
+- `note` ↔ `note` (non-secret)
+
+If a type change would drop existing fields that contain non-empty values and
+cannot be mapped to the destination type (such as unmapped custom fields when
+converting to `login`, or field names incompatible with `env` variable naming
+rules), the operation is **rejected** with:
+
+```text
+Type change would drop fields: <field1>, <field2>
+```
+
+The change is permitted only when the caller explicitly specifies
+`dropFields: true` (CLI: `webmcp-vault update <id> --drop-fields`).
 
 ### Redaction / reveal
 
@@ -288,6 +320,24 @@ The vault key is never written to disk. It comes from:
 2. `WEBMCP_VAULT_KEY`
 3. `WEBMCP_VAULT_KEY_FILE`
 
+### Envelope size limit (64 MiB)
+
+Vault envelopes have a hard size limit of **64 MiB**
+(`MAX_ENVELOPE_BYTES = 64 * 1024 * 1024` bytes, defined in `lib/vault/envelope.js`).
+
+- **Pre-write rejection**: Before any file write begins, `writeEnvelope` checks
+  the byte length of the serialized envelope output (`Buffer.byteLength(out)`).
+  If the payload exceeds 64 MiB (or `options.maxBytes`), `writeEnvelope` **refuses
+  to write immediately** and throws:
+  ```text
+  Vault file is too large; max 67108864 bytes.
+  ```
+  Because this rejection triggers before `writePrivateFile` is called, the
+  existing vault file on disk is left completely intact and uncorrupted.
+- **Read enforcement**: `readEnvelope` checks `fs.statSync(file).size` before
+  parsing; any file larger than 64 MiB throws `Vault file is too large; max 67108864 bytes.`
+  without attempting JSON parsing or decryption.
+
 ## Security Model
 
 Assumptions:
@@ -301,7 +351,7 @@ Controls:
 
 - AES-256-GCM authenticated encryption.
 - scrypt KDF with per-vault salt.
-- Bounded and validated envelope/KDF parameters before expensive crypto work.
+- Bounded and validated envelope/KDF parameters and strict 64 MiB envelope size limit with pre-write rejection to preserve existing files on oversized writes.
 - Redacted list/get results by default.
 - Atomic private-file replacement with file and directory `fsync` where the
   filesystem supports it.

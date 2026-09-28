@@ -41,7 +41,32 @@ WEBMCP_VAULT_KEY_FILE=~/.webmcp/vault/vault.key webmcp vault init --json
 
 This creates `~/.webmcp/vault/credentials.enc.json` with a default **Personal**
 vault folder. If the file already exists, `init` is a no-op (returns
-`created: false`). Pass `--force` to re-initialize an existing store.
+`created: false`).
+
+Pass `--force` to re-initialize an existing store:
+
+```bash
+WEBMCP_VAULT_KEY_FILE=~/.webmcp/vault/vault.key webmcp vault init --force --json
+```
+
+When `--force` is used on an existing vault, `init` **automatically creates an
+encrypted backup before overwriting** to prevent accidental data loss. The CLI
+prints the backup path in human mode (`Backup: <path>`) and returns `backupFile`
+in JSON mode (`{ ok: true, initialized: true, file, created: true, backupFile: "..." }`).
+
+### CLI Flag Parsing & Value Coercion
+
+The CLI parses arguments with strict boolean coercion:
+
+- **Boolean flags**: `--flag=false`, `--flag=no`, and `--flag=0` are coerced to
+  boolean `false`. Destructive actions are safely prevented when `false` is
+  passed (e.g. `init --force=false` will **not** overwrite the store, and
+  `delete <id> --confirm=false` will **not** delete the item). Likewise,
+  `--flag=true`, `--flag=yes`, and `--flag=1` evaluate to `true`.
+- **String token validation**: Flags expecting a non-empty string reject boolean
+  falsy inputs. Specifically, `--gateway-token=false` (or empty strings) is
+  rejected with:
+  `--gateway-token requires a non-empty token value.`
 
 ### 3. Start the Vault UI server
 
@@ -213,7 +238,18 @@ printf '%s' '{"type":"ssh_key","title":"deploy host","fields":[{"name":"private_
 
 `api_token` requires a secret `token` field; `ssh_key` requires a secret
 `private_key` field. An item's `type` can be changed on update; the vault
-automatically migrates fields between layouts (login columns ↔ typed `fields[]`).
+automatically migrates fields between layouts (login columns ↔ typed `fields[]`):
+- Compatible fields are mapped automatically: `username ↔ username`,
+  `password ↔ password`, `otpSecret ↔ otp_secret`, `web ↔ web`, and `note ↔ note`.
+- If changing `type` would drop non-empty unmapped fields, the update is
+  **rejected** with `Type change would drop fields: …` unless `--drop-fields` is
+  passed (or `dropFields: true` in JSON input):
+  ```bash
+  webmcp vault update <id> --drop-fields --stdin-json --json < patch.json
+  ```
+- Updating secret fields (Decision D1): Sending `value: ""` for a secret field
+  that currently has a value preserves the stored value. To delete a secret field,
+  remove the entire field entry from the `fields` array.
 
 Import a whole `.env` file as one `env` item (comments, blank lines, an
 optional `export ` prefix, and quoted values are all supported; every parsed
@@ -321,3 +357,10 @@ before changing the active vault and reports only redacted key-strength buckets.
   them to fill a form field.
 - Keep resolved secret values scoped to the immediate browser action; never
   persist them in run history, workflow artifacts, or log files.
+- When passing boolean flags to CLI commands, note that `--flag=false`,
+  `--flag=no`, and `--flag=0` evaluate to `false`; do not use `--gateway-token=false`
+  (rejected with `--gateway-token requires a non-empty token value.`).
+- `init --force` always automatically creates a pre-overwrite backup and returns
+  `backupFile`.
+- When updating item types, unmapped fields with values are protected against
+  accidental drops unless `--drop-fields` is explicitly provided.
