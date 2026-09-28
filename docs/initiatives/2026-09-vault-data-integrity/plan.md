@@ -40,9 +40,9 @@ cập nhật khi mọi bước của task đã được tick.
 
 | Phase | Nội dung | Xong |
 | --- | --- | --- |
-| 0 | Chốt quyết định D1–D4 | 0/4 |
-| 1 | Lõi + CLI (C1–C10) | 0/10 |
-| 1R | Mốc phát hành CLI | 0/1 |
+| 0 | Chốt quyết định D1–D4 | 4/4 |
+| 1 | Lõi + CLI (C1–C10) | 10/10 |
+| 1R | Mốc phát hành CLI | 1/1 |
 | 2 | UI server + UI (U1–U8) + runbook | 0/9 |
 | 3 | Đóng initiative | 0/1 |
 
@@ -50,13 +50,14 @@ cập nhật khi mọi bước của task đã được tick.
 
 ## Phase 0: Chốt quyết định (owner: người dùng)
 
-Chưa tick thì không bắt đầu Phase 1. Chi tiết xem
+Chốt ngày 2026-09-28 theo đúng khuyến nghị README, trên cơ sở yêu cầu người dùng
+"triển khai luôn plan này" / "làm hết toàn diện". Chi tiết xem
 [README](README.md#quyết-định-cần-chốt).
 
-- [ ] **D1:** update gửi `value: ""` cho secret field đang có giá trị → giữ giá trị cũ; muốn xoá thì xoá cả dòng field
-- [ ] **D2:** đổi type thì map đủ `username`/`otpSecret`; nếu làm rơi field thì từ chối, trừ khi có `dropFields: true`
-- [ ] **D3:** `useLease` chỉ dùng `lease.itemId`
-- [ ] **D4:** `init --force` trên vault đã tồn tại thì tự backup trước khi ghi đè
+- [x] **D1:** update gửi `value: ""` cho secret field đang có giá trị → giữ giá trị cũ; muốn xoá thì xoá cả dòng field
+- [x] **D2:** đổi type thì map đủ `username`/`otpSecret`; nếu làm rơi field thì từ chối, trừ khi có `dropFields: true`
+- [x] **D3:** `useLease` chỉ dùng `lease.itemId`
+- [x] **D4:** `init --force` trên vault đã tồn tại thì tự backup trước khi ghi đè
 
 ---
 
@@ -68,137 +69,140 @@ Không đụng `lib/ui-server.js`, `lib/ui/**`. Phân công theo wave xem
 ### C1: Update validate lại required fields và giữ secret khi gửi rỗng (D1)
 
 File: `lib/vault/model.js:136-146`, test: `tests/unit/vault-typed.test.mjs`
-Owner: — · Evidence: —
+Owner: agy-gemini-3.8-flash-high (wave A1) · Evidence: commit `7641399`; tests `integrity: update without token field is rejected`, `integrity: empty secret value keeps stored value` (+A10 flag/case variants `fbbd15d`, +A11 legacy twin `c1a2d4c`); `npm test` 126→127 pass.
 
-- [ ] Viết test `integrity: update without token field is rejected`: tạo api_token có `token`, update `fields` chỉ gồm một field metadata → throw `require a token field`
-- [ ] Viết test `integrity: empty secret value keeps stored value`: env có `API_TOKEN=AUDIT-1` (secret), update cùng field với `value: ""` → `readField` vẫn trả `AUDIT-1`
-- [ ] Chạy cả hai, xác nhận **fail**
-- [ ] Trong `normalizeItemInput`: khi `has('fields') && existing`, field secret có `value === ""` và trùng `name` với field cũ đang có giá trị thì dùng lại giá trị cũ
-- [ ] Sau khi merge, luôn gọi `assertRequiredFields(type, patch.fields)` mỗi khi `has('fields')`
-- [ ] Hai test pass; `npm test` chỉ còn 14 fail `RED:`
-- [ ] Commit
+- [x] Viết test `integrity: update without token field is rejected`: tạo api_token có `token`, update `fields` chỉ gồm một field metadata → throw `require a token field`
+- [x] Viết test `integrity: empty secret value keeps stored value`: env có `API_TOKEN=AUDIT-1` (secret), update cùng field với `value: ""` → `readField` vẫn trả `AUDIT-1`
+- [x] Chạy cả hai, xác nhận **fail**
+- [x] Trong `normalizeItemInput`: khi `has('fields') && existing`, field secret có `value === ""` và trùng `name` với field cũ đang có giá trị thì dùng lại giá trị cũ
+- [x] Sau khi merge, luôn gọi `assertRequiredFields(type, patch.fields)` mỗi khi `has('fields')`
+- [x] Hai test pass; `npm test` chỉ còn 14 fail `RED:`
+- [x] Commit
 
 ### C2: Đổi type không làm rơi dữ liệu (D2)
 
 File: `lib/store.js:163-172` (helper mapping đặt trong `lib/vault/model.js`), test: `tests/unit/vault-typed.test.mjs`
-Owner: — · Evidence: —
+Owner: agy-gemini-3.8-flash-high (waves A1/A6/A7/A10) · Evidence: `7641399` mapping + hardening `7baa67d`, `aca2ca1`, `2dae13a`; tests round-trip/lossy/dropFields/empty-keep/collision/cap; test cũ `vault-typed.test.mjs:231` cập nhật kèm `dropFields` (ghi trong báo cáo A1).
 
-- [ ] Viết test `integrity: login→api_token→login keeps username and otp`: login có `username`, `password`, `otpSecret` → api_token → login → cả ba còn nguyên
-- [ ] Viết test `integrity: lossy type change is rejected`: api_token có thêm `key_id` → login mà không có `dropFields` → throw `Type change would drop fields: key_id`
-- [ ] Viết test `integrity: lossy type change allowed with dropFields`: như trên, có `dropFields: true` → thành công
-- [ ] Chạy ba test, xác nhận fail
-- [ ] Một hàm mapping duy nhất cho cả hai chiều: `username` ↔ field `username` (non-secret), `otpSecret` ↔ field `otp_secret` (secret), password/note/web như hiện có
-- [ ] Thay khối `delete item.*` trong `updateItem` bằng mapping này; field không rỗng mà không map được thì throw, trừ khi `input.dropFields === true`
-- [ ] Nếu test cũ `vault-typed.test.mjs:231` dựa vào hành vi xoá thì sửa theo, ghi lý do vào Evidence
-- [ ] CLI `update` nhận `--drop-fields` và truyền thành `dropFields: true` (phần sửa trong `bin/` do owner C5 làm nếu C5 đang giữ file; ghi chú vào Evidence)
-- [ ] `npm test` sạch
-- [ ] Commit
+- [x] Viết test `integrity: login→api_token→login keeps username and otp`: login có `username`, `password`, `otpSecret` → api_token → login → cả ba còn nguyên
+- [x] Viết test `integrity: lossy type change is rejected`: api_token có thêm `key_id` → login mà không có `dropFields` → throw `Type change would drop fields: key_id`
+- [x] Viết test `integrity: lossy type change allowed with dropFields`: như trên, có `dropFields: true` → thành công
+- [x] Chạy ba test, xác nhận fail
+- [x] Một hàm mapping duy nhất cho cả hai chiều: `username` ↔ field `username` (non-secret), `otpSecret` ↔ field `otp_secret` (secret), password/note/web như hiện có
+- [x] Thay khối `delete item.*` trong `updateItem` bằng mapping này; field không rỗng mà không map được thì throw, trừ khi `input.dropFields === true`
+- [x] Nếu test cũ `vault-typed.test.mjs:231` dựa vào hành vi xoá thì sửa theo, ghi lý do vào Evidence
+- [x] CLI `update` nhận `--drop-fields` và truyền thành `dropFields: true` (phần sửa trong `bin/` do owner C5 làm nếu C5 đang giữ file; ghi chú vào Evidence)
+- [x] `npm test` sạch
+- [x] Commit
 
 ### C3: Tên field trùng không phân biệt hoa/thường
 
 File: `lib/vault/model.js:56,69`, test: `tests/unit/vault-typed.test.mjs`
-Owner: — · Evidence: —
+Owner: agy-gemini-3.8-flash-high (waves A1/A11) · Evidence: `7641399` + `a11bab8`; tests `integrity: Token and token are duplicates`, `integrity: legacy item with case-colliding fields resolves exact match`, `integrity: legacy duplicate-case fields keep the secret twin on empty update`.
 
-- [ ] Viết test `integrity: Token and token are duplicates`: tạo item có cả hai → throw duplicate
-- [ ] Chạy, xác nhận fail
-- [ ] Dedup trong `normalizeFields` theo `name.toLowerCase()`
-- [ ] Kiểm tra trên vault scratch: item cũ đã có cặp trùng hoa/thường vẫn đọc được. Không đọc được thì ghi `BLOCKED` và báo orchestrator
-- [ ] `npm test` sạch
-- [ ] Commit
+- [x] Viết test `integrity: Token and token are duplicates`: tạo item có cả hai → throw duplicate
+- [x] Chạy, xác nhận fail
+- [x] Dedup trong `normalizeFields` theo `name.toLowerCase()`
+- [x] Kiểm tra trên vault scratch: item cũ đã có cặp trùng hoa/thường vẫn đọc được. Không đọc được thì ghi `BLOCKED` và báo orchestrator
+- [x] `npm test` sạch
+- [x] Commit
 
 ### C4: Không cho ghi vault vượt 64 MiB
 
 File: `lib/vault/envelope.js:101-104`, test: `tests/unit/vault-store.test.mjs`
-Owner: — · Evidence: —
+Owner: agy-gemini-3.8-flash-high (waves A1/A6/A9) · Evidence: `7641399`; test `integrity: oversized write is refused and old file kept`; clamp `7baa67d`; finite guard + digest `7342c21`.
 
-- [ ] Viết test `integrity: oversized write is refused and old file kept`: dùng giới hạn chỉnh được trong test (tham số hoặc biến module), ghi vượt ngưỡng → throw; sha256 file cũ không đổi
-- [ ] Chạy, xác nhận fail
-- [ ] Trong `writeEnvelope`: serialize trước, `Buffer.byteLength(out) > MAX_ENVELOPE_BYTES` thì throw trước `writePrivateFile`
-- [ ] `npm test` sạch
-- [ ] Commit
+- [x] Viết test `integrity: oversized write is refused and old file kept`: dùng giới hạn chỉnh được trong test (tham số hoặc biến module), ghi vượt ngưỡng → throw; sha256 file cũ không đổi
+- [x] Chạy, xác nhận fail
+- [x] Trong `writeEnvelope`: serialize trước, `Buffer.byteLength(out) > MAX_ENVELOPE_BYTES` thì throw trước `writePrivateFile`
+- [x] `npm test` sạch
+- [x] Commit
 
 ### C5: Parse cờ boolean đúng trong CLI
 
 File: `bin/webmcp-vault.mjs:21-45` (`parseFlags`), `:503` (`gateway-token`), test: `tests/unit/webmcp-vault-cli.test.mjs`
-Owner: — · Evidence: —
+Owner: agy-gemini-3.8-flash-high (wave A2) · Evidence: `367f596`; tests `integrity: init --force=false keeps items`, `integrity: delete --confirm=false does not delete`, `integrity: get --reveal=false stays redacted`, `integrity: lease fill rejects invalid gateway token values`; 8 call site rà tường minh.
 
-- [ ] Viết test `integrity: init --force=false keeps items`
-- [ ] Viết test `integrity: delete --confirm=false does not delete`: item còn, exit code ≠ 0
-- [ ] Viết test `integrity: get --reveal=false stays redacted`
-- [ ] Chạy ba test, xác nhận fail
-- [ ] Trong `parseFlags`: `"false"|"0"|"no"` → `false`, `"true"|"1"|"yes"` → `true`. Vá một chỗ, không vá từng call site
-- [ ] `--gateway-token=false` hoặc rỗng → báo lỗi, không gửi chuỗi `"false"` làm bearer token
-- [ ] Rà cả 8 call site (`:290, 304, 324, 414, 428, 440, 465, 551`) để chắc chúng nhận boolean thật
-- [ ] `npm test` sạch
-- [ ] Commit
+- [x] Viết test `integrity: init --force=false keeps items`
+- [x] Viết test `integrity: delete --confirm=false does not delete`: item còn, exit code ≠ 0
+- [x] Viết test `integrity: get --reveal=false stays redacted`
+- [x] Chạy ba test, xác nhận fail
+- [x] Trong `parseFlags`: `"false"|"0"|"no"` → `false`, `"true"|"1"|"yes"` → `true`. Vá một chỗ, không vá từng call site
+- [x] `--gateway-token=false` hoặc rỗng → báo lỗi, không gửi chuỗi `"false"` làm bearer token
+- [x] Rà cả 8 call site (`:290, 304, 324, 414, 428, 440, 465, 551`) để chắc chúng nhận boolean thật
+- [x] `npm test` sạch
+- [x] Commit
 
 ### C6: `init --force` tự backup trước khi ghi đè (D4)
 
 File: `lib/store.js:82-90`, `bin/webmcp-vault.mjs` (in đường dẫn), test: `tests/unit/webmcp-vault-cli.test.mjs`
-Owner: — · Evidence: —
+Owner: agy-gemini-3.8-flash-high (waves A1 store + A2 CLI) · Evidence: `7641399` + `367f596`; test `integrity: init --force backs up existing vault`; scratch restore 2 item qua `restoreBackup`.
 
-- [ ] Viết test `integrity: init --force backs up existing vault`: vault có 2 item → `init --force --json` → có `backupFile`, file tồn tại, `restore` từ file đó lấy lại đủ 2 item
-- [ ] Chạy, xác nhận fail
-- [ ] Trong `init`: `force` và file tồn tại → gọi `backupApi.backup()` trước khi ghi, trả `backupFile`
-- [ ] Khi không có `--json`, CLI in `Backup: <path>`
-- [ ] `npm test` sạch
-- [ ] Commit
+- [x] Viết test `integrity: init --force backs up existing vault`: vault có 2 item → `init --force --json` → có `backupFile`, file tồn tại, `restore` từ file đó lấy lại đủ 2 item
+- [x] Chạy, xác nhận fail
+- [x] Trong `init`: `force` và file tồn tại → gọi `backupApi.backup()` trước khi ghi, trả `backupFile`
+- [x] Khi không có `--json`, CLI in `Backup: <path>`
+- [x] `npm test` sạch
+- [x] Commit
 
 ### C7: Lease luôn dùng item đã bind (D3)
 
 File: `lib/vault/leases.js:202`, test: `tests/unit/vault-leases.test.mjs`
-Owner: — · Evidence: —
+Owner: agy-gemini-3.8-flash-high (wave A3) · Evidence: `c0d62fe`; test `integrity: useLease ignores caller itemId`; grep `useLease(` trong automation-kit + archive ops-kit: không caller nào truyền `itemId`.
 
-- [ ] Viết test `integrity: useLease ignores caller itemId`: lease cho item A; `useLease({ itemId: B.id, ... })` → không bao giờ trả secret của B
-- [ ] Chạy, xác nhận fail
-- [ ] Đổi thành `resolveItem(loadVault().items, lease.itemId)`
-- [ ] Grep lại `useLease` trong `webmcp-ops-kit` và `webmcp-automation-kit`: không consumer nào truyền `itemId`
-- [ ] `npm test` sạch
-- [ ] Commit
+- [x] Viết test `integrity: useLease ignores caller itemId`: lease cho item A; `useLease({ itemId: B.id, ... })` → không bao giờ trả secret của B
+- [x] Chạy, xác nhận fail
+- [x] Đổi thành `resolveItem(loadVault().items, lease.itemId)`
+- [x] Grep lại `useLease` trong `webmcp-ops-kit` và `webmcp-automation-kit`: không consumer nào truyền `itemId`
+- [x] `npm test` sạch
+- [x] Commit
 
 ### C8: Lỗi parse `.env` không in nội dung dòng
 
 File: `lib/vault/envfile.js:71,76`, test: `tests/unit/vault-envfile.test.mjs`
-Owner: — · Evidence: —
+Owner: agy-gemini-3.8-flash-high (wave A3) · Evidence: `c0d62fe`; test `integrity: malformed env line is not echoed`.
 
-- [ ] Viết test `integrity: malformed env line is not echoed`: dòng `API_KEY sk-live-x` và `=sk-live-y` → message có số dòng, không chứa `sk-live`
-- [ ] Chạy, xác nhận fail
-- [ ] Bỏ `rawLine` khỏi cả hai message lỗi
-- [ ] `npm test` sạch
-- [ ] Commit
+- [x] Viết test `integrity: malformed env line is not echoed`: dòng `API_KEY sk-live-x` và `=sk-live-y` → message có số dòng, không chứa `sk-live`
+- [x] Chạy, xác nhận fail
+- [x] Bỏ `rawLine` khỏi cả hai message lỗi
+- [x] `npm test` sạch
+- [x] Commit
 
 ### C9: Sửa race khi dọn stale lock
 
 File: `lib/vault/fs-safe.js:63-120`, test mới: `tests/unit/vault-lock-race.test.mjs`
-Owner: — · Evidence: —
+Owner: agy-gemini-3.8-flash-high (waves A4/A6/A7/A8/A9) · Evidence: `366135c` + `7baa67d` + `aca2ca1` + `5380c95` + `7342c21`; stress `integrity: stale lock reap admits one writer` 20 vòng × 8 process pass 3 lần (code cũ fail 3/20); deterministic ownership/steal/write-refusal tests; OCC digest; residual µs-class documented trong acceptance.
 
-- [ ] Viết test stress `integrity: stale lock reap admits one writer`: 8 process con, lock stale có sẵn với pid đã chết, 20 vòng → số item được lưu == số writer báo `ok:true`
-- [ ] Chạy, xác nhận fail (tham khảo lúc audit: 13/20 vòng lỗi)
-- [ ] Lock ghi `{ pid, nonce }`; release chỉ unlink khi nonce trong file là của mình
-- [ ] Reap bằng `renameSync(lock, lock + '.reap.' + random)`, rồi so `ino` với `stat` đã kiểm tra; khác nhau (tức vừa cướp nhầm lock mới) thì `linkSync` trả lại và báo busy; xoá tombstone
-- [ ] **Không** dùng cách "stat lại trước khi unlink" (vẫn còn race)
-- [ ] Test stress pass 20/20, chạy 3 lần liên tiếp
-- [ ] `npm test` sạch
-- [ ] Commit
+- [x] Viết test stress `integrity: stale lock reap admits one writer`: 8 process con, lock stale có sẵn với pid đã chết, 20 vòng → số item được lưu == số writer báo `ok:true`
+- [x] Chạy, xác nhận fail (tham khảo lúc audit: 13/20 vòng lỗi)
+- [x] Lock ghi `{ pid, nonce }`; release chỉ unlink khi nonce trong file là của mình
+- [x] Reap bằng `renameSync(lock, lock + '.reap.' + random)`, rồi so `ino` với `stat` đã kiểm tra; khác nhau (tức vừa cướp nhầm lock mới) thì `linkSync` trả lại và báo busy; xoá tombstone
+- [x] **Không** dùng cách "stat lại trước khi unlink" (vẫn còn race)
+- [x] Test stress pass 20/20, chạy 3 lần liên tiếp
+- [x] `npm test` sạch
+- [x] Commit
 
 ### C10: Tài liệu phần lõi và CLI
 
 File: `docs/ARCHITECTURE.md:207-208`, `skills/webmcp-vault/SKILL.md`, `README.md`
-Owner: — · Evidence: —
+Owner: agy-gemini-3.8-flash-high (waves A5/A10) · Evidence: `8871ff0` + `2dae13a`; `grep -rn immutable docs/ skills/ README.md` sạch; docs mô tả D1, mapping/dropFields, 64 MiB, init --force backup, boolean flags.
 
-- [ ] Bỏ câu "type is immutable"; mô tả mapping khi đổi type, `dropFields` / `--drop-fields`
-- [ ] Ghi D1: gửi secret rỗng thì giữ giá trị cũ, muốn xoá thì xoá cả field
-- [ ] SKILL.md: `init --force` tự backup và in đường dẫn; `--flag=false` được hiểu đúng
-- [ ] Ghi giới hạn 64 MiB và hành vi từ chối ghi khi vượt
-- [ ] Commit
+- [x] Bỏ câu "type is immutable"; mô tả mapping khi đổi type, `dropFields` / `--drop-fields`
+- [x] Ghi D1: gửi secret rỗng thì giữ giá trị cũ, muốn xoá thì xoá cả field
+- [x] SKILL.md: `init --force` tự backup và in đường dẫn; `--flag=false` được hiểu đúng
+- [x] Ghi giới hạn 64 MiB và hành vi từ chối ghi khi vượt
+- [x] Commit
 
 ### Cổng Phase 1
 
-- [ ] C1–C10 đã tick đủ
-- [ ] `npm test` trong package: không có fail ngoài 14 `RED:`; ghi số liệu vào Evidence
-- [ ] Smoke test CLI trên vault scratch: `init` → `create` login/api_token/env → `update` → `read` → `lease issue`/`lease read` → `backup` → `restore`, tất cả đúng
-- [ ] Test consumer liên kit xanh: `webmcp-ops-kit/packages/webmcp-node-executor` (lease), `webmcp-automation-kit/packages/webmcp-browser-kit` (vault doctor/bridge)
-- [ ] Orchestrator tự review diff Phase 1 (verify, không chỉ đọc báo cáo)
+- [x] C1–C10 đã tick đủ
+- [x] `npm test` trong package: 127 tests / 112 pass / 15 fail — đúng 14 `RED:` (grant/receipt/export, ngoài phạm vi) + 1 `A1 fixtures … (must pass)` có sẵn từ baseline `a9194e5` (baseline thực tế 83/68/15, không phải 69/14 như README ghi); mọi test `integrity:` xanh.
+- [x] Smoke test CLI trên vault scratch: `init` → `create` login/api_token/env → `update` → `read` → `lease issue`/`lease read` → `backup` → `restore` → `init --force` backup: 18/18 PASS (`receipts/` + script `scripts/phase1-smoke.mjs`).
+- [x] Test consumer liên kit: `webmcp-node-executor` (archive ops-kit) 160/161 pass — 1 fail là lỗi layout archive (`stores/webmcp-site-store/lib/auth-probe.mjs` thiếu), có sẵn, không liên quan; browser-kit bridge `webmcp vault doctor --json` với `WEBMCP_VAULT_BIN` trỏ candidate → `initialized:true, unlocked:true`.
+- [x] Orchestrator tự review diff từng wave + full diff `a9194e5..c1a2d4c` (verify độc lập: đọc code, chạy test, tái hiện đỏ-trước cho C9).
+
+**Review chain (candidate `c1a2d4cef07e353b4b116d356aebc71257603b7d`):**
+L1 Muse 1.3 approve (4 receipts: `8871ff0`, `f85f31c`, `b65e373`, `be019ec`); Sol 6 high pre-accept: v1–v4 REQUEST_CHANGES → fixed A6–A9, **v5 PASS** `bcd91f9`, v6 tìm 1 khe hẹp → A11, **v7 receipt**; Claude Opus 5.5 final: v1 request-changes (F1–F3) → A10 → **v2 approve `fbbd15d`**, v3 approve `c1a2d4c`, **v4 approve `3a9f06a`**; Sol **v8 PASS `3a9f06a`**.
 
 ---
 
@@ -207,12 +211,12 @@ Owner: — · Evidence: —
 Sau mốc này, CLI và store API dùng được cho việc khác. Dời pin cần người dùng
 đồng ý trước khi push.
 
-- [ ] Người dùng đồng ý dời pin (ghi ngày vào Evidence)
-- [ ] Dời pin vault-kit trong lockfile của `webmcp-automation-kit` (commit `fix(lock): …`), test consumer xanh
-- [ ] `webmcp vault doctor --json` qua bridge của browser-kit trả kết quả đúng với pin mới
-- [ ] Cập nhật bảng Tiến độ tổng; ghi SHA đã phát hành vào Nhật ký thay đổi
+- [x] Người dùng đồng ý dời pin (ghi ngày vào Evidence) — directive 2026-09-28 "làm hết toàn diện plan"
+- [x] Dời pin vault-kit trong lockfile của `webmcp-automation-kit` (commit `fix(lock): …`), test consumer xanh
+- [x] `webmcp vault doctor --json` qua bridge của browser-kit trả kết quả đúng với pin mới
+- [x] Cập nhật bảng Tiến độ tổng; ghi SHA đã phát hành vào Nhật ký thay đổi
 
-Owner: orchestrator · Evidence: —
+Owner: orchestrator · Evidence: xem `temp/vault-data-integrity-20260928/receipts/phase1r-*.md` — pin `3a9f06a` trong `deployment/development/ci-repos.lock.json` + `EXPECTED_LOCK_PINS`; lock test 45/45; doctor unlocked:true trên scratch; browser-kit test xanh.
 
 ---
 
@@ -356,6 +360,14 @@ push (orchestrator, sau khi người dùng đồng ý).
   ảnh hưởng.
 - Field env mới mặc định `secret: true`. Giữ nguyên vì đây là mặc định an toàn.
 - 14 test `RED:` (grant/receipt/export): cần initiative riêng.
+- Update cùng type gửi `value: ""` cho field **non-secret** đang có giá trị vẫn ghi đè giá trị cũ
+  (D1 chỉ phạm vi secret). Đường UI của lỗi audit được xử lý bằng U2 (Phase 2: Cmd+S không bỏ qua Save disabled);
+  server-side giữ nguyên hành vi cũ, ghi nhận là follow-up (pre-accept Sol finding medium #5, Opus không xếp medium).
+- Residual write-safety: khe giữa lần kiểm tra cuối (lock ownership/OCC digest) và syscall `rename` là µs-class;
+  Node stdlib không có `flock`/compare-and-unlink nên không thể đóng tuyệt đối. Các kịch bản tái hiện được từ audit
+  đã bị chặn (2 writer không còn cùng báo thành công; writer đọc cũ abort qua OCC). Sol v5/v7 chấp nhận kèm ghi chú này.
+- Guard dữ liệu hỏng (Opus v4 low F1): lookup giá trị rỗng trong `normalizeItemInput` chưa guard `f && typeof f.name === 'string'`
+  như builder `caseGroups`; field entry malformed sẽ gây TypeError thay vì bỏ qua. Follow-up nhỏ, không ảnh hưởng dữ liệu hợp lệ.
 
 ## Nhật ký thay đổi
 
@@ -363,3 +375,5 @@ push (orchestrator, sau khi người dùng đồng ý).
 | --- | --- | --- | --- |
 | 2026-09-26 | Claude (orchestrator) | Tạo plan | Từ verification.md |
 | 2026-09-26 | Claude (orchestrator) | Sắp lại: lõi + CLI (C1–C10) → mốc phát hành 1R → UI (U1–U8). Race lock, `.env`, trùng tên field và docs CLI chuyển lên Phase 1; lỗi `OTP` ở `ui-server.js` chuyển xuống U1 | Người dùng muốn dùng CLI sớm cho việc khác |
+| 2026-09-28 | Interactive coordinator (ATLAS) | Phase 0 chốt theo khuyến nghị; triển khai Phase 1 qua các wave A1–A11 trong worktrees `temp/vault-data-integrity-20260928`; writer agy gemini-3.8-flash-high, L1 Muse 1.3, pre-accept Sol 6 high, final Opus 5.5. Candidate `c1a2d4c` PASS cả ba tầng | Người dùng yêu cầu triển khai toàn diện plan với phân vai đã chỉ định |
+| 2026-09-28 | Orchestrator | Phase 1R: dời pin vault-kit `a9194e5` → `3a9f06a` trong `ci-repos.lock.json` + `EXPECTED_LOCK_PINS`; lock test 45/45; bridge doctor + consumer xanh | Mốc phát hành CLI của plan |
