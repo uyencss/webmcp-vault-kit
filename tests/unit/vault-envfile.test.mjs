@@ -226,3 +226,20 @@ test('multi-line private_key round-trips byte-for-byte via create --stdin-json',
   assert.equal(cliRead.status, 0, cliRead.stderr);
   assert.equal(cliRead.stdout, `${privateKey}\n`);
 });
+
+test('integrity: malformed env line is not echoed', () => {
+  const text = 'API_KEY sk-live-x\n=sk-live-y\n';
+  const { item, errors } = parseEnvFile(text, { title: 'secret env' });
+  assert.equal(item, null);
+  assert.equal(errors.length, 2);
+
+  assert.equal(errors[0].line, 1);
+  assert.match(errors[0].error, /line 1/i);
+  assert.equal(errors[1].line, 2);
+  assert.match(errors[1].error, /line 2/i);
+
+  assert.equal(errors[0].error.includes('sk-live'), false);
+  assert.equal(errors[1].error.includes('sk-live'), false);
+  assert.equal(JSON.stringify(errors).includes('sk-live'), false);
+});
+
