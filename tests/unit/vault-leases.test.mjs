@@ -294,3 +294,50 @@ test('typed lease signed approval authorizes exactly the field named in the cred
   // in its signed credentialScopes[0].fields.
   assert.throws(() => store.issueLease({ ...common, fields: ['refresh_token'] }), /credential scope/i);
 });
+
+test('integrity: useLease ignores caller itemId', () => {
+  const store = createVaultStore({ dataDir: tempHome(), key: 'lease-ignore-itemid-key' });
+  store.init();
+
+  const itemA = store.createItem({
+    title: 'Login Item A',
+    web: 'https://login.example.test/app',
+    username: 'user-a',
+    password: 'secret-a-only',
+  });
+
+  const itemB = store.createItem({
+    title: 'Login Item B',
+    web: 'https://login.example.test/app',
+    username: 'user-b',
+    password: 'secret-b-never-return',
+  });
+
+  const issued = store.issueLease({
+    itemId: itemA.id,
+    receiptDigest: 'receipt-digest-a',
+    runId: 'run-c7',
+    nodeId: 'node-c7',
+    principalId: 'principal-c7',
+    profileBindingId: 'binding-c7',
+    siteOrigin: 'https://login.example.test/app',
+    purpose: 'login',
+    fields: ['password'],
+    now: 1_000,
+  });
+
+  const used = store.useLease({
+    leaseId: issued.lease.leaseId,
+    token: issued.token,
+    field: 'password',
+    siteOrigin: 'https://login.example.test',
+    profileBindingId: 'binding-c7',
+    purpose: 'login',
+    itemId: itemB.id,
+    now: 2_000,
+  });
+
+  assert.equal(used.value, 'secret-a-only');
+  assert.notEqual(used.value, 'secret-b-never-return');
+});
+
