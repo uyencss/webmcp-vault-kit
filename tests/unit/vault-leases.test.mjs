@@ -9,6 +9,7 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const { createVaultStore } = require('../../lib/store.js');
 const { canonicalJson, publicKeyToPem } = require('../../lib/approval-receipt.js');
+const { readEnvelope, writeEnvelope, encryptVault, decryptVault } = require('../../lib/vault/envelope.js');
 
 function tempHome() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'webmcp-vault-leases-'));
@@ -150,10 +151,14 @@ test('typed lease use re-validates the requested field against the item\'s curre
     now: 1_000,
   });
 
-  // The item is edited after the lease was issued: the field is no longer
-  // secret. The lease still names it (lease.fields still includes 'token'),
-  // but useLease must re-check against the item's *current* secret set.
-  store.updateItem(item.id, { fields: [{ name: 'token', value: 'sk-revalidate', secret: false }] });
+  // The item is edited out-of-band after the lease was issued: the field is no longer
+  // secret. We mutate the raw envelope directly because store.updateItem
+  // now strictly forbids un-secreting a required secret field.
+  const env = readEnvelope(store.file);
+  const decrypted = decryptVault(env, 'typed-lease-revalidate-key');
+  const targetItem = decrypted.items.find((it) => it.id === item.id);
+  targetItem.fields[0].secret = false;
+  writeEnvelope(store.file, encryptVault(decrypted, 'typed-lease-revalidate-key'));
 
   assert.throws(() => store.useLease({
     leaseId: issued.lease.leaseId,

@@ -17,8 +17,10 @@ const {
 } = require('../../lib/approval-receipt.js');
 const {
   writeEnvelope,
+  readEnvelope,
   emptyVault,
   encryptVault,
+  MAX_ENVELOPE_BYTES,
 } = require('../../lib/vault/envelope.js');
 
 function tempHome() {
@@ -621,6 +623,47 @@ test('integrity: init with force creates backup before overwriting existing vaul
   assert.equal(restored.ok, true);
   assert.equal(restored.itemCount, 2);
   assert.equal(store.listItems().length, 2);
+});
+
+test('integrity: dropFields ignores non-boolean truthy values', () => {
+  const dataDir = tempHome();
+  const store = createVaultStore({ dataDir, key: 'drop-fields-truthy-key' });
+  store.init();
+  const item = store.createItem({
+    type: 'api_token',
+    title: 'Drop Fields Test',
+    fields: [
+      { name: 'token', value: 'sk-tok', secret: true },
+      { name: 'key_id', value: 'key-123', secret: false },
+    ],
+  });
+
+  // String "false" is truthy in JavaScript, but dropFields must only accept boolean true
+  assert.throws(
+    () => store.updateItem(item.id, { type: 'login', dropFields: 'false' }),
+    /Type change would drop fields/i,
+  );
+
+  // boolean true succeeds
+  const updated = store.updateItem(item.id, { type: 'login', dropFields: true });
+  assert.equal(updated.type, 'login');
+});
+
+test('integrity: writeEnvelope clamps maxBytes to MAX_ENVELOPE_BYTES', () => {
+  const dir = tempHome();
+  const file = path.join(dir, 'test-clamp.enc.json');
+  const env = encryptVault(emptyVault(), 'test-secret');
+
+  // Small envelope with huge maxBytes (> 64 MiB) writes OK and is readable by readEnvelope
+  writeEnvelope(file, env, { maxBytes: 128 * 1024 * 1024 });
+  const read = readEnvelope(file);
+  assert.equal(read.version, env.version);
+
+  // Smaller override still works and restricts writes
+  assert.throws(
+    () => writeEnvelope(file, env, { maxBytes: 50 }),
+    /max 50 bytes/i,
+  );
 });
 
 

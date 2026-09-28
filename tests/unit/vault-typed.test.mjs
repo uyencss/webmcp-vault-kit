@@ -514,5 +514,175 @@ test('integrity: lossy type change allowed with dropFields', () => {
   assert.equal(Object.hasOwn(stored, 'dropFields'), false);
 });
 
+test('integrity: update cannot unsecret a required field', () => {
+  const dataDir = tempHome();
+  const store = createVaultStore({ dataDir, key: 'unsecret-required-key' });
+  store.init();
+  const item = store.createItem({
+    type: 'api_token',
+    title: 'Secret Token',
+    fields: [{ name: 'token', value: 'sk-12345', secret: true }],
+  });
+
+  assert.throws(
+    () => store.updateItem(item.id, {
+      fields: [{ name: 'token', value: 'sk-12345', secret: false }],
+    }),
+    /marked secret/i,
+  );
+});
+
+test('integrity: type change keeps old values when incoming fields are empty', () => {
+  const dataDir = tempHome();
+  const store = createVaultStore({ dataDir, key: 'type-change-empty-fields-key' });
+  store.init();
+
+  // 1. login -> typed: incoming field with empty value retains source login value
+  const login = store.createItem({
+    title: 'Old Login',
+    username: 'alice',
+    password: 'super-password',
+  });
+  store.updateItem(login.id, {
+    type: 'api_token',
+    fields: [
+      { name: 'token', value: 'sk-token-123', secret: true },
+      { name: 'password', value: '', secret: true },
+    ],
+  });
+  assert.equal(store.readField(login.id, 'password'), 'super-password');
+
+  // 2. typed -> login: patch with empty string value retains source typed value
+  const typed = store.createItem({
+    type: 'api_token',
+    title: 'Old Token',
+    fields: [
+      { name: 'token', value: 'sk-token-456', secret: true },
+      { name: 'password', value: 'typed-password', secret: true },
+    ],
+  });
+  store.updateItem(typed.id, {
+    type: 'login',
+    password: '',
+    dropFields: true,
+  });
+  assert.equal(store.readField(typed.id, 'password'), 'typed-password');
+});
+
+test('integrity: colliding source fields mapping to one login property require dropFields', () => {
+  const dataDir = tempHome();
+  const key = 'colliding-source-fields-key';
+  const store = createVaultStore({ dataDir, key });
+  store.init();
+
+  // Case 1: different values -> requires dropFields
+  const vault1 = {
+    version: 2,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    vaults: [{
+      id: 'personal',
+      name: 'Personal',
+      description: 'Private credentials stored on this device.',
+      icon: 'key',
+      isDefault: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }],
+    items: [{
+      id: 'colliding-item-1',
+      vaultId: 'personal',
+      type: 'ssh_key',
+      title: 'Colliding Item',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      fields: [
+        { name: 'private_key', value: 'pk-val', secret: true },
+        { name: 'password', value: 'pw1', secret: true },
+        { name: 'Password', value: 'pw2', secret: true },
+      ],
+    }],
+  };
+  writeEnvelope(store.file, encryptVault(vault1, key));
+
+  assert.throws(
+    () => store.updateItem('colliding-item-1', { type: 'login' }),
+    /drop fields.*Password/i,
+  );
+
+  const updated = store.updateItem('colliding-item-1', { type: 'login', dropFields: true });
+  assert.equal(updated.type, 'login');
+
+  // Case 2: same value -> valid without dropFields (only private_key dropped if unmapped)
+  // Let's create an item where only password and Password exist with the same value
+  const vault2 = {
+    version: 2,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    vaults: [{
+      id: 'personal',
+      name: 'Personal',
+      description: 'Private credentials stored on this device.',
+      icon: 'key',
+      isDefault: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }],
+    items: [{
+      id: 'colliding-item-2',
+      vaultId: 'personal',
+      type: 'env',
+      title: 'Same Value Colliding Item',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      fields: [
+        { name: 'password', value: 'same-pw', secret: true },
+        { name: 'Password', value: 'same-pw', secret: true },
+      ],
+    }],
+  };
+  writeEnvelope(store.file, encryptVault(vault2, key));
+
+  const updatedSame = store.updateItem('colliding-item-2', { type: 'login' });
+  assert.equal(updatedSame.type, 'login');
+  assert.equal(store.readField('colliding-item-2', 'password'), 'same-pw');
+});
+
+test('integrity: merged fields cannot exceed 256 entries', () => {
+  const dataDir = tempHome();
+  const store = createVaultStore({ dataDir, key: 'max-merged-fields-key' });
+  store.init();
+
+  // Create an item with 250 fields
+  const initialFields = [
+    { name: 'private_key', value: 'some-pk', secret: true },
+  ];
+  for (let i = 1; i < 250; i++) {
+    initialFields.push({ name: `field_${i}`, value: `val_${i}`, secret: false });
+  }
+  const item = store.createItem({
+    type: 'ssh_key',
+    title: 'Big Item',
+    fields: initialFields,
+  });
+
+  // Now change type to api_token, supplying 10 new fields (total would be 250 + 10 = 260 > 256)
+  const patchFields = [
+    { name: 'token', value: 'sk-new-tok', secret: true },
+  ];
+  for (let i = 0; i < 9; i++) {
+    patchFields.push({ name: `new_field_${i}`, value: `new_val_${i}`, secret: false });
+  }
+
+  assert.throws(
+    () => store.updateItem(item.id, {
+      type: 'api_token',
+      fields: patchFields,
+      dropFields: true,
+    }),
+    /fields cannot exceed 256 entries/i,
+  );
+});
+
 
 

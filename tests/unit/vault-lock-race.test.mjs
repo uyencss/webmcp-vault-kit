@@ -10,7 +10,7 @@ import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
 const { createVaultStore } = require('../../lib/store.js');
-const { STALE_LOCK_MS } = require('../../lib/vault/fs-safe.js');
+const { STALE_LOCK_MS, withFileLock } = require('../../lib/vault/fs-safe.js');
 
 const __filename = fileURLToPath(import.meta.url);
 
@@ -180,6 +180,64 @@ test('integrity: stale lock reap admits one writer', async () => {
   } finally {
     try {
       fs.rmSync(scratchDir, { recursive: true, force: true });
+    } catch {}
+  }
+});
+
+test('integrity: release leaves a foreign lock intact', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'webmcp-vault-foreign-lock-'));
+  const vaultFile = path.join(dir, 'vault.enc.json');
+  const lockFile = `${vaultFile}.lock`;
+
+  try {
+    let foreignLockWritten = false;
+    try {
+      withFileLock(vaultFile, () => {
+        fs.writeFileSync(
+          lockFile,
+          JSON.stringify({ pid: process.pid, nonce: 'foreign', createdAt: new Date().toISOString() }),
+        );
+        foreignLockWritten = true;
+      });
+    } catch {
+      // Expected to throw if post-callback ownership check is in place
+    }
+
+    assert.equal(foreignLockWritten, true);
+    assert.equal(fs.existsSync(lockFile), true, 'Lock file must still exist after withFileLock');
+    const content = JSON.parse(fs.readFileSync(lockFile, 'utf8'));
+    assert.equal(content.nonce, 'foreign', 'Foreign lock must remain intact');
+  } finally {
+    try {
+      fs.rmSync(dir, { recursive: true, force: true });
+    } catch {}
+  }
+});
+
+test('integrity: withFileLock fails when its lock was stolen during the callback', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'webmcp-vault-stolen-lock-'));
+  const vaultFile = path.join(dir, 'vault.enc.json');
+  const lockFile = `${vaultFile}.lock`;
+
+  try {
+    assert.throws(
+      () => {
+        withFileLock(vaultFile, () => {
+          fs.writeFileSync(
+            lockFile,
+            JSON.stringify({ pid: process.pid, nonce: 'foreign', createdAt: new Date().toISOString() }),
+          );
+        });
+      },
+      /busy with another writer/i,
+    );
+
+    assert.equal(fs.existsSync(lockFile), true);
+    const content = JSON.parse(fs.readFileSync(lockFile, 'utf8'));
+    assert.equal(content.nonce, 'foreign');
+  } finally {
+    try {
+      fs.rmSync(dir, { recursive: true, force: true });
     } catch {}
   }
 });
