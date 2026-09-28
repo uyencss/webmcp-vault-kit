@@ -747,5 +747,40 @@ test('integrity: typed merge keeps old secret flag when filling empty value', ()
   assert.equal(itemMatchesSearch(updated, 'old-secret-privkey'), false, 'item with carried over secret must not match search');
 });
 
+test('integrity: secret field mapped to a non-secret login prop requires dropFields', () => {
+  const dataDir = tempHome();
+  const store = createVaultStore({ dataDir, key: 'secret-to-nonsecret-key' });
+  store.init();
+
+  const env = store.createItem({
+    type: 'env',
+    title: 'Env with secret username',
+    fields: [
+      { name: 'username', value: 'SYNTH_SECRET', secret: true },
+    ],
+  });
+
+  assert.throws(
+    () => store.updateItem(env.id, { type: 'login' }),
+    /Type change would drop fields: username/,
+  );
+
+  const updated = store.updateItem(env.id, { type: 'login', dropFields: true });
+  assert.equal(updated.type, 'login');
+  assert.equal(updated.username, 'SYNTH_SECRET');
+
+  const env2 = store.createItem({
+    type: 'env',
+    title: 'Env with plain username',
+    fields: [
+      { name: 'username', value: 'alice_plain', secret: false },
+    ],
+  });
+
+  const updated2 = store.updateItem(env2.id, { type: 'login' });
+  assert.equal(updated2.type, 'login');
+  assert.equal(updated2.username, 'alice_plain');
+});
+
 
 

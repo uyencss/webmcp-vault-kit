@@ -22,6 +22,7 @@ const {
   encryptVault,
   MAX_ENVELOPE_BYTES,
 } = require('../../lib/vault/envelope.js');
+const { fileDigest, assertFileUnchanged } = require('../../lib/vault/fs-safe.js');
 
 function tempHome() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'webmcp-vault-store-'));
@@ -687,6 +688,79 @@ test('integrity: invalid maxBytes falls back to the default cap', () => {
     () => writeEnvelope(file, env, { maxBytes: 10 }),
     /max 10 bytes/i,
   );
+});
+
+test('integrity: backup refuses a symlinked alias of the active vault', () => {
+  const dataDir = tempHome();
+  const store = createVaultStore({ dataDir, key: 'symlink-backup-key-1234' });
+  store.init();
+
+  const symlinkVault = path.join(dataDir, 'alias-vault.enc.json');
+  fs.symlinkSync(store.file, symlinkVault);
+
+  assert.throws(
+    () => store.backup({ file: symlinkVault, force: true }),
+    /Backup path must be different from the active vault file\./,
+  );
+
+  const symlinkDir = path.join(tempHome(), 'symdir');
+  fs.symlinkSync(path.dirname(store.file), symlinkDir);
+  const aliasInsideSymDir = path.join(symlinkDir, path.basename(store.file));
+
+  assert.throws(
+    () => store.backup({ file: aliasInsideSymDir, force: true }),
+    /Backup path must be different from the active vault file\./,
+  );
+});
+
+test('integrity: assertFileUnchanged detects an out-of-band write', () => {
+  const dir = tempHome();
+  const file = path.join(dir, 'test-occ.txt');
+  fs.writeFileSync(file, 'initial content');
+
+  const digest = fileDigest(file);
+  assert.ok(digest, 'fileDigest should return non-null for existing file');
+
+  assert.doesNotThrow(() => assertFileUnchanged(file, digest));
+
+  fs.writeFileSync(file, 'modified content');
+
+  assert.throws(
+    () => assertFileUnchanged(file, digest),
+    /Vault changed on disk during the operation; retry\./,
+  );
+});
+
+test('integrity: stale-loaded save is rejected when file changes on disk before save', () => {
+  const dataDir = tempHome();
+  const store = createVaultStore({ dataDir, key: 'occ-stale-save-key-1234' });
+  store.init();
+
+  store.createItem({ title: 'Initial Item' });
+
+  const maliciousInput = {
+    get title() {
+      fs.appendFileSync(store.file, ' ');
+      return 'Tampered Item';
+    },
+  };
+
+  assert.throws(
+    () => store.createItem(maliciousInput),
+    /Vault changed on disk during the operation; retry\./,
+  );
+});
+
+test('integrity: saveVault still succeeds on unchanged file', () => {
+  const dataDir = tempHome();
+  const store = createVaultStore({ dataDir, key: 'occ-success-key-1234' });
+  store.init();
+
+  const item1 = store.createItem({ title: 'Item 1' });
+  assert.ok(item1.id);
+
+  const updated = store.updateItem(item1.id, { title: 'Item 1 Updated' });
+  assert.equal(updated.title, 'Item 1 Updated');
 });
 
 

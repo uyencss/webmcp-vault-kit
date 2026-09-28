@@ -10,7 +10,7 @@ import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
 const { createVaultStore } = require('../../lib/store.js');
-const { STALE_LOCK_MS, withFileLock, assertActiveLockOwned } = require('../../lib/vault/fs-safe.js');
+const { STALE_LOCK_MS, withFileLock, assertActiveLockOwned, writePrivateFile } = require('../../lib/vault/fs-safe.js');
 const { writeEnvelope, encryptVault } = require('../../lib/vault/envelope.js');
 
 const __filename = fileURLToPath(import.meta.url);
@@ -295,4 +295,24 @@ test('integrity: assertActiveLockOwned is a no-op for non-locked targets', () =>
     writeEnvelope(unlockedFile, envelope);
   });
   assert.equal(fs.existsSync(unlockedFile), true);
+});
+
+test('integrity: writePrivateFile asserts active lock ownership immediately before rename', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'webmcp-vault-wpf-lock-'));
+  const targetFile = path.join(dir, 'test.dat');
+  const lockFile = `${targetFile}.lock`;
+
+  assert.throws(
+    () => {
+      withFileLock(targetFile, () => {
+        fs.writeFileSync(
+          lockFile,
+          JSON.stringify({ pid: process.pid, nonce: 'foreign-stolen-nonce', createdAt: new Date().toISOString() }),
+        );
+        writePrivateFile(targetFile, 'content');
+      });
+    },
+    /busy with another writer/i,
+  );
+  assert.equal(fs.existsSync(targetFile), false, 'Target file must not be created when lock is stolen');
 });
