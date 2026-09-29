@@ -74,13 +74,33 @@ When a human needs to add, edit, import, or visually manage entries, start or
 ensure the local web UI:
 
 ```bash
-# Start in foreground
+# Start in foreground (interactive terminal)
 WEBMCP_VAULT_KEY_FILE=~/.webmcp/vault/vault.key webmcp vault ui --json
 
 # Start or reuse in background (recommended for agents / automated runs)
 webmcp vault ui ensure --json
 # Or spawn as detached daemon explicitly
 webmcp vault ui --daemon --json
+
+# Inspect running daemon status
+webmcp vault ui status --json
+
+# Stop background daemon
+webmcp vault ui stop --json
+```
+
+Output for `ensure` / `daemon`:
+```json
+{
+  "ok": true,
+  "running": true,
+  "reused": true,
+  "url": "http://127.0.0.1:7876/?token=...",
+  "host": "127.0.0.1",
+  "port": 7876,
+  "token": "...",
+  "pid": 80157
+}
 ```
 
 The server binds to `http://127.0.0.1:7876` by default and prints a one-time
@@ -100,6 +120,18 @@ Available flags and subcommands:
 | `--host <ip>` | `127.0.0.1` | Bind address (use `0.0.0.0` to expose on LAN) |
 | `--port <number>` | `7876` | Listen port |
 | `--json` | off | Print `{ ok, url, host, port, token, pid }` as JSON |
+
+Programmatic Node.js API (from scripts or runner tasks):
+```js
+const {
+  ensureVaultUiServer,
+  getVaultUiStatus,
+  stopVaultUiServer,
+} = require('@gyga-browser/webmcp-vault-kit/ui-server');
+
+const ui = await ensureVaultUiServer({ host: '127.0.0.1', port: 7876 });
+console.log(ui.url);
+```
 
 When the process inherits `WEBMCP_VAULT_KEY` or `WEBMCP_VAULT_KEY_FILE`, the
 lock screen shows a one-click configured-key unlock button. Otherwise the user
@@ -196,7 +228,7 @@ Open the local UI when a human should add, edit, or import (CSV) entries (see
 **Start Here § 3** for full bootstrap and daemon guidance):
 
 ```bash
-WEBMCP_VAULT_KEY_FILE=~/.webmcp/vault/vault.key webmcp vault ui --json
+WEBMCP_VAULT_KEY_FILE=~/.webmcp/vault/vault.key webmcp vault ui ensure --json
 ```
 
 The command prints a token-secured URL. Every API call from the browser carries
