@@ -68,50 +68,49 @@ The CLI parses arguments with strict boolean coercion:
   rejected with:
   `--gateway-token requires a non-empty token value.`
 
-### 3. Start the Vault UI server
+### 3. Start or ensure the Vault UI server
 
-When a human needs to add, edit, import, or visually manage entries, start the
-local web UI:
+When a human needs to add, edit, import, or visually manage entries, start or
+ensure the local web UI:
 
 ```bash
+# Start in foreground
 WEBMCP_VAULT_KEY_FILE=~/.webmcp/vault/vault.key webmcp vault ui --json
+
+# Start or reuse in background (recommended for agents / automated runs)
+webmcp vault ui ensure --json
+# Or spawn as detached daemon explicitly
+webmcp vault ui --daemon --json
 ```
 
 The server binds to `http://127.0.0.1:7876` by default and prints a one-time
 token URL (e.g. `http://127.0.0.1:7876/?token=<hex>`). The token is required to
-access the UI and is generated fresh on every startup.
+access the UI and is generated fresh on every startup. Unauthenticated health
+checks are available at `http://127.0.0.1:7876/health`.
 
-Available flags:
+Available flags and subcommands:
 
-| Flag | Default | Description |
-|------|---------|-------------|
+| Command / Flag | Default | Description |
+|----------------|---------|-------------|
+| `webmcp vault ui` | foreground | Start Vault UI in foreground |
+| `webmcp vault ui --daemon` | off | Start as a detached background daemon |
+| `webmcp vault ui ensure` (or `--ensure`) | off | Idempotent: reuse existing running UI or spawn background daemon |
+| `webmcp vault ui status` | — | Check if the UI server daemon is alive (`{ ok, running, pid, url }`) |
+| `webmcp vault ui stop` | — | Gracefully stop the running UI server daemon |
 | `--host <ip>` | `127.0.0.1` | Bind address (use `0.0.0.0` to expose on LAN) |
 | `--port <number>` | `7876` | Listen port |
-| `--json` | off | Print `{ ok, url, host, port, token }` as JSON |
+| `--json` | off | Print `{ ok, url, host, port, token, pid }` as JSON |
 
 When the process inherits `WEBMCP_VAULT_KEY` or `WEBMCP_VAULT_KEY_FILE`, the
 lock screen shows a one-click configured-key unlock button. Otherwise the user
 must paste the key manually.
 
-**Running as a background daemon.** The `ui` command is a long-running HTTP
-server. In agent runtimes, start it as a daemon/background task so it stays
-alive while automation continues:
-
-```bash
-# Agent daemon example (Antigravity / Codex)
-WEBMCP_VAULT_KEY_FILE=~/.webmcp/vault/vault.key webmcp vault ui --json &
-```
-
-The server keeps running until the process is killed. Agents should parse the
-JSON output to capture the `url` field for opening in a browser or passing to
-automation tools.
-
 **Bootstrap decision tree (agent shortcut):**
 
 1. Run `webmcp vault doctor --json`.
 2. If `initialized: false` → run `webmcp vault init --json`.
-3. If the UI is needed → run `webmcp vault ui --json` as a background daemon.
-4. Open the printed token URL in a browser or pass it to browser automation.
+3. If the UI is needed → run `webmcp vault ui ensure --json` (auto-spawns if not running or reuses existing).
+4. Open the returned `url` in a browser or pass it to browser automation.
 
 ## Read Path
 

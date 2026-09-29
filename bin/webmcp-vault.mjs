@@ -27,6 +27,12 @@ const KNOWN_BOOLEAN_FLAGS = new Set([
   'stdin-json',
   'drop-fields',
   'force-backup',
+  'daemon',
+  'detach',
+  'background',
+  'ensure',
+  'status',
+  'stop',
 ]);
 
 function coerceFlagValue(key, value) {
@@ -93,7 +99,7 @@ Usage:
   webmcp-vault update-vault <vault-id> [--name <name>] [--description <text>] [--icon <icon>] [--json]
   webmcp-vault update-vault <vault-id> (--stdin-json | --input-json <file>) [--json]
   webmcp-vault delete-vault <vault-id> [--move-to <vault-id>] --confirm [--json]
-  webmcp-vault ui [--host 127.0.0.1] [--port 7876] [--json]
+  webmcp-vault ui [status|stop|ensure] [--daemon] [--ensure] [--status] [--stop] [--host 127.0.0.1] [--port 7876] [--json]
 
 Fields for read:
   username, password, otp, note, web, title, otpSecret
@@ -603,12 +609,48 @@ async function run(args) {
   }
 
   if (subcommand === 'ui') {
-    const { startVaultUiServer } = requireFromBin(resolve(ROOT, 'lib', 'ui-server.js'));
-    const server = await startVaultUiServer({
-      host: String(flags.host || '127.0.0.1'),
-      port: Number(flags.port || 7876),
-    });
-    const payload = { ok: true, url: server.url, host: server.host, port: server.port, token: server.token };
+    const action = positional[0];
+    const isDaemon = Boolean(flags.daemon || flags.detach || flags.background || action === 'daemon');
+    const isEnsure = Boolean(flags.ensure || action === 'ensure');
+    const isStatus = Boolean(flags.status || action === 'status');
+    const isStop = Boolean(flags.stop || action === 'stop');
+    const host = String(flags.host || '127.0.0.1');
+    const port = Number(flags.port || 7876);
+
+    const {
+      startVaultUiServer,
+      getVaultUiStatus,
+      stopVaultUiServer,
+      ensureVaultUiServer,
+    } = requireFromBin(resolve(ROOT, 'lib', 'ui-server.js'));
+
+    if (isStatus) {
+      const status = await getVaultUiStatus({ host, port });
+      const message = status.running
+        ? `Vault UI is running at ${status.url || `http://${status.host}:${status.port}/`} (PID ${status.pid})`
+        : 'Vault UI is not running.';
+      printJsonOrHuman(status, json, message);
+      if (!status.running) process.exit(1);
+      return;
+    }
+
+    if (isStop) {
+      const result = await stopVaultUiServer({ host, port });
+      printJsonOrHuman(result, json, result.stopped ? `Vault UI stopped (PID ${result.pid})` : result.message);
+      return;
+    }
+
+    if (isEnsure || isDaemon) {
+      const result = await ensureVaultUiServer({ host, port });
+      const desc = result.reused
+        ? `WebMCP vault UI ready (reused): ${result.url}`
+        : `WebMCP vault UI ready (spawned): ${result.url}`;
+      printJsonOrHuman(result, json, desc);
+      return;
+    }
+
+    const server = await startVaultUiServer({ host, port });
+    const payload = { ok: true, url: server.url, host: server.host, port: server.port, token: server.token, pid: process.pid };
     if (json) console.log(JSON.stringify(payload, null, 2));
     else console.log(`WebMCP vault UI: ${server.url}`);
     return;

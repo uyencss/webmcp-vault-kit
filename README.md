@@ -49,7 +49,11 @@ webmcp-vault rotate-key --new-key-file /protected/path/new-vault.key
 webmcp-vault restore ./credentials.backup.enc.json --force
 webmcp-vault read --web https://github.com password
 webmcp-vault read --web https://github.com otp
-webmcp-vault ui --host 127.0.0.1 --port 7876
+webmcp-vault ui ensure --json         # Idempotent: reuse existing or start background daemon
+webmcp-vault ui --daemon --json      # Start in background explicitly
+webmcp-vault ui status --json        # Check running state
+webmcp-vault ui stop --json          # Stop background server
+webmcp-vault ui --host 127.0.0.1 --port 7876  # Foreground mode
 npm run ui
 npm run test:ui
 ```
@@ -123,8 +127,15 @@ webmcp-vault rotate-key --new-key-file /protected/path/new-vault.key --json
 ## Web UI server
 
 ```js
-const { startVaultUiServer } = require('@gyga-browser/webmcp-vault-kit/ui-server');
-const ui = await startVaultUiServer({ host: '127.0.0.1', port: 7876 });
+const {
+  startVaultUiServer,
+  ensureVaultUiServer,
+  getVaultUiStatus,
+  stopVaultUiServer,
+} = require('@gyga-browser/webmcp-vault-kit/ui-server');
+
+// Idempotent: reuse existing or start background daemon
+const ui = await ensureVaultUiServer({ host: '127.0.0.1', port: 7876 });
 console.log(ui.url); // open in a browser; requires the printed token
 ```
 

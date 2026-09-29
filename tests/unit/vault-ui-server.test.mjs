@@ -8,7 +8,12 @@ import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const { startVaultUiServer } = require('../../lib/ui-server.js');
+const {
+  startVaultUiServer,
+  getVaultUiStatus,
+  stopVaultUiServer,
+  ensureVaultUiServer,
+} = require('../../lib/ui-server.js');
 
 function tempHome() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'webmcp-vault-ui-'));
@@ -465,5 +470,86 @@ test('integrity: typed field named OTP reads its stored value', async (t) => {
   assert.equal(response.status, 200);
   const data = await response.json();
   assert.equal(data.value, 'AUDIT-OTP');
+});
+
+test('vault UI server exposes /health without auth and cleans up state on close', async (t) => {
+  const oldHome = process.env.WEBMCP_HOME;
+  const home = tempHome();
+  process.env.WEBMCP_HOME = home;
+
+  const ui = await startVaultUiServer({ host: '127.0.0.1', port: 0 });
+  assert.ok(ui.stateFile, 'stateFile must be returned');
+  assert.ok(fs.existsSync(ui.stateFile), 'stateFile must exist while server is running');
+
+  const healthRes = await fetch(`http://127.0.0.1:${ui.port}/health`);
+  assert.equal(healthRes.status, 200);
+  const healthData = await healthRes.json();
+  assert.equal(healthData.ok, true);
+  assert.equal(healthData.service, 'webmcp-vault-ui');
+  assert.equal(healthData.port, ui.port);
+  assert.equal(healthData.pid, process.pid);
+
+  const status = await getVaultUiStatus({ host: '127.0.0.1', port: ui.port });
+  assert.equal(status.running, true);
+  assert.equal(status.port, ui.port);
+  assert.equal(status.token, ui.token);
+
+  await new Promise((resolve) => ui.server.close(resolve));
+  assert.equal(fs.existsSync(ui.stateFile), false, 'stateFile must be removed on close');
+
+  const afterStatus = await getVaultUiStatus({ host: '127.0.0.1', port: ui.port });
+  assert.equal(afterStatus.running, false);
+
+  if (oldHome === undefined) delete process.env.WEBMCP_HOME;
+  else process.env.WEBMCP_HOME = oldHome;
+});
+
+test('ensureVaultUiServer starts background daemon and reuses running instance', async (t) => {
+  const oldHome = process.env.WEBMCP_HOME;
+  const home = tempHome();
+  process.env.WEBMCP_HOME = home;
+
+  // Choose a random high port for isolated daemon test
+  const testPort = 18900 + Math.floor(Math.random() * 1000);
+
+  // 1. Initial status: not running
+  const initial = await getVaultUiStatus({ host: '127.0.0.1', port: testPort });
+  assert.equal(initial.running, false);
+
+  // 2. Ensure starts the server (spawned)
+  const spawned = await ensureVaultUiServer({ host: '127.0.0.1', port: testPort });
+  assert.equal(spawned.ok, true);
+  assert.equal(spawned.running, true);
+  assert.equal(spawned.spawned, true);
+  assert.equal(spawned.port, testPort);
+  assert.ok(spawned.token);
+  assert.ok(spawned.pid);
+
+  // Health check passes
+  const healthRes = await fetch(`http://127.0.0.1:${testPort}/health`);
+  assert.equal(healthRes.status, 200);
+  const healthData = await healthRes.json();
+  assert.equal(healthData.ok, true);
+  assert.equal(healthData.service, 'webmcp-vault-ui');
+
+  // 3. Second ensure reuses running instance
+  const reused = await ensureVaultUiServer({ host: '127.0.0.1', port: testPort });
+  assert.equal(reused.ok, true);
+  assert.equal(reused.running, true);
+  assert.equal(reused.reused, true);
+  assert.equal(reused.pid, spawned.pid);
+  assert.equal(reused.token, spawned.token);
+
+  // 4. Stop terminates the process
+  const stopped = await stopVaultUiServer({ host: '127.0.0.1', port: testPort });
+  assert.equal(stopped.ok, true);
+  assert.equal(stopped.stopped, true);
+  assert.equal(stopped.pid, spawned.pid);
+
+  const finalStatus = await getVaultUiStatus({ host: '127.0.0.1', port: testPort });
+  assert.equal(finalStatus.running, false);
+
+  if (oldHome === undefined) delete process.env.WEBMCP_HOME;
+  else process.env.WEBMCP_HOME = oldHome;
 });
 
