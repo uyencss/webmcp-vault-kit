@@ -367,7 +367,26 @@ Use `rotate-key` when doctor reports a weak active key source. It accepts the
 replacement key only from `--new-key-file`, `WEBMCP_VAULT_NEW_KEY_FILE`, or
 `WEBMCP_VAULT_NEW_KEY`; prefer a private key file so secret material is not
 placed in shell history. Rotation creates a `pre-rotate.*` encrypted backup
-before changing the active vault and reports only redacted key-strength buckets.
+## Multi-Device Synchronization (Cluster Sync)
+
+Safely synchronize encrypted credentials (`credentials.enc.json`) and encryption keys between the local machine and cluster nodes (e.g. Mac M1 via Tailscale SSH):
+
+```bash
+# Compare local vs remote vault status & hashes
+node .agents/skills/webmcp-vault/scripts/sync-vault.mjs status
+
+# Pull encrypted store from Mac M1 to local (auto backup created)
+node .agents/skills/webmcp-vault/scripts/sync-vault.mjs pull
+
+# Push encrypted store from local to Mac M1 (auto backup created)
+node .agents/skills/webmcp-vault/scripts/sync-vault.mjs push
+
+# Sync encryption key (only needed once or after key rotation)
+node .agents/skills/webmcp-vault/scripts/sync-vault.mjs sync-key
+
+# Dry-run preview
+node .agents/skills/webmcp-vault/scripts/sync-vault.mjs pull --dry-run
+```
 
 ## Rules
 
