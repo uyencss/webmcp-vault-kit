@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Privacy Policy & Security Architecture · WebMCP Vault Kit & Companion</title>
+  <meta name="description" content="Official Chrome Web Store Privacy Policy and Zero-Cloud Security Disclosure for WebMCP Vault Companion and @gyga-browser/webmcp-vault-kit." />
+  <style>
+    :root {
+      --bg-base: #090A0F;
+      --bg-surface: #11131A;
+      --bg-elevated: #171A24;
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --border-strong: rgba(255, 255, 255, 0.14);
+      --text-primary: #F3F4F6;
+      --text-secondary: #9CA3AF;
+      --text-muted: #64748B;
+      --accent: #3B82F6;
+      --emerald: #10B981;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --font-mono: "JetBrains Mono", "SFMono-Regular", Menlo, Consolas, monospace;
+      --radius-card: 12px;
+      --radius-btn: 8px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-base);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a {
+      color: #60A5FA;
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+
+    .nav {
+      height: 68px;
+      border-bottom: 1px solid var(--border-subtle);
+      background: rgba(9, 10, 15, 0.86);
+      backdrop-filter: blur(16px);
+      position: sticky;
+      top: 0;
+      z-index: 40;
+    }
+
+    .nav-inner {
+      max-width: 1120px;
+      margin: 0 auto;
+      height: 100%;
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 600;
+      font-size: 15px;
+      color: var(--text-primary);
+      text-decoration: none !important;
+    }
+
+    .brand-mark {
+      width: 28px;
+      height: 28px;
+      border-radius: 7px;
+      background: rgba(59, 130, 246, 0.16);
+      border: 1px solid rgba(59, 130, 246, 0.45);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: #60A5FA;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .container {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 56px 24px 96px;
+    }
+
+    h1 {
+      font-size: clamp(28px, 4vw, 40px);
+      line-height: 1.15;
+      letter-spacing: -0.025em;
+      margin-bottom: 14px;
+    }
+
+    .lead {
+      font-size: 16px;
+      color: var(--text-secondary);
+      max-width: 65ch;
+      margin-bottom: 32px;
+    }
+
+    .meta-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      padding: 14px 18px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-card);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-bottom: 40px;
+    }
+
+    .meta-bar strong {
+      color: var(--text-primary);
+    }
+
+    h2 {
+      font-size: 21px;
+      letter-spacing: -0.015em;
+      margin-top: 40px;
+      margin-bottom: 14px;
+      color: var(--text-primary);
+    }
+
+    p {
+      color: var(--text-secondary);
+      margin-bottom: 16px;
+      max-width: 68ch;
+    }
+
+    .grid-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 16px;
+      margin: 20px 0 28px;
+    }
+
+    .card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-card);
+      padding: 18px;
+    }
+
+    .card h3 {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card p {
+      font-size: 13.5px;
+      margin-bottom: 0;
+    }
+
+    code {
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-subtle);
+      padding: 2px 6px;
+      border-radius: 5px;
+      color: #93C5FD;
+    }
+
+    .perm-list {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      margin: 20px 0;
+    }
+
+    .perm-item {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-card);
+      padding: 18px 20px;
+    }
+
+    .perm-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      gap: 12px;
+    }
+
+    .footer {
+      border-top: 1px solid var(--border-subtle);
+      padding: 32px 24px;
+      text-align: center;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+  </style>
+</head>
+<body>
+  <header class="nav">
+    <div class="nav-inner">
+      <a href="./index.html" class="brand">
+        <span class="brand-mark">VK</span>
+        <span>WebMCP Vault</span>
+      </a>
+      <a href="./index.html" style="font-size: 13.5px; font-weight: 500;">← Back to Overview</a>
+    </div>
+  </header>
+
+  <main class="container">
+    <h1>Privacy Policy &amp; Chrome Web Store Data Disclosure</h1>
+    <p class="lead">
+      WebMCP Vault Kit (<code>@gyga-browser/webmcp-vault-kit</code>) and the <strong>WebMCP Vault Companion</strong> Chrome Extension operate on a strict 100% offline, local-first architecture. Zero personal data or credentials ever leave your machine.
+    </p>
+
+    <div class="meta-bar">
+      <span><strong>Effective Date:</strong> October 17, 2026</span>
+      <span><strong>Extension Version:</strong> v1.0.0 (Manifest V3)</span>
+      <span><strong>License:</strong> MIT Open Source</span>
+      <span><strong>Network Scope:</strong> Loopback Only (127.0.0.1)</span>
+    </div>
+
+    <h2>1. Zero Data Collection Guarantee</h2>
+    <p>
+      Neither the WebMCP Vault Kit CLI/daemon nor the WebMCP Vault Companion browser extension collects, transmits, sells, or logs any user data to external servers, cloud databases, or analytics providers.
+    </p>
+    <div class="grid-cards">
+      <div class="card">
+        <h3>No Cloud Sync</h3>
+        <p>All encrypted credentials, FIDO2 passkey keys, and TOTP seeds reside strictly inside <code>~/.webmcp/vault/credentials.enc.json</code> on your local disk with <code>0600</code> permissions.</p>
+      </div>
+      <div class="card">
+        <h3>No Telemetry or Tracking</h3>
+        <p>The extension contains zero analytics SDKs, zero crash reporters, and zero external network calls beyond your local loopback interface.</p>
+      </div>
+      <div class="card">
+        <h3>No Plaintext in Browser Storage</h3>
+        <p>Passwords, passkeys, and TOTP secrets are never saved inside <code>chrome.storage.local</code>, <code>chrome.storage.sync</code>, or page <code>localStorage</code>.</p>
+      </div>
+    </div>
+
+    <h2>2. Chrome Web Store Permission Justifications</h2>
+    <p>
+      The WebMCP Vault Companion extension requests the minimum set of Manifest V3 permissions required to perform local WebAuthn passkey ceremonies and credential autofill:
+    </p>
+
+    <div class="perm-list">
+      <div class="perm-item">
+        <div class="perm-head">
+          <code>storage</code>
+          <span style="font-size: 12px; color: var(--emerald); font-family: var(--font-mono);">Local Preferences Only</span>
+        </div>
+        <p style="margin-bottom: 0;">
+          Used exclusively to persist two non-sensitive preferences in <code>chrome.storage.local</code>: the local Vault loopback port URL (<code>webmcp_vault_url</code>, defaulting to <code>http://127.0.0.1:7876</code>) and the boolean toggle for login form auto-save prompts (<code>webmcp_vault_autosave</code>).
+        </p>
+      </div>
+
+      <div class="perm-item">
+        <div class="perm-head">
+          <code>tabs</code>
+          <span style="font-size: 12px; color: var(--emerald); font-family: var(--font-mono);">Origin &amp; RP ID Verification</span>
+        </div>
+        <p style="margin-bottom: 0;">
+          Used to inspect the active tab's URL and hostname so the extension can verify the WebAuthn Relying Party ID (<code>rpId</code>) against phishing, display the badge count of matching local accounts for the current domain, and send user-triggered autofill messages to the top frame (<code>frameId: 0</code>).
+        </p>
+      </div>
+
+      <div class="perm-item">
+        <div class="perm-head">
+          <code>http://127.0.0.1/*</code> &amp; <code>http://localhost/*</code>
+          <span style="font-size: 12px; color: var(--emerald); font-family: var(--font-mono);">Local Loopback Bridge</span>
+        </div>
+        <p style="margin-bottom: 0;">
+          Allows the extension's background service worker to query the user's self-hosted WebMCP Vault daemon running locally on <code>127.0.0.1:7876</code>. No external remote hosts are contacted.
+        </p>
+      </div>
+
+      <div class="perm-item">
+        <div class="perm-head">
+          <code>content_scripts (&lt;all_urls&gt;)</code>
+          <span style="font-size: 12px; color: var(--emerald); font-family: var(--font-mono);">Isolated Autofill &amp; WebAuthn Shim</span>
+        </div>
+        <p style="margin-bottom: 0;">
+          Required because login forms and FIDO2 WebAuthn challenges (<code>navigator.credentials.get</code> and <code>navigator.credentials.create</code>) can occur on any website. Password and 2FA TOTP DOM injection runs strictly inside Chrome's <code>ISOLATED</code> world so page scripts cannot access plaintext credentials.
+        </p>
+      </div>
+    </div>
+
+    <h2>3. Cryptographic Storage Specification</h2>
+    <p>
+      Your local vault file is encrypted at rest using authenticated <code>AES-256-GCM</code> with a fresh 12-byte random IV and 16-byte authentication tag on every write. Encryption keys are derived in memory using <code>scrypt</code> (<code>N=16384, r=8, p=1</code>, 32-byte key length) from your unlock key file (<code>WEBMCP_VAULT_KEY_FILE</code>). The unlock key is never written to disk by the vault process.
+    </p>
+
+    <h2>4. Open Source Verification &amp; Contact</h2>
+    <p>
+      The complete source code for both the CLI/Server package and the Chrome Extension is publicly auditable under the MIT License at <a href="https://github.com/uyencss/webmcp-vault-kit" target="_blank" rel="noopener">github.com/uyencss/webmcp-vault-kit</a>. For security inquiries or support, please open an issue on the GitHub repository.
+    </p>
+  </main>
+
+  <footer class="footer">
+    WebMCP Vault Kit &amp; Companion · Open Source under the MIT License · <a href="https://github.com/uyencss/webmcp-vault-kit">GitHub Repository</a>
+  </footer>
+</body>
+</html>
