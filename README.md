@@ -164,3 +164,11 @@ store starts with a non-deletable **Personal** vault. From the sidebar you can:
 Existing encrypted payloads that predate vault folders remain compatible. On
 unlock, entries without a `vaultId` are assigned to Personal in memory and the
 upgraded shape is persisted with the next write.
+
+## Documentation & Architecture
+
+- [Architecture Overview](docs/ARCHITECTURE.md): Detailed package layout, composition roots, and security models.
+- [Passkey & Virtual Authenticator Architecture](docs/passkey-webauthn-virtual-authenticator-architecture.md): Deep-dive into FIDO2/WebAuthn asymmetric cryptography (ECDSA ES256), Chrome DevTools Protocol Virtual Authenticator, and decoupled delegation with WebMCP Tools Provider.
+- [1Password Forensic Migration & 2SKD Recovery](docs/1password-forensic-migration-and-passkey-2skd.md): Specification and tools for decrypting 1Password local SQLite databases and extracting Passkeys.
+- [WebMCP Vault Companion Extension](webmcp-vault-extension/README.md): Overview of the dedicated autofill browser extension.
+
