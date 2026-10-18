@@ -8,6 +8,9 @@ test('item-icon: getFaviconHost accepts public domains and rejects unsafe/privat
   assert.equal(getFaviconHost({ web: 'http://www.google.com/search?q=test' }), 'google.com');
   assert.equal(getFaviconHost({ web: 'supabase.com' }), 'supabase.com');
   assert.equal(getFaviconHost({ passkey: { rpId: 'apple.com' } }), 'apple.com');
+  assert.equal(getFaviconHost({ vaultName: 'GITHUB' }), 'github.com');
+  assert.equal(getFaviconHost({ vaultName: 'FACEBOOK' }), 'facebook.com');
+  assert.equal(getFaviconHost({ title: 'github' }), 'github.com');
 
   // IPv4 / IPv6 must be rejected
   assert.equal(getFaviconHost({ web: 'http://127.0.0.1:7876' }), '');

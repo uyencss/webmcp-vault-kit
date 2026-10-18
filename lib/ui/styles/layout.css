@@ -396,11 +396,15 @@
 .item-avatar-box.has-favicon .item-monogram {
   display: none !important;
 }
+#detailEyebrow,
+.eyebrow#detailEyebrow {
+  display: none !important;
+}
 .detail-title-row {
   display: flex;
   align-items: center;
   gap: var(--s3);
-  margin-top: var(--s1);
+  margin-top: 0;
 }
 .detail-title-row h2 {
   margin: 0;
