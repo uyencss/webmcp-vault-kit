@@ -180,31 +180,54 @@
   font-family: var(--font-mono);
   font-size: var(--fs-meta);
 }
+.item-row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s2);
+  min-width: 0;
+  width: 100%;
+}
+.item-badges {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  margin-left: auto;
+  transition: opacity var(--dur-fast) var(--ease);
+}
 .item-type-badge {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 2px 6px;
-  border-radius: var(--r-sm);
-  background: var(--sunk);
+  justify-content: center;
+  padding: 0;
+  background: transparent;
   color: var(--muted);
-  font-size: 10px;
-  font-weight: var(--fw-strong);
-  letter-spacing: 0.04em;
+  opacity: 0.7;
+  transition: color var(--dur-fast) var(--ease), opacity var(--dur-fast) var(--ease);
 }
-.item-type-badge svg {
-  flex: none;
+.item:hover .item-type-badge {
+  opacity: 1;
+  color: var(--ink);
 }
-.item-type-api_token {
-  background: color-mix(in srgb, var(--live) 24%, var(--sunk));
-  color: var(--live);
+.item-type-badge.item-badge-passkey {
+  color: color-mix(in srgb, var(--ok) 85%, var(--muted));
 }
-.item-type-ssh_key {
-  background: color-mix(in srgb, var(--ok) 22%, var(--sunk));
+.item:hover .item-type-badge.item-badge-passkey {
   color: var(--ok);
 }
-.item-type-env {
-  background: color-mix(in srgb, var(--ink) 12%, var(--sunk));
+.item-type-badge.item-type-api_token {
+  color: var(--live);
+}
+.item-type-badge.item-type-ssh_key {
+  color: var(--ok);
+}
+.item-type-badge.item-type-env {
+  color: var(--muted);
+}
+.item-type-badge svg {
+  display: block;
+  flex: none;
 }
 .vault-sidebar-foot {
   display: flex;
@@ -323,7 +346,15 @@
   padding: 0 var(--s3) var(--s3);
   list-style: none;
 }
+.item-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
 .item .name {
+  flex: 1 1 auto;
+  min-width: 0;
   overflow: hidden;
   font-size: var(--fs-body);
   font-weight: var(--fw-strong);
@@ -339,6 +370,95 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.item-avatar-box {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  border-radius: 8px;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: var(--sunk);
+  position: relative;
+  flex: 0 0 32px;
+  user-select: none;
+}
+.item-avatar-box > * {
+  grid-area: 1 / 1;
+}
+.item-avatar-box [hidden] {
+  display: none !important;
+}
+.item-avatar-box.has-favicon {
+  background: var(--surface);
+  border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
+}
+.item-avatar-box.has-favicon .item-monogram {
+  display: none !important;
+}
+.detail-title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  margin-top: var(--s1);
+}
+.detail-title-row h2 {
+  margin: 0;
+}
+.item-avatar-box.detail-avatar {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  border-radius: 10px;
+  flex: 0 0 40px;
+}
+.item-avatar-box .item-favicon {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  z-index: 1;
+  border-radius: 4px;
+}
+.item-avatar-box.detail-avatar .item-favicon {
+  width: 26px;
+  height: 26px;
+}
+.item-avatar-box .item-monogram {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.item-avatar-box.detail-avatar .item-monogram {
+  font-size: 14px;
+}
+/* 1Password Pastel Monogram Colors */
+.item-monogram.mono-0 { background: #dbeafe; color: #1e40af; }
+.item-monogram.mono-1 { background: #dcfce7; color: #166534; }
+.item-monogram.mono-2 { background: #fef3c7; color: #92400e; }
+.item-monogram.mono-3 { background: #f3e8ff; color: #6b21a8; }
+.item-monogram.mono-4 { background: #ffe4e6; color: #9f1239; }
+.item-monogram.mono-5 { background: #e0e7ff; color: #3730a3; }
+.item-monogram.mono-6 { background: #ccfbf1; color: #115e59; }
+.item-monogram.mono-7 { background: #ffedd5; color: #9a3412; }
+/* Dark theme adjustments */
+[data-theme="dark"] .item-monogram.mono-0 { background: #1e3a8a; color: #bfdbfe; }
+[data-theme="dark"] .item-monogram.mono-1 { background: #14532d; color: #bbf7d0; }
+[data-theme="dark"] .item-monogram.mono-2 { background: #78350f; color: #fde68a; }
+[data-theme="dark"] .item-monogram.mono-3 { background: #581c87; color: #e9d5ff; }
+[data-theme="dark"] .item-monogram.mono-4 { background: #881337; color: #fecdd3; }
+[data-theme="dark"] .item-monogram.mono-5 { background: #312e81; color: #c7d2fe; }
+[data-theme="dark"] .item-monogram.mono-6 { background: #134e4a; color: #99f6e4; }
+[data-theme="dark"] .item-monogram.mono-7 { background: #7c2d12; color: #fed7aa; }
+.item-avatar-box.item-avatar-type { color: var(--muted); }
+.item-avatar-box.item-avatar-ssh_key { background: color-mix(in srgb, var(--ok) 18%, var(--sunk)); color: var(--ok); }
+.item-avatar-box.item-avatar-api_token { background: color-mix(in srgb, var(--live) 18%, var(--sunk)); color: var(--live); }
+.item-avatar-box.item-avatar-env { background: color-mix(in srgb, var(--ink) 12%, var(--sunk)); color: var(--ink); }
 .rail-foot {
   display: flex;
   gap: var(--s1);
@@ -427,10 +547,18 @@
   background: var(--sunk);
   padding: 2px;
   border-radius: var(--r-sm);
+  z-index: 2;
 }
 .list-row:hover .item-quick-actions,
 .list-row:focus-within .item-quick-actions {
   display: inline-flex;
+}
+.list-row.has-quick-actions:hover .item-badges,
+.list-row.has-quick-actions:focus-within .item-badges,
+.list-row:has(.quick-btn):hover .item-badges,
+.list-row:has(.quick-btn):focus-within .item-badges {
+  opacity: 0;
+  pointer-events: none;
 }
 .quick-btn {
   width: 24px;

@@ -133,6 +133,7 @@ test('vault UI serves the Lockbox design with strict CSP and no old teal accent'
   assert.match(csp, /default-src 'none'/);
   assert.match(csp, /script-src 'self' 'nonce-/);
   assert.match(csp, /style-src 'self'/);
+  assert.match(csp, /img-src 'self' https:\/\/www\.google\.com https:\/\/\*\.gstatic\.com/);
   assert.match(csp, /connect-src 'self'/);
   assert.match(html, /class="lockcard"/);
   assert.match(html, /Vault is locked/);
