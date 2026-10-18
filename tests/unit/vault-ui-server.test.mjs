@@ -285,6 +285,24 @@ test('vault UI API manages vaults, filters items, and moves items on deletion', 
   assert.equal(createdVaultResponse.status, 201);
   const work = (await createdVaultResponse.json()).vault;
 
+  const childVaultResponse = await fetch(`${base}/vaults`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ name: 'SubWork', parentId: work.id }),
+  });
+  assert.equal(childVaultResponse.status, 201);
+  const subWork = (await childVaultResponse.json()).vault;
+  assert.equal(subWork.parentId, work.id);
+
+  const reparentResponse = await fetch(`${base}/vaults/${encodeURIComponent(subWork.id)}`, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify({ parentId: null }),
+  });
+  assert.equal(reparentResponse.status, 200);
+  const reparented = (await reparentResponse.json()).vault;
+  assert.equal(reparented.parentId, null);
+
   const createdItem = await (await fetch(`${base}/items`, {
     method: 'POST',
     headers,

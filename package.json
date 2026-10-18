@@ -28,12 +28,14 @@
     "docs/",
     "lib/",
     "skills/webmcp-vault/",
+    "webmcp-vault-extension/dist/",
     ".env.example",
     "README.md",
     "LICENSE"
   ],
   "scripts": {
     "ui": "node bin/webmcp-vault.mjs ui",
+    "build:extension": "node scripts/build-extension-zip.mjs",
     "test:ui": "node tests/unit/vault-ui-server.test.mjs",
     "test": "node --test tests/unit/*.test.mjs",
     "test:coverage": "node --experimental-test-coverage --test tests/unit/*.test.mjs"

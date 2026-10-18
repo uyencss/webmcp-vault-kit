@@ -1,0 +1,63 @@
+{
+  "version": "1.1.0",
+  "description": "Zero-Regression Invariant Manifest (Ponytail Research)",
+  "files": {
+    "/Users/ttcenter/Desktop/VIBE_CODE/webmcp-automation-kit/packages/webmcp-vault-kit/lib/vault/model.js": {
+      "digest": "6d580c680128eec96a94c6e9534871a91855c5e34bceefaa2661071aee2ce891",
+      "total_lines": 626
+    },
+    "/Users/ttcenter/Desktop/VIBE_CODE/webmcp-automation-kit/packages/webmcp-vault-kit/lib/store.js": {
+      "digest": "4b9f3f1bedc391ae78a41ab38d85182c29be498a23bbe10808718b71cf8a9c02",
+      "total_lines": 346
+    },
+    "/Users/ttcenter/Desktop/VIBE_CODE/webmcp-automation-kit/packages/webmcp-vault-kit/lib/ui-server.js": {
+      "digest": "62694011d94a49e3e4c93350803dcc624c6481f28377b354710f386c7a9d426a",
+      "total_lines": 568
+    },
+    "/Users/ttcenter/Desktop/VIBE_CODE/webmcp-automation-kit/packages/webmcp-vault-kit/lib/vault/leases.js": {
+      "digest": "1a8e6b47e6bdc1eea4319b78c3ad8458b6d358871fecc675d06fbe67dd21d6d3",
+      "total_lines": 280
+    },
+    "/Users/ttcenter/Desktop/VIBE_CODE/webmcp-automation-kit/packages/webmcp-vault-kit/lib/broker.js": {
+      "digest": "78f382dfb825c4d3babb203dad24881499c8a9e97631e3373aec9ec30c829e21",
+      "total_lines": 244
+    }
+  },
+  "invariants": [
+    {
+      "file": "/Users/ttcenter/Desktop/VIBE_CODE/webmcp-automation-kit/packages/webmcp-vault-kit/lib/vault/model.js",
+      "token": "ITEM_TYPES",
+      "description": "Mandatory invariant: 'ITEM_TYPES'"
+    },
+    {
+      "file": "/Users/ttcenter/Desktop/VIBE_CODE/webmcp-automation-kit/packages/webmcp-vault-kit/lib/vault/model.js",
+      "token": "generateTotp",
+      "description": "Mandatory invariant: 'generateTotp'"
+    },
+    {
+      "file": "/Users/ttcenter/Desktop/VIBE_CODE/webmcp-automation-kit/packages/webmcp-vault-kit/lib/vault/model.js",
+      "token": "parentId",
+      "description": "Mandatory invariant: 'parentId'"
+    },
+    {
+      "file": "/Users/ttcenter/Desktop/VIBE_CODE/webmcp-automation-kit/packages/webmcp-vault-kit/lib/store.js",
+      "token": "generateTotp",
+      "description": "Mandatory invariant: 'generateTotp'"
+    },
+    {
+      "file": "/Users/ttcenter/Desktop/VIBE_CODE/webmcp-automation-kit/packages/webmcp-vault-kit/lib/store.js",
+      "token": "parentId",
+      "description": "Mandatory invariant: 'parentId'"
+    },
+    {
+      "file": "/Users/ttcenter/Desktop/VIBE_CODE/webmcp-automation-kit/packages/webmcp-vault-kit/lib/ui-server.js",
+      "token": "bypassToken",
+      "description": "Mandatory invariant: 'bypassToken'"
+    },
+    {
+      "file": "/Users/ttcenter/Desktop/VIBE_CODE/webmcp-automation-kit/packages/webmcp-vault-kit/lib/broker.js",
+      "token": "fillLoginFormWithLease",
+      "description": "Mandatory invariant: 'fillLoginFormWithLease'"
+    }
+  ]
+}

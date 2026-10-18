@@ -393,3 +393,120 @@
 .detail-actions .danger {
   margin-left: auto;
 }
+
+/* Drag & Drop over Vault button */
+.vault-button.drag-over,
+.vault-tree-summary.drag-over {
+  outline: 2px dashed var(--live);
+  background: var(--live-weak);
+}
+.item.is-dragging,
+.vault-button.is-dragging,
+.vault-tree-summary.is-dragging {
+  opacity: 0.45;
+  cursor: grabbing;
+}
+
+/* List row & Quick actions */
+.list-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  border-radius: var(--r-md);
+}
+.list-row .item {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.list-row .item-quick-actions {
+  position: absolute;
+  right: var(--s2);
+  display: none;
+  align-items: center;
+  gap: 2px;
+  background: var(--sunk);
+  padding: 2px;
+  border-radius: var(--r-sm);
+}
+.list-row:hover .item-quick-actions,
+.list-row:focus-within .item-quick-actions {
+  display: inline-flex;
+}
+.quick-btn {
+  width: 24px;
+  height: 24px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background var(--dur-fast), color var(--dur-fast);
+}
+.quick-btn:hover {
+  background: var(--surface);
+  color: var(--ink);
+}
+.quick-btn.quick-btn-otp:hover {
+  background: color-mix(in srgb, #f59e0b 20%, var(--surface));
+  color: #d97706;
+}
+
+/* Vault Folder Tree View (Collapsible) */
+.vault-tree-item {
+  list-style: none;
+  margin: 2px 0;
+}
+.vault-tree-group {
+  width: 100%;
+}
+/* Summary reuses .vault-button so the 28px glyph column lines up with flat rows; chevron trails on the right. */
+.vault-tree-summary {
+  grid-template-columns: 28px minmax(0, 1fr) auto 12px;
+  list-style: none;
+  user-select: none;
+}
+.vault-tree-summary::-webkit-details-marker {
+  display: none;
+}
+.vault-tree-chevron {
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  transition: transform var(--dur-fast) var(--ease);
+}
+.vault-tree-group[open] > .vault-tree-summary .vault-tree-chevron {
+  transform: rotate(90deg);
+}
+.vault-tree-children {
+  margin: 2px 0 4px 21px;
+  padding: 0 0 0 7px;
+  list-style: none;
+  border-left: 1px dashed color-mix(in srgb, var(--ink) 18%, transparent);
+}
+.vault-tree-children .vault-row.is-subvault {
+  margin: 1px 0;
+}
+.vault-tree-children .vault-button.is-subvault {
+  padding: 7px var(--s2);
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+}
+.vault-tree-children .vault-button.is-subvault .vault-glyph {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  font-size: 11px;
+}
+.vault-tree-children .vault-button.is-subvault .vault-name {
+  font-size: 12.5px;
+}
+.main.sidebar-collapsed .vault-tree-chevron {
+  display: none;
+}
+.main.sidebar-collapsed .vault-tree-children {
+  margin-left: 0;
+  padding-left: 0;
+  border-left: 0;
+}

@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>WebMCP Vault Companion</title>
+  <style>
+    :root {
+      --bg-base: #090A0F;
+      --bg-surface: #11131A;
+      --bg-elevated: #171A24;
+      --bg-input: #0D0F16;
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --border-strong: rgba(255, 255, 255, 0.14);
+      --text-primary: #F3F4F6;
+      --text-secondary: #9CA3AF;
+      --text-muted: #64748B;
+      --accent: #3B82F6;
+      --accent-hover: #2563EB;
+      --success: #10B981;
+      --warning: #F59E0B;
+      --danger: #EF4444;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+      --font-mono: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      width: 356px;
+      margin: 0;
+      padding: 12px;
+      font-family: var(--font-sans);
+      font-size: 12px;
+      line-height: 1.4;
+      background: var(--bg-base);
+      color: var(--text-primary);
+      user-select: none;
+    }
+
+    /* Top Header */
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-weight: 600;
+      font-size: 13px;
+      letter-spacing: -0.01em;
+      color: var(--text-primary);
+    }
+
+    .brand-mark {
+      width: 18px;
+      height: 18px;
+      border-radius: 5px;
+      background: rgba(59, 130, 246, 0.16);
+      border: 1px solid rgba(59, 130, 246, 0.4);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: #60A5FA;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 700;
+    }
+
+    .version-tag {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-muted);
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      padding: 1px 6px;
+      border-radius: 4px;
+    }
+
+    /* Status Pill Row */
+    .telemetry-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 7px;
+      padding: 7px 9px;
+      margin-bottom: 10px;
+    }
+
+    .pill-info {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: var(--danger);
+      flex-shrink: 0;
+    }
+    .dot.open {
+      background: var(--success);
+      box-shadow: 0 0 8px rgba(16, 185, 129, 0.55);
+    }
+    .dot.connecting {
+      background: var(--warning);
+    }
+
+    .pill-title {
+      font-weight: 600;
+      font-size: 11px;
+      color: var(--text-primary);
+    }
+
+    .pill-sub {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-secondary);
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Segmented Tabs */
+    .tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 7px;
+      padding: 3px;
+      margin-bottom: 10px;
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      font-family: var(--font-sans);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 5px 8px;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: all 0.12s ease;
+    }
+
+    .tab-btn:hover {
+      color: var(--text-primary);
+    }
+
+    .tab-btn.active {
+      background: var(--bg-elevated);
+      color: var(--text-primary);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    }
+
+    .panel {
+      display: none;
+    }
+    .panel.active {
+      display: block;
+    }
+
+    /* Surface Card */
+    .card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+      border-radius: 8px;
+      padding: 10px;
+      margin-bottom: 8px;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+
+    .card-label {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+    }
+
+    .badge {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      padding: 1px 6px;
+      border-radius: 4px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-secondary);
+      font-variant-numeric: tabular-nums;
+    }
+    .badge.active {
+      color: #60A5FA;
+      border-color: rgba(59, 130, 246, 0.35);
+      background: rgba(59, 130, 246, 0.12);
+    }
+
+    /* Inputs & Buttons */
+    input[type="text"],
+    input[type="url"],
+    input[type="search"] {
+      width: 100%;
+      background: var(--bg-input);
+      border: 1px solid var(--border-subtle);
+      border-radius: 6px;
+      padding: 6px 8px;
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      font-size: 12px;
+      outline: none;
+      transition: border-color 0.12s ease;
+    }
+
+    input.mono-input {
+      font-family: var(--font-mono);
+      font-size: 11px;
+    }
+
+    input:focus {
+      border-color: var(--accent);
+    }
+
+    .actions {
+      display: flex;
+      gap: 5px;
+      margin-top: 7px;
+      justify-content: flex-end;
+    }
+
+    button {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-primary);
+      border-radius: 5px;
+      padding: 4px 8px;
+      font-family: var(--font-sans);
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.12s ease, border-color 0.12s ease;
+    }
+
+    button:hover:not(:disabled) {
+      background: #222634;
+      border-color: var(--border-strong);
+    }
+
+    button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    button.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #FFFFFF;
+      font-weight: 600;
+    }
+
+    button.primary:hover:not(:disabled) {
+      background: var(--accent-hover);
+    }
+
+    .vault-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: 228px;
+      overflow-y: auto;
+      margin-top: 8px;
+    }
+
+    .vault-item {
+      background: var(--bg-input);
+      border: 1px solid var(--border-subtle);
+      border-radius: 7px;
+      padding: 8px 9px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .vault-item-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 6px;
+    }
+
+    .vault-item-user {
+      font-weight: 600;
+      font-size: 12px;
+      color: var(--text-primary);
+      word-break: break-all;
+    }
+
+    .vault-item-title {
+      font-size: 10px;
+      color: var(--text-muted);
+      margin-top: 1px;
+    }
+
+    .vault-otp-pill {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 600;
+      color: #93C5FD;
+      background: rgba(59, 130, 246, 0.14);
+      border: 1px solid rgba(59, 130, 246, 0.35);
+      border-radius: 4px;
+      padding: 1px 5px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .vault-item-actions {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+    }
+
+    .vault-item-actions button {
+      padding: 3px 7px;
+      font-size: 10.5px;
+    }
+
+    .vault-empty {
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 11px;
+      padding: 18px 8px;
+      border: 1px dashed var(--border-subtle);
+      border-radius: 6px;
+      margin-top: 8px;
+    }
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding-top: 2px;
+    }
+
+    .toggle-title {
+      font-weight: 500;
+      color: var(--text-primary);
+      font-size: 11.5px;
+    }
+
+    .toggle-desc {
+      font-size: 10.5px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .subtext {
+      font-size: 10.5px;
+      color: var(--text-muted);
+      margin-top: 4px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .toast {
+      min-height: 15px;
+      font-size: 11px;
+      color: var(--success);
+      text-align: right;
+      margin-top: 2px;
+    }
+    .toast.error {
+      color: var(--danger);
+    }
+  </style>
+</head>
+<body>
+  <!-- Header -->
+  <div class="topbar">
+    <div class="brand">
+      <span class="brand-mark">VK</span>
+      <span>WebMCP Vault Companion</span>
+    </div>
+    <span class="version-tag" id="appVersion">v1.0.0</span>
+  </div>
+
+  <!-- Vault Health Bar -->
+  <div class="telemetry-bar">
+    <div class="pill-info">
+      <span class="dot" id="vaultDot"></span>
+      <span class="pill-title">Local Vault Kit</span>
+    </div>
+    <span class="pill-sub" id="vaultStateText">Checking...</span>
+  </div>
+
+  <!-- Segmented Navigation: Accounts | Settings -->
+  <div class="tabs">
+    <button class="tab-btn active" id="tabBtnAccounts" type="button">Accounts</button>
+    <button class="tab-btn" id="tabBtnSettings" type="button">Settings</button>
+  </div>
+
+  <!-- TAB 1: ACCOUNTS (1Password-style Domain Autofill & OTP) -->
+  <div class="panel active" id="panelAccounts">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-label" id="vaultDomainLabel">Matching Logins</span>
+        <div style="display:flex; gap:4px; align-items:center;">
+          <button id="btnOpenInlineSelector" type="button" style="padding:2px 6px; font-size:10px;" title="Show inline selector on page (Alt+K)">Inline (Alt+K)</button>
+          <span class="badge active" id="vaultMatchCount">0</span>
+        </div>
+      </div>
+      <input type="search" id="vaultSearchInput" placeholder="Filter by username or title..." />
+      <div class="vault-list" id="vaultCandidateList"></div>
+      <div class="vault-empty" id="vaultEmptyState" style="display:none;">No matching credentials for this domain.</div>
+    </div>
+  </div>
+
+  <!-- TAB 2: SETTINGS (Vault URL & Autosave) -->
+  <div class="panel" id="panelSettings">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-label">Vault Kit HTTP URL</span>
+        <span class="badge" id="vaultPortBadge">7876</span>
+      </div>
+      <input type="text" class="mono-input" id="vaultUrlInput" placeholder="http://127.0.0.1:7876" />
+      <div class="subtext">Passkey WebAuthn + Password/TOTP Autofill endpoint</div>
+      <div class="actions">
+        <button id="btnTestVault" type="button">Test</button>
+        <button id="btnResetVault" type="button">Reset Default</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-title">Auto-save Passwords</div>
+          <div class="toggle-desc">Prompt to save or update login credentials on form submit</div>
+        </div>
+        <input type="checkbox" id="chkVaultAutosave" checked style="width:15px; height:15px; accent-color: var(--accent); cursor:pointer;" />
+      </div>
+      <div class="actions" style="margin-top: 10px;">
+        <button id="btnSaveSettings" class="primary" type="button">Save Settings</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toastMsg"></div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

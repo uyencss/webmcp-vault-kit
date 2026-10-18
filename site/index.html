@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="vi" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WebMCP Vault Kit &amp; Companion · Local-First Passkey &amp; Credential Enclave</title>
+  <meta name="description" content="Open-source local AES-256-GCM credential vault, FIDO2 WebAuthn passkey authenticator, and 1Password-grade browser autofill companion for developers and AI agents." />
+  <meta property="og:title" content="WebMCP Vault Kit &amp; Companion" />
+  <meta property="og:description" content="Zero-cloud FIDO2 Passkey, Password &amp; 2FA TOTP Vault for Developers and AI Agents." />
+  <meta property="og:image" content="./assets/ui-vault-dashboard.png" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <!-- Top Navigation (Single line, 68px height) -->
+  <header class="site-nav">
+    <div class="nav-container">
+      <a href="#" class="brand-link">
+        <span class="brand-mark">VK</span>
+        <span>WebMCP Vault</span>
+      </a>
+
+      <ul class="nav-links">
+        <li><a href="#showcase" data-vi="Giao diện thực tế" data-en="Interactive Tour">Giao diện thực tế</a></li>
+        <li><a href="#architecture" data-vi="Kiến trúc bảo mật" data-en="Architecture">Kiến trúc bảo mật</a></li>
+        <li><a href="#quickstart" data-vi="Cài đặt nhanh" data-en="Quickstart">Cài đặt nhanh</a></li>
+        <li><a href="#specs" data-vi="Thông số" data-en="Specifications">Thông số</a></li>
+        <li><a href="./privacy.html" data-vi="Chính sách riêng tư" data-en="Privacy Policy">Chính sách riêng tư</a></li>
+      </ul>
+
+      <div class="nav-actions">
+        <button id="langToggleBtn" class="lang-switch" type="button" title="Chuyển đổi ngôn ngữ VI / EN">VI · EN</button>
+        <a href="https://github.com/uyencss/webmcp-vault-kit" target="_blank" rel="noopener" class="btn btn-secondary btn-sm">GitHub</a>
+        <a href="./downloads/webmcp-vault-extension-v1.0.0.zip" download class="btn btn-primary btn-sm" data-vi="Tải Extension (.zip)" data-en="Download Extension">Tải Extension (.zip)</a>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- SECTION 1: Hero (Asymmetric Split, max 4 text elements, fits viewport) -->
+    <section class="hero-section">
+      <div class="hero-grid">
+        <div>
+          <div class="eyebrow">
+            <span class="status-dot"></span>
+            <span data-vi="MÃ NGUỒN MỞ MIT · 100% LOCAL LOOPBACK" data-en="MIT OPEN SOURCE · 100% LOCAL LOOPBACK">MÃ NGUỒN MỞ MIT · 100% LOCAL LOOPBACK</span>
+          </div>
+
+          <h1 class="hero-headline" data-vi="Kho khóa Passkey &amp; 2FA cục bộ cho Developer và AI Agent." data-en="Local-first Passkey &amp; 2FA Vault for Developers and AI Agents.">
+            Kho khóa Passkey &amp; 2FA cục bộ cho Developer và AI Agent.
+          </h1>
+
+          <p class="hero-subtext" data-vi="Mã hóa AES-256-GCM ngay trên máy, tự động ký FIDO2 Passkey và điền nhanh mật khẩu kèm OTP qua phím tắt Alt+K." data-en="AES-256-GCM disk encryption, zero-click FIDO2 passkey signing, and instant Alt+K browser autofill without cloud sync.">
+            Mã hóa AES-256-GCM ngay trên máy, tự động ký FIDO2 Passkey và điền nhanh mật khẩu kèm OTP qua phím tắt Alt+K.
+          </p>
+
+          <div class="hero-cta-row">
+            <a href="./downloads/webmcp-vault-extension-v1.0.0.zip" download class="btn btn-primary" data-vi="Tải Extension (.zip)" data-en="Download Extension">Tải Extension (.zip)</a>
+            <a href="https://github.com/uyencss/webmcp-vault-kit" target="_blank" rel="noopener" class="btn btn-secondary" data-vi="Xem mã nguồn GitHub" data-en="View on GitHub">Xem mã nguồn GitHub</a>
+          </div>
+        </div>
+
+        <div class="hero-visual-stage">
+          <img
+            src="./assets/ui-vault-dashboard.png"
+            alt="WebMCP Vault Kit Local Web UI Dashboard showing encrypted logins, passkeys, and live TOTP codes"
+            class="hero-main-img"
+            width="1280"
+            height="800"
+          />
+          <div class="hero-floating-card">
+            <img
+              src="./assets/ui-extension-popup.png"
+              alt="WebMCP Vault Companion Chrome Extension Popup showing domain matching logins and 2FA OTP"
+              width="800"
+              height="600"
+            />
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 2: Compatible Platforms & Standards Strip (Logos only per Section 4.8) -->
+    <section class="protocol-strip" aria-label="Supported WebAuthn and Developer Platforms">
+      <div class="protocol-inner">
+        <div class="protocol-logos">
+          <img src="https://cdn.simpleicons.org/googlechrome/9CA3AF" alt="Google Chrome" />
+          <img src="https://cdn.simpleicons.org/github/9CA3AF" alt="GitHub" />
+          <img src="https://cdn.simpleicons.org/cloudflare/9CA3AF" alt="Cloudflare" />
+          <img src="https://cdn.simpleicons.org/nodedotjs/9CA3AF" alt="Node.js" />
+          <img src="https://cdn.simpleicons.org/apple/9CA3AF" alt="macOS Touch ID" />
+          <img src="https://cdn.simpleicons.org/1password/9CA3AF" alt="1Password Migration" />
+          <img src="https://cdn.simpleicons.org/bitwarden/9CA3AF" alt="Bitwarden CSV Import" />
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 3: Interactive Product Tour (Real Screenshots of Vault Kit + Extension + Inline Alt+K) -->
+    <section id="showcase" class="section-wrap">
+      <div class="section-stack-header">
+        <h2 class="section-title" data-vi="Trải nghiệm trọn bộ Vault Kit &amp; Browser Companion" data-en="Explore the Local Vault UI &amp; Browser Companion">
+          Trải nghiệm trọn bộ Vault Kit &amp; Browser Companion
+        </h2>
+        <p class="section-desc" data-vi="Ba điểm chạm đồng bộ qua cổng cục bộ 127.0.0.1:7876: Bảng điều khiển Vault, Popup tiện ích và Menu điền nhanh Alt+K trên trang." data-en="Three synchronized surfaces talking strictly over 127.0.0.1:7876: Local Vault Dashboard, Extension Popup, and Inline Alt+K Picker.">
+          Ba điểm chạm đồng bộ qua cổng cục bộ 127.0.0.1:7876: Bảng điều khiển Vault, Popup tiện ích và Menu điền nhanh Alt+K trên trang.
+        </p>
+      </div>
+
+      <div class="tour-tabs" role="tablist" aria-label="Product Surface Switcher">
+        <button type="button" class="tour-tab-btn active" role="tab" aria-selected="true" data-tour-target="surface-inline" data-vi="1. Menu điền nhanh Alt+K &amp; Passkey" data-en="1. Inline Alt+K &amp; Passkey">
+          1. Menu điền nhanh Alt+K &amp; Passkey
+        </button>
+        <button type="button" class="tour-tab-btn" role="tab" aria-selected="false" data-tour-target="surface-popup" data-vi="2. Extension Popup (Alt+Shift+V)" data-en="2. Extension Popup (Alt+Shift+V)">
+          2. Extension Popup (Alt+Shift+V)
+        </button>
+        <button type="button" class="tour-tab-btn" role="tab" aria-selected="false" data-tour-target="surface-dashboard" data-vi="3. Bảng quản trị Local Vault UI" data-en="3. Local Vault Web UI">
+          3. Bảng quản trị Local Vault UI
+        </button>
+      </div>
+
+      <div class="tour-stage">
+        <!-- Panel 1: Inline Autofill -->
+        <div class="tour-panel active" data-tour-panel="surface-inline">
+          <div class="tour-copy">
+            <h3 data-vi="Điền mật khẩu, 2FA OTP &amp; ký Passkey ngay trên trang" data-en="Zero-Click Passkey &amp; Isolated Alt+K Autofill">
+              Điền mật khẩu, 2FA OTP &amp; ký Passkey ngay trên trang
+            </h3>
+            <p data-vi="Nhấn Alt+K tại bất kỳ ô đăng nhập nào để mở hộp chọn tài khoản bọc trong Closed Shadow DOM. Tự động điền Username, Password và copy mã 2FA OTP trong môi trường cô lập ISOLATED world." data-en="Press Alt+K on any login input to open a closed Shadow DOM account selector. Injects credentials inside Chrome's ISOLATED world so page scripts never see plaintext secrets.">
+              Nhấn Alt+K tại bất kỳ ô đăng nhập nào để mở hộp chọn tài khoản bọc trong Closed Shadow DOM. Tự động điền Username, Password và copy mã 2FA OTP trong môi trường cô lập ISOLATED world.
+            </p>
+            <ul class="tour-meta-list">
+              <li><span class="tour-meta-badge">Alt+K</span> <span data-vi="Mở hộp chọn tài khoản nổi ngay dưới ô input" data-en="Summon floating account selector below active input">Mở hộp chọn tài khoản nổi ngay dưới ô input</span></li>
+              <li><span class="tour-meta-badge">FIDO2</span> <span data-vi="Tự động ký navigator.credentials.get &amp; create" data-en="Intercepts navigator.credentials.get &amp; create">Tự động ký navigator.credentials.get &amp; create</span></li>
+              <li><span class="tour-meta-badge">ISOLATED</span> <span data-vi="Không lộ biến toàn cục hay mật khẩu ra trang web" data-en="Zero global variables or plaintext exposure to page JS">Không lộ biến toàn cục hay mật khẩu ra trang web</span></li>
+            </ul>
+          </div>
+          <div class="tour-screenshot-wrap">
+            <img src="./assets/ui-inline-autofill.png" alt="Inline Alt+K Autofill selector open on a login form with live TOTP badge" width="1000" height="650" loading="lazy" />
+          </div>
+        </div>
+
+        <!-- Panel 2: Extension Popup -->
+        <div class="tour-panel" data-tour-panel="surface-popup">
+          <div class="tour-copy">
+            <h3 data-vi="Popup gọn nhẹ với quyền hạn tối giản" data-en="Minimal-Permission Companion Popup">
+              Popup gọn nhẹ với quyền hạn tối giản
+            </h3>
+            <p data-vi="Tự động lọc tài khoản khớp với tên miền của tab đang mở, hiển thị mã OTP 6 số trực tiếp và trạng thái kết nối tới Local Vault (:7876)." data-en="Automatically filters accounts matching the active tab hostname, renders live 6-digit TOTP codes, and monitors local daemon health on port 7876.">
+              Tự động lọc tài khoản khớp với tên miền của tab đang mở, hiển thị mã OTP 6 số trực tiếp và trạng thái kết nối tới Local Vault (:7876).
+            </p>
+            <ul class="tour-meta-list">
+              <li><span class="tour-meta-badge">Alt+Shift+V</span> <span data-vi="Mở nhanh Popup kiểm tra tài khoản &amp; copy OTP" data-en="Quickly open popup to fill or copy 2FA OTP">Mở nhanh Popup kiểm tra tài khoản &amp; copy OTP</span></li>
+              <li><span class="tour-meta-badge">MV3</span> <span data-vi="Chỉ dùng quyền storage, tabs và localhost" data-en="Requests only storage, tabs, and localhost access">Chỉ dùng quyền storage, tabs và localhost</span></li>
+              <li><span class="tour-meta-badge">Auto-Save</span> <span data-vi="Gợi ý lưu hoặc cập nhật tài khoản khi đăng nhập" data-en="Prompts to save or update credentials on submit">Gợi ý lưu hoặc cập nhật tài khoản khi đăng nhập</span></li>
+            </ul>
+          </div>
+          <div class="tour-screenshot-wrap">
+            <img src="./assets/ui-extension-popup.png" alt="WebMCP Vault Companion Extension Popup Accounts and Settings views" width="800" height="600" loading="lazy" />
+          </div>
+        </div>
+
+        <!-- Panel 3: Vault Web UI -->
+        <div class="tour-panel" data-tour-panel="surface-dashboard">
+          <div class="tour-copy">
+            <h3 data-vi="Quản lý đa phân mục Vault ngay trên trình duyệt" data-en="Multi-Vault Organization &amp; Token-Gated Web UI">
+              Quản lý đa phân mục Vault ngay trên trình duyệt
+            </h3>
+            <p data-vi="Phân loại tài khoản theo Personal, Work, Finance, Social hoặc AI Fleet. Hỗ trợ xem trước khi import CSV/1Password và mở khóa bằng Touch ID trên macOS." data-en="Organize logins, API tokens, SSH keys, and .env bundles across custom vaults with redacted CSV preview and macOS Touch ID unlock.">
+              Phân loại tài khoản theo Personal, Work, Finance, Social hoặc AI Fleet. Hỗ trợ xem trước khi import CSV/1Password và mở khóa bằng Touch ID trên macOS.
+            </p>
+            <ul class="tour-meta-list">
+              <li><span class="tour-meta-badge">127.0.0.1</span> <span data-vi="Bảo vệ bằng token ngẫu nhiên 24-byte mỗi phiên" data-en="Gated by a per-process 24-byte random hex token">Bảo vệ bằng token ngẫu nhiên 24-byte mỗi phiên</span></li>
+              <li><span class="tour-meta-badge">RFC 6238</span> <span data-vi="Sinh mã TOTP trong bộ nhớ, ẩn hạt giống gốc" data-en="Generates live TOTP in memory while keeping seeds redacted">Sinh mã TOTP trong bộ nhớ, ẩn hạt giống gốc</span></li>
+              <li><span class="tour-meta-badge">1Password</span> <span data-vi="Khôi phục 100% Passkey từ .1pux &amp; SQLite cục bộ" data-en="Forensic 2SKD recovery of Passkeys from .1pux &amp; SQLite">Khôi phục 100% Passkey từ .1pux &amp; SQLite cục bộ</span></li>
+            </ul>
+          </div>
+          <div class="tour-screenshot-wrap">
+            <img src="./assets/ui-vault-dashboard.png" alt="WebMCP Vault Local Web UI showing sidebar vaults and credential details" width="1280" height="800" loading="lazy" />
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 4: 5-Cell Asymmetric Bento Architecture Grid (5 items -> 5 cells) -->
+    <section id="architecture" class="section-wrap section-divider">
+      <div class="section-stack-header">
+        <div class="eyebrow">
+          <span data-vi="KIẾN TRÚC ZERO-CLOUD" data-en="ZERO-CLOUD ARCHITECTURE">KIẾN TRÚC ZERO-CLOUD</span>
+        </div>
+        <h2 class="section-title" data-vi="Thiết kế bảo mật đa lớp, không phụ thuộc đám mây" data-en="Engineered for Local Sovereignty &amp; AI Automation">
+          Thiết kế bảo mật đa lớp, không phụ thuộc đám mây
+        </h2>
+        <p class="section-desc" data-vi="Mọi khóa bí mật được mã hóa tại chỗ và chỉ trao đổi qua giao thức cục bộ giữa trình duyệt, CLI và AI Agent." data-en="Every secret stays encrypted on your local filesystem and communicates strictly over loopback between browser, CLI, and AI agents.">
+          Mọi khóa bí mật được mã hóa tại chỗ và chỉ trao đổi qua giao thức cục bộ giữa trình duyệt, CLI và AI Agent.
+        </p>
+      </div>
+
+      <div class="bento-grid">
+        <!-- Cell 1 (Span 7, with dark-tech hardware visual) -->
+        <article class="bento-cell bento-span-7">
+          <img src="./assets/hero-vault-enclave.jpg" alt="Local cryptographic hardware enclave illustration" class="bento-media" width="1280" height="720" loading="lazy" />
+          <div class="bento-body">
+            <h3 data-vi="100% Loopback · Không máy chủ trung gian" data-en="100% Loopback · Zero External Servers">
+              100% Loopback · Không máy chủ trung gian
+            </h3>
+            <p data-vi="Extension chỉ kết nối tới http://127.0.0.1:7876 ngay trên máy của bạn. Không tài khoản đám mây, không phụ thuộc kết nối internet, không nguy cơ lộ dữ liệu từ bên thứ ba." data-en="The browser companion talks strictly to http://127.0.0.1:7876 on your workstation. No cloud accounts, no third-party sync servers, and full offline operation.">
+              Extension chỉ kết nối tới http://127.0.0.1:7876 ngay trên máy của bạn. Không tài khoản đám mây, không phụ thuộc kết nối internet, không nguy cơ lộ dữ liệu từ bên thứ ba.
+            </p>
+          </div>
+        </article>
+
+        <!-- Cell 2 (Span 5, with FIDO2 visual) -->
+        <article class="bento-cell bento-span-5">
+          <img src="./assets/feature-passkey-fido2.jpg" alt="FIDO2 ECDSA P-256 Passkey signing core" class="bento-media" width="800" height="600" loading="lazy" />
+          <div class="bento-body">
+            <h3 data-vi="Bộ xác thực FIDO2 Passkey chuẩn W3C" data-en="W3C FIDO2 Passkey Virtual Authenticator">
+              Bộ xác thực FIDO2 Passkey chuẩn W3C
+            </h3>
+            <p data-vi="Ký xác thực ECDSA P-256 (ES256) và Ed25519 với cờ tương thích Synced Passkey (0x1d) cho Google, GitHub, Microsoft và Apple." data-en="Signs ECDSA P-256 (ES256) and Ed25519 assertions with synced-passkey flags (0x1d) compatible with Google, GitHub, Microsoft, and Apple.">
+              Ký xác thực ECDSA P-256 (ES256) và Ed25519 với cờ tương thích Synced Passkey (0x1d) cho Google, GitHub, Microsoft và Apple.
+            </p>
+          </div>
+        </article>
+
+        <!-- Cell 3 (Span 4, with AES visual) -->
+        <article class="bento-cell bento-span-4">
+          <img src="./assets/feature-aes-storage.jpg" alt="AES-256-GCM encrypted file storage" class="bento-media" width="800" height="600" loading="lazy" />
+          <div class="bento-body">
+            <h3 data-vi="Mã hóa AES-256-GCM &amp; scrypt" data-en="AES-256-GCM &amp; scrypt Envelope">
+              Mã hóa AES-256-GCM &amp; scrypt
+            </h3>
+            <p data-vi="Lưu trữ trong tệp credentials.enc.json (quyền 0600) với khóa dẫn xuất scrypt (N=16384, r=8, p=1) và ghi nguyên tử chống hỏng file." data-en="Stored in credentials.enc.json (mode 0600) using memory-hard scrypt KDF (N=16384, r=8, p=1) and atomic fsync writes.">
+              Lưu trữ trong tệp credentials.enc.json (quyền 0600) với khóa dẫn xuất scrypt (N=16384, r=8, p=1) và ghi nguyên tử chống hỏng file.
+            </p>
+          </div>
+        </article>
+
+        <!-- Cell 4 (Span 4, Tinted AI Agent CLI & SDK cell) -->
+        <article class="bento-cell bento-span-4 bento-tinted">
+          <div class="bento-body">
+            <h3 data-vi="CLI &amp; SDK sẵn sàng cho AI Agent" data-en="First-Class CLI &amp; Node.js SDK">
+              CLI &amp; SDK sẵn sàng cho AI Agent
+            </h3>
+            <p data-vi="Cấp quyền truy cập tạm thời theo từng trang (scoped lease) hoặc đọc mật khẩu, OTP, API token trực tiếp từ dòng lệnh." data-en="Issue short-lived origin-bound credential leases for AI agents or query passwords, live TOTP, and API tokens from the CLI.">
+              Cấp quyền truy cập tạm thời theo từng trang (scoped lease) hoặc đọc mật khẩu, OTP, API token trực tiếp từ dòng lệnh.
+            </p>
+          </div>
+          <pre class="bento-code-snippet"><code>$ webmcp-vault read --web https://github.com otp
+482910</code></pre>
+        </article>
+
+        <!-- Cell 5 (Span 4, 1Password Forensic Passkey Migration) -->
+        <article class="bento-cell bento-span-4">
+          <div class="bento-body">
+            <h3 data-vi="Di chuyển 100% từ 1Password &amp; Bitwarden" data-en="1Password Passkey &amp; Bitwarden Migration">
+              Di chuyển 100% từ 1Password &amp; Bitwarden
+            </h3>
+            <p data-vi="Khôi phục nguyên vẹn cả khóa bí mật Passkey từ cơ sở dữ liệu 1Password 8 (2SKD / .1pux), nhập CSV Bitwarden và gom tệp .env." data-en="Forensically recovers ECDSA P-256 passkey private keys from local 1Password 8 SQLite (.1pux / 2SKD) plus Bitwarden CSVs and .env files.">
+              Khôi phục nguyên vẹn cả khóa bí mật Passkey từ cơ sở dữ liệu 1Password 8 (2SKD / .1pux), nhập CSV Bitwarden và gom tệp .env.
+            </p>
+          </div>
+          <pre class="bento-code-snippet"><code>$ webmcp-vault import ./passwords.csv --preview
+$ webmcp-vault env-import .env --title "Prod"</code></pre>
+        </article>
+      </div>
+    </section>
+
+    <!-- SECTION 5: 3-Step Quickstart -->
+    <section id="quickstart" class="section-wrap section-divider">
+      <div class="section-stack-header">
+        <h2 class="section-title" data-vi="Khởi chạy trong 60 giây" data-en="Up and Running in 60 Seconds">
+          Khởi chạy trong 60 giây
+        </h2>
+        <p class="section-desc" data-vi="Cài đặt qua npm hoặc chạy trực tiếp từ repo mã nguồn mở, sau đó nạp tiện ích vào Chrome." data-en="Start the local vault daemon via npx/npm, load the companion extension, and press Alt+K on any login page.">
+          Cài đặt qua npm hoặc chạy trực tiếp từ repo mã nguồn mở, sau đó nạp tiện ích vào Chrome.
+        </p>
+      </div>
+
+      <div class="steps-grid">
+        <div class="step-block">
+          <div>
+            <span class="step-badge">01</span>
+            <h3 data-vi="Khởi tạo Kho khóa Cục bộ" data-en="Initialize Local Encrypted Vault">Khởi tạo Kho khóa Cục bộ</h3>
+            <p data-vi="Tạo tệp khóa mở khoá và khởi tạo cơ sở dữ liệu AES-256-GCM tại ~/.webmcp/vault/." data-en="Create your local unlock key file and initialize the AES-256-GCM store under ~/.webmcp/vault/.">
+              Tạo tệp khóa mở khoá và khởi tạo cơ sở dữ liệu AES-256-GCM tại ~/.webmcp/vault/.
+            </p>
+          </div>
+          <div class="cmd-box">
+            <code>npx @gyga-browser/webmcp-vault-kit init</code>
+            <button type="button" class="copy-btn" data-copy-text="npx @gyga-browser/webmcp-vault-kit init">Copy</button>
+          </div>
+        </div>
+
+        <div class="step-block">
+          <div>
+            <span class="step-badge">02</span>
+            <h3 data-vi="Bật Daemon &amp; Giao diện Web (:7876)" data-en="Start Loopback Daemon (:7876)">Bật Daemon &amp; Giao diện Web (:7876)</h3>
+            <p data-vi="Chạy ngầm dịch vụ Vault trên cổng 127.0.0.1:7876 để phục vụ trình duyệt và AI Agent." data-en="Launch the idempotent background server bound strictly to 127.0.0.1:7876.">
+              Chạy ngầm dịch vụ Vault trên cổng 127.0.0.1:7876 để phục vụ trình duyệt và AI Agent.
+            </p>
+          </div>
+          <div class="cmd-box">
+            <code>webmcp-vault ui ensure --json</code>
+            <button type="button" class="copy-btn" data-copy-text="webmcp-vault ui ensure --json">Copy</button>
+          </div>
+        </div>
+
+        <div class="step-block">
+          <div>
+            <span class="step-badge">03</span>
+            <h3 data-vi="Cài đặt Chrome Extension" data-en="Load Chrome Companion Extension">Cài đặt Chrome Extension</h3>
+            <p data-vi="Tải gói .zip bên dưới, giải nén và chọn Load unpacked tại trang chrome://extensions." data-en="Download the extension zip below, extract it, and click Load unpacked in chrome://extensions.">
+              Tải gói .zip bên dưới, giải nén và chọn Load unpacked tại trang chrome://extensions.
+            </p>
+          </div>
+          <div class="cmd-box">
+            <code>chrome://extensions → Load unpacked</code>
+            <a href="./downloads/webmcp-vault-extension-v1.0.0.zip" download class="copy-btn" style="color: #60A5FA; border-color: rgba(59,130,246,0.4);">.zip</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 6: Cryptographic & Runtime Specifications (2-Col Card Grid per Section 4.9) -->
+    <section id="specs" class="section-wrap section-divider">
+      <div class="section-stack-header">
+        <h2 class="section-title" data-vi="Thông số Kỹ thuật &amp; Mật mã học" data-en="Cryptographic &amp; Runtime Specifications">
+          Thông số Kỹ thuật &amp; Mật mã học
+        </h2>
+        <p class="section-desc" data-vi="Mọi thông số dưới đây được kiểm chứng trực tiếp trong bộ unit test của @gyga-browser/webmcp-vault-kit." data-en="Every parameter below is enforced in code and verified by the @gyga-browser/webmcp-vault-kit test suite.">
+          Mọi thông số dưới đây được kiểm chứng trực tiếp trong bộ unit test của @gyga-browser/webmcp-vault-kit.
+        </p>
+      </div>
+
+      <div class="spec-grid">
+        <div class="spec-card">
+          <span class="spec-label" data-vi="THUẬT TOÁN MÃ HÓA DỮ LIỆU" data-en="AUTHENTICATED CIPHER">THUẬT TOÁN MÃ HÓA DỮ LIỆU</span>
+          <div class="spec-value">AES-256-GCM (12B IV, 16B Tag)</div>
+          <p class="spec-why" data-vi="Sinh vector khởi tạo ngẫu nhiên 12-byte mới ở mỗi lần ghi, chống sửa đổi trái phép tệp dữ liệu." data-en="Generates a fresh 12-byte random IV and 128-bit authentication tag on every write operation.">
+            Sinh vector khởi tạo ngẫu nhiên 12-byte mới ở mỗi lần ghi, chống sửa đổi trái phép tệp dữ liệu.
+          </p>
+        </div>
+
+        <div class="spec-card">
+          <span class="spec-label" data-vi="DẪN XUẤT KHÓA MỞ KHOÁ" data-en="KEY DERIVATION FUNCTION">DẪN XUẤT KHÓA MỞ KHOÁ</span>
+          <div class="spec-value">scrypt (N=16384, r=8, p=1)</div>
+          <p class="spec-why" data-vi="Dẫn xuất khóa 256-bit trong bộ nhớ RAM với muối ngẫu nhiên riêng biệt; khóa gốc không bao giờ ghi xuống đĩa." data-en="Derives a 256-bit key in memory with per-vault random salt; the unlock key is never written to disk.">
+            Dẫn xuất khóa 256-bit trong bộ nhớ RAM với muối ngẫu nhiên riêng biệt; khóa gốc không bao giờ ghi xuống đĩa.
+          </p>
+        </div>
+
+        <div class="spec-card">
+          <span class="spec-label" data-vi="CHỮ KÝ SỐ PASSKEY WEBAUTHN" data-en="WEBAUTHN PASSKEY SIGNING">CHỮ KÝ SỐ PASSKEY WEBAUTHN</span>
+          <div class="spec-value">ECDSA P-256 (ES256) &amp; Ed25519</div>
+          <p class="spec-why" data-vi="Tuân thủ W3C WebAuthn Level 3, kiểm tra nghiêm ngặt Relying Party ID (rpId) chống tấn công giả mạo tên miền." data-en="W3C WebAuthn Level 3 compliant with strict one-way Relying Party ID (rpId) domain verification.">
+            Tuân thủ W3C WebAuthn Level 3, kiểm tra nghiêm ngặt Relying Party ID (rpId) chống tấn công giả mạo tên miền.
+          </p>
+        </div>
+
+        <div class="spec-card">
+          <span class="spec-label" data-vi="RANH GIỚI CHROME EXTENSION" data-en="EXTENSION SANDBOX BOUNDARY">RANH GIỚI CHROME EXTENSION</span>
+          <div class="spec-value">Manifest V3 · ISOLATED World</div>
+          <p class="spec-why" data-vi="Mật khẩu và mã 2FA OTP chỉ được điền từ ISOLATED world, tuyệt đối không đi qua MAIN world của trang web." data-en="Passwords and TOTP codes are injected strictly from the ISOLATED world and never enter page JS memory.">
+            Mật khẩu và mã 2FA OTP chỉ được điền từ ISOLATED world, tuyệt đối không đi qua MAIN world của trang web.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 7: Final Call to Action Banner -->
+    <section class="section-wrap section-divider">
+      <div class="cta-banner">
+        <div>
+          <h2 data-vi="Làm chủ hoàn toàn mật khẩu &amp; Passkey trên máy của bạn" data-en="Own Your Passkeys &amp; Credentials Locally">
+            Làm chủ hoàn toàn mật khẩu &amp; Passkey trên máy của bạn
+          </h2>
+          <p data-vi="Tải ngay gói cài đặt WebMCP Vault Companion v1.0.0 hoặc kiểm tra mã nguồn mở trên GitHub." data-en="Download the WebMCP Vault Companion v1.0.0 package or audit the full source code on GitHub.">
+            Tải ngay gói cài đặt WebMCP Vault Companion v1.0.0 hoặc kiểm tra mã nguồn mở trên GitHub.
+          </p>
+        </div>
+        <div class="hero-cta-row">
+          <a href="./downloads/webmcp-vault-extension-v1.0.0.zip" download class="btn btn-primary" data-vi="Tải Extension (.zip)" data-en="Download Extension">Tải Extension (.zip)</a>
+          <a href="https://github.com/uyencss/webmcp-vault-kit" target="_blank" rel="noopener" class="btn btn-secondary" data-vi="Xem mã nguồn GitHub" data-en="View on GitHub">Xem mã nguồn GitHub</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <div>
+        <span>WebMCP Vault Kit &amp; Companion · MIT Open Source License</span>
+      </div>
+      <div class="footer-links">
+        <a href="https://github.com/uyencss/webmcp-vault-kit" target="_blank" rel="noopener">GitHub</a>
+        <a href="./privacy.html" data-vi="Chính sách Quyền riêng tư (Chrome Web Store)" data-en="Privacy Policy (Chrome Web Store)">Chính sách Quyền riêng tư (Chrome Web Store)</a>
+        <a href="./downloads/webmcp-vault-extension-v1.0.0.zip" download>Extension ZIP</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="./app.js"></script>
+</body>
+</html>

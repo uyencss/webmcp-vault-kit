@@ -317,6 +317,11 @@ function buildVaultFolderInput(flags) {
   if (flags.name && flags.name !== true) input.name = String(flags.name);
   if (flags.description && flags.description !== true) input.description = String(flags.description);
   if (flags.icon && flags.icon !== true) input.icon = String(flags.icon);
+  if (flags.parent && flags.parent !== true) input.parentId = String(flags.parent);
+  if (flags['parent-id'] && flags['parent-id'] !== true) input.parentId = String(flags['parent-id']);
+  if (flags.parent === 'none' || flags.parent === 'null' || flags['parent-id'] === 'none' || flags['parent-id'] === 'null') {
+    input.parentId = null;
+  }
   return input;
 }
 
@@ -616,6 +621,7 @@ async function run(args) {
     const isStop = Boolean(flags.stop || action === 'stop');
     const host = String(flags.host || '127.0.0.1');
     const port = Number(flags.port || 7876);
+    const bypassToken = Boolean(flags['bypass-token'] || flags.public || flags.tailnet || process.env.WEBMCP_VAULT_BYPASS_TOKEN === '1' || host === '0.0.0.0');
 
     const {
       startVaultUiServer,
@@ -641,7 +647,7 @@ async function run(args) {
     }
 
     if (isEnsure || isDaemon) {
-      const result = await ensureVaultUiServer({ host, port });
+      const result = await ensureVaultUiServer({ host, port, bypassToken });
       const desc = result.reused
         ? `WebMCP vault UI ready (reused): ${result.url}`
         : `WebMCP vault UI ready (spawned): ${result.url}`;
@@ -649,7 +655,7 @@ async function run(args) {
       return;
     }
 
-    const server = await startVaultUiServer({ host, port });
+    const server = await startVaultUiServer({ host, port, bypassToken });
     const payload = { ok: true, url: server.url, host: server.host, port: server.port, token: server.token, pid: process.pid };
     if (json) console.log(JSON.stringify(payload, null, 2));
     else console.log(`WebMCP vault UI: ${server.url}`);

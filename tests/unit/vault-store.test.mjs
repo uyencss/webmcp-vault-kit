@@ -837,5 +837,50 @@ test('integrity: rotateKey refuses a hardlinked alias of the active vault', () =
   );
 });
 
+test('nested vaults: create, update with parentId, prevent circular hierarchy, and reparent on delete', () => {
+  const dataDir = tempHome();
+  const store = createVaultStore({ dataDir, key: 'test-nested-vaults-key' });
+  store.init();
 
+  const parent = store.createVault({ name: 'PARENT', icon: 'folder' });
+  assert.equal(parent.parentId, null);
 
+  const child1 = store.createVault({ name: 'CHILD1', icon: 'key', parentId: parent.id });
+  assert.equal(child1.parentId, parent.id);
+
+  const child2 = store.createVault({ name: 'CHILD2', icon: 'people' });
+  assert.equal(child2.parentId, null);
+
+  // Reparent child2 under parent
+  const updatedChild2 = store.updateVault(child2.id, { parentId: parent.id });
+  assert.equal(updatedChild2.parentId, parent.id);
+
+  // Circular hierarchy prevention:
+  // 1. Vault cannot be its own parent
+  assert.throws(
+    () => store.updateVault(parent.id, { parentId: parent.id }),
+    /A vault cannot be its own parent/,
+  );
+
+  // 2. Parent cannot be a child of its descendant
+  assert.throws(
+    () => store.updateVault(parent.id, { parentId: child1.id }),
+    /circular hierarchy detected/,
+  );
+
+  // Create sub-child: parent -> child1 -> subchild
+  const subChild = store.createVault({ name: 'SUBCHILD', parentId: child1.id });
+  assert.equal(subChild.parentId, child1.id);
+
+  // Parent cannot be child of subchild either
+  assert.throws(
+    () => store.updateVault(parent.id, { parentId: subChild.id }),
+    /circular hierarchy detected/,
+  );
+
+  // Delete child1: subchild should be reparented to parent.id
+  store.deleteVault(child1.id);
+  const remaining = store.listVaults();
+  const foundSubChild = remaining.find((v) => v.id === subChild.id);
+  assert.equal(foundSubChild.parentId, parent.id);
+});
