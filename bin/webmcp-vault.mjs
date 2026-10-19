@@ -33,6 +33,7 @@ const KNOWN_BOOLEAN_FLAGS = new Set([
   'ensure',
   'status',
   'stop',
+  'proxy',
 ]);
 
 function coerceFlagValue(key, value) {
@@ -610,6 +611,18 @@ async function run(args) {
       moveItemsTo: flags['move-to'] ? String(flags['move-to']) : undefined,
     });
     printJsonOrHuman({ ok: true, deleted }, json, `Deleted vault ${deleted.name} (${deleted.id})`);
+    return;
+  }
+
+  if (subcommand === 'proxy' || (subcommand === 'ui' && (flags.proxy || positional[0] === 'proxy'))) {
+    const host = String(flags.host || '127.0.0.1');
+    const port = Number(flags.port || 7876);
+    const upstreams = flags.upstreams || process.env.WEBMCP_VAULT_UPSTREAMS;
+    const { startVaultProxyServer } = requireFromBin(resolve(ROOT, 'lib', 'vault-proxy.js'));
+    const proxy = await startVaultProxyServer({ host, port, upstreams });
+    const payload = { ok: true, mode: 'proxy', url: proxy.url, host: proxy.host, port: proxy.port, upstreams: proxy.upstreams, pid: process.pid };
+    if (json) console.log(JSON.stringify(payload, null, 2));
+    else console.log(`WebMCP vault failover proxy listening on ${proxy.url} -> ${proxy.upstreams.join(', ')}`);
     return;
   }
 

@@ -441,7 +441,13 @@
         <span class="badge" id="vaultPortBadge">7876</span>
       </div>
       <input type="text" class="mono-input" id="vaultUrlInput" placeholder="http://127.0.0.1:7876" />
-      <div class="subtext">Passkey WebAuthn + Password/TOTP Autofill endpoint</div>
+      <div class="subtext">Passkey WebAuthn + Password/TOTP Autofill endpoint (supports comma-separated failover)</div>
+      <div style="display:flex; gap:4px; flex-wrap:wrap; margin-top:6px;" id="vaultPresetRow">
+        <button type="button" data-preset-url="http://127.0.0.1:7876" style="padding:2px 6px; font-size:10px;">Local (127.0.0.1)</button>
+        <button type="button" data-preset-url="http://100.105.109.56:7876" style="padding:2px 6px; font-size:10px;">Mac .56</button>
+        <button type="button" data-preset-url="http://100.100.207.69:7876" style="padding:2px 6px; font-size:10px;">Mac M1 .69</button>
+        <button type="button" data-preset-url="http://100.105.109.56:7876, http://100.100.207.69:7876" style="padding:2px 6px; font-size:10px;">Auto (.56 → .69)</button>
+      </div>
       <div class="actions">
         <button id="btnTestVault" type="button">Test</button>
         <button id="btnResetVault" type="button">Reset Default</button>

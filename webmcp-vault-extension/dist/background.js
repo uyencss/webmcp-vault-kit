@@ -38,12 +38,10 @@ export function resolveValidRpId(requestedRpId, hostname) {
   throw new Error(`Invalid rpId "${cleanRp}" for hostname "${cleanHost}".`);
 }
 
-export function normalizeVaultUrl(raw) {
-  const trimmed = typeof raw === 'string' ? raw.trim() : '';
-  if (!trimmed) return DEFAULT_VAULT_URL;
+function normalizeSingleVaultUrl(raw) {
   let parsed;
   try {
-    parsed = new URL(trimmed);
+    parsed = new URL(raw);
   } catch {
     throw new Error('Vault URL không hợp lệ (ví dụ: http://127.0.0.1:7876)');
   }
@@ -52,6 +50,34 @@ export function normalizeVaultUrl(raw) {
   }
   const cleanPath = parsed.pathname.replace(/\/+$/, '');
   return parsed.origin + cleanPath;
+}
+
+export const CLUSTER_FALLBACK_VAULT_URLS = [
+  'http://100.105.109.56:7876',
+  'http://100.100.207.69:7876',
+];
+
+export function normalizeVaultUrl(raw) {
+  const trimmed = typeof raw === 'string' ? raw.trim() : '';
+  if (!trimmed) return DEFAULT_VAULT_URL;
+  const parts = trimmed
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map(normalizeSingleVaultUrl);
+  return parts.length > 0 ? parts.join(', ') : DEFAULT_VAULT_URL;
+}
+
+export function expandVaultCandidateUrls(vaultUrl) {
+  const normalized = normalizeVaultUrl(vaultUrl);
+  const explicit = normalized
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (explicit.length === 1 && explicit[0] === DEFAULT_VAULT_URL) {
+    return [DEFAULT_VAULT_URL, ...CLUSTER_FALLBACK_VAULT_URLS];
+  }
+  return explicit;
 }
 
 export async function getVaultSettings() {
@@ -96,28 +122,50 @@ export async function saveVaultSettings({ vaultUrl, autosaveEnabled } = {}) {
   };
 }
 
-export async function probeVaultHealth(vaultUrl, rpId = 'localhost') {
-  const t0 = Date.now();
-  try {
+export async function fetchFromVaultWithFailover(vaultUrl, path, init = {}, timeoutMs = 1200) {
+  const candidates = expandVaultCandidateUrls(vaultUrl);
+  let lastError = null;
+  for (const base of candidates) {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 800);
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
     if (typeof timer?.unref === 'function') timer.unref();
-    const res = await fetch(vaultUrl + '/api/passkey/candidates', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ rpId }),
-      signal: controller.signal,
-    });
-    clearTimeout(timer);
+    const t0 = Date.now();
+    try {
+      const res = await fetch(base + path, {
+        ...init,
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+      return { res, activeVaultUrl: base, latencyMs: Math.max(1, Date.now() - t0) };
+    } catch (err) {
+      clearTimeout(timer);
+      lastError = err;
+    }
+  }
+  throw lastError || new Error('Vault unreachable');
+}
+
+export async function probeVaultHealth(vaultUrl, rpId = 'localhost') {
+  try {
+    const { res, activeVaultUrl, latencyMs } = await fetchFromVaultWithFailover(
+      vaultUrl,
+      '/api/passkey/candidates',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rpId }),
+      },
+      800
+    );
     if (!res.ok) {
-      return { vaultState: 'closed', latencyMs: null, passkeyCount: null, vaultUrl };
+      return { vaultState: 'closed', latencyMs: null, passkeyCount: null, vaultUrl: activeVaultUrl };
     }
     const data = await res.json().catch(() => ({}));
     return {
       vaultState: 'open',
-      latencyMs: Math.max(1, Date.now() - t0),
+      latencyMs,
       passkeyCount: typeof data?.count === 'number' ? data.count : 0,
-      vaultUrl,
+      vaultUrl: activeVaultUrl,
     };
   } catch {
     return { vaultState: 'closed', latencyMs: null, passkeyCount: null, vaultUrl };
@@ -134,22 +182,22 @@ export async function queryDomainCandidates(vaultUrl, targetUrl, usernameHint = 
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
     return { ok: true, hostname: '', origin: '', candidates: [] };
   }
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 1500);
-  if (typeof timer?.unref === 'function') timer.unref();
   try {
-    const res = await fetch(vaultUrl + '/api/credentials/autofill', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        rpId: parsed.hostname,
-        origin: parsed.origin,
-        web: parsed.origin,
-        usernameHint,
-      }),
-      signal: controller.signal,
-    });
-    clearTimeout(timer);
+    const { res, activeVaultUrl } = await fetchFromVaultWithFailover(
+      vaultUrl,
+      '/api/credentials/autofill',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          rpId: parsed.hostname,
+          origin: parsed.origin,
+          web: parsed.origin,
+          usernameHint,
+        }),
+      },
+      1500
+    );
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       throw new Error(data?.error || 'Vault autofill query failed (' + res.status + ')');
@@ -158,10 +206,10 @@ export async function queryDomainCandidates(vaultUrl, targetUrl, usernameHint = 
       ok: true,
       hostname: parsed.hostname,
       origin: parsed.origin,
+      activeVaultUrl,
       candidates: Array.isArray(data?.candidates) ? data.candidates : [],
     };
   } catch (err) {
-    clearTimeout(timer);
     return {
       ok: false,
       hostname: parsed.hostname,
@@ -349,16 +397,21 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           throw new Error('Unknown vault request method: ' + reqMethod);
         }
 
-        const vaultRes = await fetch(vaultUrl + path, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            ...(request.params || {}),
-            rpId: effectiveRpId,
-            origin: verifiedOrigin,
-            web: verifiedOrigin,
-          }),
-        });
+        const { res: vaultRes } = await fetchFromVaultWithFailover(
+          vaultUrl,
+          path,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              ...(request.params || {}),
+              rpId: effectiveRpId,
+              origin: verifiedOrigin,
+              web: verifiedOrigin,
+            }),
+          },
+          2000
+        );
         const data = await vaultRes.json().catch(() => ({}));
         if (!vaultRes.ok) {
           throw new Error(data?.error || 'Vault request failed (' + vaultRes.status + ')');

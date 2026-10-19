@@ -275,9 +275,18 @@ elBtnOpenInlineSelector?.addEventListener('click', async () => {
 
 elVaultUrlInput?.addEventListener('input', () => {
   elVaultPortBadge.textContent = extractPortLabel(
-    elVaultUrlInput.value.trim() || DEFAULT_VAULT_URL,
+    elVaultUrlInput.value.split(',')[0].trim() || DEFAULT_VAULT_URL,
     '7876'
   );
+});
+
+document.getElementById('vaultPresetRow')?.addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-preset-url]');
+  if (!btn) return;
+  const preset = btn.getAttribute('data-preset-url') || DEFAULT_VAULT_URL;
+  elVaultUrlInput.value = preset;
+  elVaultPortBadge.textContent = extractPortLabel(preset.split(',')[0].trim(), '7876');
+  showToast('Selected preset: ' + btn.textContent);
 });
 
 elBtnTestVault?.addEventListener('click', async () => {
