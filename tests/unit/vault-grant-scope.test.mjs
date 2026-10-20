@@ -243,11 +243,53 @@ test('RED: grant scope enforces exact run/claim/binding/purpose/field/origin/rec
   const vectors = loadJson('../fixtures/vault-grant-vectors.json');
   const store = createVaultStore({ dataDir: tempHome(), key: 'grant-enforcement-key' });
   store.init();
-  // If grant API existed, each invalid vector should be rejected with exact code.
-  // Since it does not exist, we assert the API is missing — this is the RED failure.
-  // Additionally, we prove current lease API does NOT enforce these new dimensions (so fallback is unsafe).
   const hasGrantApi = typeof store.createCredentialGrant === 'function';
   assert.equal(hasGrantApi, true, `RED: grant scope validation missing — expected rejection for ${vectors.invalid[0].expectedCode} but createCredentialGrant not implemented`);
+
+  const baseFill = vectors.valid[0].grant;
+  const baseRead = vectors.valid[1].grant;
+
+  for (const inv of vectors.invalid) {
+    const g = inv.grant;
+    const isRead = g.operation === 'read';
+    const ctx = isRead
+      ? {
+          now: Date.parse(baseRead.issuedAt) + 1000,
+          runId: baseRead.runId,
+          nodeId: baseRead.nodeId,
+          principalId: baseRead.principalId,
+          profileBindingId: baseRead.profileBindingId,
+          siteOrigin: baseRead.siteOrigin,
+          purpose: baseRead.purpose,
+          fields: baseRead.fields,
+          runClaimDigest: baseRead.runClaimDigest,
+          bindingDigest: baseRead.bindingDigest,
+          profileSessionDigest: baseRead.profileSessionDigest,
+          operation: inv.mismatch?.includes('export') ? 'export' : 'read',
+          exposureMode: inv.mismatch?.includes('export') ? 'export' : 'scoped-values',
+        }
+      : {
+          now: inv.expectedCode === 'CREDENTIAL_GRANT_EXPIRED' ? Date.parse(g.expiresAt) + 1000 : Date.parse(baseFill.issuedAt) + 1000,
+          runId: baseFill.runId,
+          nodeId: baseFill.nodeId,
+          principalId: baseFill.principalId,
+          profileBindingId: baseFill.profileBindingId,
+          siteOrigin: baseFill.siteOrigin,
+          purpose: baseFill.purpose,
+          fields: baseFill.fields,
+          runClaimDigest: baseFill.runClaimDigest,
+          bindingDigest: baseFill.bindingDigest,
+          profileSessionDigest: baseFill.profileSessionDigest,
+          operation: inv.mismatch?.includes('read') ? 'read' : 'fill',
+          exposureMode: inv.mismatch?.includes('read') ? 'scoped-values' : 'metadata-only',
+        };
+
+    assert.throws(
+      () => store.validateGrantScope(g, ctx),
+      (err) => err && err.code === inv.expectedCode,
+      `Expected ${inv.name} to fail with ${inv.expectedCode}`
+    );
+  }
 });
 
 test('RED: metadata-only grant must not return value, scoped-values must be exact (read ≠ export)', () => {

@@ -353,5 +353,29 @@ describe('WebMCP Vault Companion v1.0.0 — Security & Architecture Suite', () =
     assert.equal(createCall.params.userName, 'uyencss');
     assert.equal(createCall.params.userHandle, 'CQk');
   });
+
+  it('7. Strong Password Generator, Touch ID locked state detection, and Popup UI elements', async () => {
+    const bg = await import(
+      `../../webmcp-vault-extension/dist/background.js?t=${Date.now() + 2}`
+    );
+    const pwd = bg.generateStrongPassword(20);
+    assert.equal(pwd.length, 20);
+    assert.match(pwd, /[A-Z]/, 'Must contain uppercase');
+    assert.match(pwd, /[a-z]/, 'Must contain lowercase');
+    assert.match(pwd, /[2-9]/, 'Must contain digit');
+    assert.match(pwd, /[!@#$%^&*\-_=+]/, 'Must contain symbol');
+
+    fetchResponder = async () => ({
+      ok: false,
+      status: 423,
+      json: async () => ({ error: 'Vault is locked', locked: true }),
+    });
+    const health = await bg.probeVaultHealth('http://127.0.0.1:7876', 'github.com');
+    assert.equal(health.vaultState, 'locked');
+
+    const popupHtml = fs.readFileSync(path.join(extDistDir, 'popup.html'), 'utf8');
+    assert.ok(popupHtml.includes('id="btnTouchIdUnlock"'), 'popup.html must have Touch ID button');
+    assert.ok(popupHtml.includes('id="btnGeneratePass"'), 'popup.html must have Password Generator button');
+  });
 });
 

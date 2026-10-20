@@ -328,6 +328,7 @@
   }
 
   let activeInlineMenuHost = null;
+  let activeFieldBadgeHost = null;
   let lastAutofillCandidate = null;
 
   function closeInlineMenu() {
@@ -335,6 +336,121 @@
       try { activeInlineMenuHost.remove(); } catch {}
       activeInlineMenuHost = null;
     }
+  }
+
+  function closeFieldBadge() {
+    if (activeFieldBadgeHost) {
+      try { activeFieldBadgeHost.remove(); } catch {}
+      activeFieldBadgeHost = null;
+    }
+  }
+
+  function generateStrongPassword(length = 20) {
+    const len = Math.max(12, Math.min(64, Number(length) || 20));
+    const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+    const lower = 'abcdefghijkmnopqrstuvwxyz';
+    const digits = '23456789';
+    const symbols = '!@#$%^&*-_=+';
+    const all = upper + lower + digits + symbols;
+    const bytes = new Uint32Array(len + 4);
+    if (globalThis.crypto?.getRandomValues) {
+      globalThis.crypto.getRandomValues(bytes);
+    } else {
+      for (let i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 0xffffffff);
+    }
+    const chars = [
+      upper[bytes[0] % upper.length],
+      lower[bytes[1] % lower.length],
+      digits[bytes[2] % digits.length],
+      symbols[bytes[3] % symbols.length],
+    ];
+    for (let i = 4; i < len; i++) chars.push(all[bytes[i] % all.length]);
+    for (let i = chars.length - 1; i > 0; i--) {
+      const j = bytes[(i + 4) % bytes.length] % (i + 1);
+      const tmp = chars[i];
+      chars[i] = chars[j];
+      chars[j] = tmp;
+    }
+    return chars.join('');
+  }
+
+  async function applyGeneratedPassword(fields = detectLoginInputs(), customPass = '', saveToVault = true) {
+    const pwd = customPass || generateStrongPassword(20);
+    let filled = false;
+    if (fields.passEl) {
+      const scope = fields.passEl.closest?.('form') || document;
+      const passInputs = Array.from(scope.querySelectorAll?.('input[type="password"]') || [fields.passEl]).filter(isVisibleInput);
+      for (const pEl of passInputs.length ? passInputs : [fields.passEl]) {
+        setNativeInputValue(pEl, pwd);
+        filled = true;
+      }
+    }
+    try {
+      await navigator.clipboard?.writeText?.(pwd);
+    } catch {}
+    let saved = false;
+    if (saveToVault) {
+      const rpId = window.location?.hostname || '';
+      const username = fields.userEl?.value?.trim() || ('user@' + rpId.replace(/^www\./, ''));
+      lastAutofillCandidate = { username, password: pwd };
+      const res = await sendBgRequest('credentials_autosave', {
+        rpId,
+        origin: window.location?.origin || '',
+        username,
+        password: pwd,
+      });
+      saved = Boolean(res?.saved || res?.action === 'created' || res?.action === 'updated');
+    }
+    showVaultToast(
+      saved
+        ? '⚡ Đã điền, copy & lưu mật khẩu mạnh vào WebMCP Vault'
+        : '⚡ Đã tạo & copy mật khẩu mạnh (20 ký tự)'
+    );
+    return { password: pwd, filled, saved };
+  }
+
+  function showInputFieldBadge(inputEl) {
+    closeFieldBadge();
+    if (!inputEl || typeof document === 'undefined' || !document.body || typeof inputEl.getBoundingClientRect !== 'function') return;
+    const rect = inputEl.getBoundingClientRect();
+    if (rect.width < 80 || rect.height < 18) return;
+    const host = document.createElement('div');
+    const size = Math.min(22, Math.max(16, rect.height - 8));
+    host.style.cssText = [
+      'position:fixed',
+      `top:${Math.round(rect.top + (rect.height - size) / 2)}px`,
+      `left:${Math.round(rect.right - size - 6)}px`,
+      'z-index:2147483646',
+    ].join(';');
+    const shadow = host.attachShadow({ mode: 'closed' });
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.title = 'Mở WebMCP Vault (Alt+K)';
+    btn.style.cssText = [
+      `width:${size}px`,
+      `height:${size}px`,
+      'border-radius:5px',
+      'background:linear-gradient(135deg,#1e3a8a,#2563eb)',
+      'border:1px solid #60a5fa',
+      'color:#f8fafc',
+      'display:flex',
+      'align-items:center',
+      'justify-content:center',
+      'cursor:pointer',
+      'padding:0',
+      'box-shadow:0 2px 6px rgba(0,0,0,0.35)',
+      'font-size:11px',
+      'line-height:1',
+    ].join(';');
+    btn.textContent = '🛡️';
+    btn.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      runPasswordAutofill({ forceMenu: true, anchorEl: inputEl });
+    });
+    shadow.appendChild(btn);
+    document.body.appendChild(host);
+    activeFieldBadgeHost = host;
   }
 
   function fillCandidate(item, fields = detectLoginInputs()) {
@@ -361,13 +477,14 @@
 
   function showInlineSelector(anchorEl, candidates, fields) {
     closeInlineMenu();
-    if (!anchorEl || typeof document === 'undefined' || !document.body || !candidates?.length) return;
+    const list = Array.isArray(candidates) ? candidates : [];
+    if (!anchorEl || typeof document === 'undefined' || !document.body || (!list.length && !fields?.passEl)) return;
 
     const rect = anchorEl.getBoundingClientRect();
     const host = document.createElement('div');
     host.style.cssText = [
       'position:fixed',
-      `top:${Math.min(window.innerHeight - 220, Math.max(8, rect.bottom + 6))}px`,
+      `top:${Math.min(window.innerHeight - 240, Math.max(8, rect.bottom + 6))}px`,
       `left:${Math.min(window.innerWidth - 300, Math.max(8, rect.left))}px`,
       'z-index:2147483647',
     ].join(';');
@@ -381,7 +498,7 @@
       'border-radius:10px',
       'padding:10px',
       'width:280px',
-      'max-height:240px',
+      'max-height:260px',
       'overflow-y:auto',
       'font:12px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif',
       'box-shadow:0 16px 32px rgba(0,0,0,0.55)',
@@ -389,7 +506,7 @@
 
     const hdr = document.createElement('div');
     hdr.style.cssText = 'display:flex;justify-content:space-between;align-items:center;font-weight:600;color:#93c5fd;margin-bottom:6px;';
-    hdr.textContent = `WebMCP Vault (${candidates.length}) · Alt+K`;
+    hdr.textContent = `WebMCP Vault (${list.length}) · Alt+K`;
     const closeBtn = document.createElement('button');
     closeBtn.textContent = '✕';
     closeBtn.style.cssText = 'background:transparent;border:none;color:#94a3b8;cursor:pointer;font-size:12px;';
@@ -397,7 +514,7 @@
     hdr.appendChild(closeBtn);
     card.appendChild(hdr);
 
-    for (const item of candidates) {
+    for (const item of list) {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.style.cssText = [
@@ -437,6 +554,31 @@
       card.appendChild(btn);
     }
 
+    if (fields?.passEl) {
+      const genBtn = document.createElement('button');
+      genBtn.type = 'button';
+      genBtn.style.cssText = [
+        'display:block',
+        'width:100%',
+        'text-align:left',
+        'background:rgba(16,185,129,0.14)',
+        'color:#6ee7b7',
+        'border:1px solid rgba(16,185,129,0.45)',
+        'border-radius:6px',
+        'padding:7px 9px',
+        'margin-top:6px',
+        'cursor:pointer',
+        'font:600 11.5px/1.3 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif',
+      ].join(';');
+      genBtn.textContent = '⚡ Tạo mật khẩu mạnh (20 ký tự) & Lưu Vault';
+      genBtn.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        closeInlineMenu();
+        applyGeneratedPassword(fields, '', true);
+      });
+      card.appendChild(genBtn);
+    }
+
     shadow.appendChild(card);
     document.body.appendChild(host);
     activeInlineMenuHost = host;
@@ -457,9 +599,14 @@
         usernameHint,
       });
       const candidates = Array.isArray(res?.candidates) ? res.candidates : [];
-      if (candidates.length === 0) return;
-
       const targetAnchor = anchorEl || fields.userEl || fields.passEl || fields.otpEl;
+      if (candidates.length === 0) {
+        if ((forceMenu || fields.isRegistration) && fields.passEl) {
+          showInlineSelector(targetAnchor, [], fields);
+        }
+        return;
+      }
+
       if (forceMenu) {
         showInlineSelector(targetAnchor, candidates, fields);
         return;
@@ -558,7 +705,7 @@
             username,
             password,
           });
-          if (res?.saved) {
+          if (res?.saved || res?.action === 'created' || res?.action === 'updated') {
             showVaultToast(
               res.action === 'created'
                 ? `Saved ${username} to WebMCP Vault`
@@ -622,6 +769,7 @@
         if (!el || el.tagName !== 'INPUT') return;
         const fields = detectLoginInputs();
         if (el === fields.userEl || el === fields.passEl || el === fields.otpEl) {
+          showInputFieldBadge(el);
           runPasswordAutofill({ forceMenu: false, anchorEl: el });
         }
       },
@@ -637,6 +785,7 @@
           runPasswordAutofill({ forceMenu: true, anchorEl: active });
         } else if (e.key === 'Escape') {
           closeInlineMenu();
+          closeFieldBadge();
         }
       },
       true
@@ -667,6 +816,12 @@
         runPasswordAutofill({ forceMenu: true });
         sendResponse({ ok: true, filled: true });
         return false;
+      }
+      if (cmd === 'fillGeneratedPassword') {
+        applyGeneratedPassword(detectLoginInputs(), msg.password || '', msg.saveToVault !== false)
+          .then((res) => sendResponse({ ok: true, ...res }))
+          .catch((err) => sendResponse({ ok: false, error: err?.message || String(err) }));
+        return true;
       }
       return false;
     });

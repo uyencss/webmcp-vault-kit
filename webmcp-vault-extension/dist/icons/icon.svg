@@ -1,0 +1,109 @@
+<svg viewBox="0 0 512 512" width="512" height="512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Background Gradient -->
+    <linearGradient id="bg512" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#070D22"/>
+      <stop offset="35%" stop-color="#0F2052"/>
+      <stop offset="70%" stop-color="#1E3A8A"/>
+      <stop offset="100%" stop-color="#1D4ED8"/>
+    </linearGradient>
+    <radialGradient id="ambientGlow" cx="50%" cy="40%" r="60%">
+      <stop offset="0%" stop-color="#38BDF8" stop-opacity="0.18"/>
+      <stop offset="60%" stop-color="#1D4ED8" stop-opacity="0.05"/>
+      <stop offset="100%" stop-color="#070D22" stop-opacity="0"/>
+    </radialGradient>
+    <!-- Outer Rim Gradient -->
+    <linearGradient id="rim512" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#38BDF8" stop-opacity="0.95"/>
+      <stop offset="100%" stop-color="#60A5FA" stop-opacity="0.4"/>
+    </linearGradient>
+    <!-- Shackle Metallic Gradient -->
+    <linearGradient id="shackle512" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#94A3B8"/>
+      <stop offset="25%" stop-color="#E2E8F0"/>
+      <stop offset="45%" stop-color="#FFFFFF"/>
+      <stop offset="75%" stop-color="#CBD5E1"/>
+      <stop offset="100%" stop-color="#64748B"/>
+    </linearGradient>
+    <!-- Shield Fill Gradient -->
+    <linearGradient id="shield512" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#101D42"/>
+      <stop offset="60%" stop-color="#0A122C"/>
+      <stop offset="100%" stop-color="#070C1E"/>
+    </linearGradient>
+    <!-- Gold Lock Body Gradient -->
+    <linearGradient id="gold512" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0%" stop-color="#FEF08A"/>
+      <stop offset="25%" stop-color="#FBBF24"/>
+      <stop offset="70%" stop-color="#F59E0B"/>
+      <stop offset="100%" stop-color="#D97706"/>
+    </linearGradient>
+    <linearGradient id="emerald512" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#34D399"/>
+      <stop offset="100%" stop-color="#059669"/>
+    </linearGradient>
+    <!-- Glow Filters -->
+    <filter id="shieldGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="12" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+    <filter id="ledGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="5" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+
+  <!-- 1. Background Squircle (95.3% full bleed: 488/512) -->
+  <rect x="12" y="12" width="488" height="488" rx="112" fill="url(#bg512)"/>
+  <!-- Ambient Radial Glow inside Squircle -->
+  <rect x="12" y="12" width="488" height="488" rx="112" fill="url(#ambientGlow)"/>
+  <!-- Glowing Rim Stroke -->
+  <rect x="12" y="12" width="488" height="488" rx="112" fill="none" stroke="url(#rim512)" stroke-width="4.5"/>
+
+  <!-- Top Glass Highlight Reflection -->
+  <path d="M28 130 C 70 56, 150 26, 256 26 C 362 26, 442 56, 484 130 C 438 88, 356 60, 256 60 C 156 60, 74 88, 28 130 Z" fill="#FFFFFF" opacity="0.07"/>
+
+  <!-- 2. Security Shield Armor -->
+  <!-- Outer Shield Ambient Glow -->
+  <path d="M256 72 L398 118 C398 262 336 376 256 438 C176 376 114 262 114 118 Z" fill="none" stroke="#38BDF8" stroke-width="20" stroke-linejoin="round" opacity="0.3" filter="url(#shieldGlow)"/>
+  
+  <!-- Solid Shield Armored Plate -->
+  <path d="M256 72 L398 118 C398 262 336 376 256 438 C176 376 114 262 114 118 Z" fill="url(#shield512)" stroke="#38BDF8" stroke-width="12" stroke-linejoin="round"/>
+
+  <!-- Shield Inner Neon Trace -->
+  <path d="M256 94 L374 134 C374 246 322 346 256 398 C190 346 138 246 138 134 Z" fill="none" stroke="#60A5FA" stroke-width="3" opacity="0.6" stroke-linejoin="round"/>
+
+  <!-- Corner Security Rivets / Tech Dots on Shield -->
+  <circle cx="160" cy="148" r="4" fill="#38BDF8" opacity="0.5"/>
+  <circle cx="352" cy="148" r="4" fill="#38BDF8" opacity="0.5"/>
+
+  <!-- 3. Heavy Vault Padlock -->
+  <!-- Shackle Drop Shadow -->
+  <path d="M204 196 V150 C204 121 227 98 256 98 C285 98 308 121 308 150 V196" fill="none" stroke="#050B1A" stroke-width="38" stroke-linecap="round" opacity="0.6"/>
+  <!-- Shackle Solid Metal Arch -->
+  <path d="M204 196 V150 C204 121 227 98 256 98 C285 98 308 121 308 150 V196" fill="none" stroke="url(#shackle512)" stroke-width="32" stroke-linecap="round"/>
+  <!-- Shackle Specular Highlight Stroke -->
+  <path d="M204 196 V150 C204 121 227 98 256 98 C285 98 308 121 308 150 V196" fill="none" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round" opacity="0.7"/>
+
+  <!-- Padlock Body (Solid Chiseled Gold) -->
+  <rect x="172" y="192" width="168" height="136" rx="26" fill="url(#gold512)" stroke="#FFFBEB" stroke-width="4"/>
+  <!-- Top Bevel Highlight on Lock Body -->
+  <line x1="194" y1="198" x2="318" y2="198" stroke="#FFFFFF" stroke-width="3.5" opacity="0.85" stroke-linecap="round"/>
+  <!-- Inset Shadow Groove on Lock Body -->
+  <rect x="180" y="200" width="152" height="120" rx="20" fill="none" stroke="#D97706" stroke-width="2" opacity="0.6"/>
+
+  <!-- Emerald Passkey Indicator LED -->
+  <circle cx="256" cy="222" r="8" fill="url(#emerald512)" stroke="#A7F3D0" stroke-width="2.5" filter="url(#ledGlow)"/>
+
+  <!-- Precision Keyhole Cutout -->
+  <circle cx="256" cy="260" r="18" fill="#070D22"/>
+  <polygon points="245,260 267,260 262,302 250,302" fill="#070D22"/>
+  <!-- Keyhole Inset Gold Bevel -->
+  <circle cx="256" cy="260" r="18" fill="none" stroke="#D97706" stroke-width="2" opacity="0.8"/>
+  <!-- Glowing Cyber-Cyan Core inside Keyhole -->
+  <circle cx="256" cy="260" r="7" fill="#38BDF8" opacity="0.95"/>
+
+  <!-- 4. Shield Apex Security Chevron (Emerald & Cyan Accent) -->
+  <path d="M226 364 L256 384 L286 364" fill="none" stroke="#10B981" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="256" cy="406" r="5" fill="#38BDF8"/>
+</svg>

@@ -102,23 +102,41 @@ test('A1 broker fixtures and schemas are well-formed (must pass)', () => {
 });
 
 test('RED: broker-fill must be grant-bound and never return secret value (missing fillWithGrant)', async () => {
-  // Future A1: broker.fillWithCredentialGrant({ store, gateway, grantId, ... }) verifies grant, then fills
-  // and returns only { schema: 'webmcp-credential-operation-receipt/1', secretReturned: false, ... } with no value.
-  // Current broker only has fillLoginFormWithLease(leaseId/token) — not grant-bound.
   assert.equal(typeof broker.fillWithCredentialGrant, 'function', 'RED: missing broker-fill grant capability — broker.fillWithCredentialGrant not implemented (expected A1 failure)');
 
-  // The following would be the correct A1 behavior after implementation (kept as documentation):
-  // const store = createVaultStore({ dataDir: tempHome(), key: 'broker-grant-key' });
-  // store.init();
-  // const item = store.createItem({ title: 'Broker Grant', web: 'https://broker.example.test', username: 'syn_user', password: 'canary_pw_deadbeef001' });
-  // const grant = store.createCredentialGrant({ itemId: item.id, operation: 'fill', exposureMode: 'metadata-only', fields: ['username','password'], ... });
-  // const calls = [];
-  // const gateway = { async call(m,p){ calls.push({m,p}); if(m==='evaluateJS') return { result:{ result:{ match:true, x:1,y:2,tag:'input' } } }; return { result:{ ok:true } }; } };
-  // const receipt = await broker.fillWithCredentialGrant({ store, gateway, grantId: grant.grantId, siteOrigin: 'https://broker.example.test', profileBindingId: 'binding_7777777777777777', fields: { username:{selector:'#u'}, password:{selector:'#p'} } });
-  // assert.equal(receipt.schema, 'webmcp-credential-operation-receipt/1');
-  // assert.equal(receipt.secretReturned, false);
-  // assert.equal(JSON.stringify(receipt).includes('canary_pw_deadbeef001'), false);
-  // assert.equal(calls.some(c => JSON.stringify(c).includes('canary_pw_deadbeef001') && c.m.includes('evaluateJS')), false);
+  const store = createVaultStore({ dataDir: tempHome(), key: 'broker-grant-key' });
+  store.init();
+  const item = store.createItem({ title: 'Broker Grant', web: 'https://broker.example.test', username: 'syn_user', password: 'canary_pw_deadbeef001' });
+  const grant = store.createCredentialGrant({
+    itemId: item.id,
+    operation: 'fill',
+    exposureMode: 'metadata-only',
+    purpose: 'login',
+    fields: ['username', 'password'],
+    siteOrigin: 'https://broker.example.test',
+    profileBindingId: 'binding_7777777777777777',
+  });
+  const calls = [];
+  const gateway = {
+    async call(m, p) {
+      calls.push({ m, p });
+      if (m === 'evaluateJS') return { result: { result: { match: true, x: 1, y: 2, tag: 'input' } } };
+      return { result: { ok: true } };
+    },
+  };
+  const receipt = await broker.fillWithCredentialGrant({
+    store,
+    gateway,
+    grantId: grant.grantId,
+    siteOrigin: 'https://broker.example.test',
+    profileBindingId: 'binding_7777777777777777',
+    purpose: 'login',
+    fields: { username: { selector: '#u' }, password: { selector: '#p' } },
+  });
+  assert.equal(receipt.schema, 'webmcp-credential-operation-receipt/1');
+  assert.equal(receipt.secretReturned, false);
+  assert.equal(JSON.stringify(receipt).includes('canary_pw_deadbeef001'), false);
+  assert.equal(calls.some((c) => JSON.stringify(c).includes('canary_pw_deadbeef001') && c.m.includes('evaluateJS')), false);
 });
 
 test('RED: broker-fill must reject clipboard and must verify field digest before submit', async () => {

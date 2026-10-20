@@ -145,6 +145,33 @@ export async function fetchFromVaultWithFailover(vaultUrl, path, init = {}, time
   throw lastError || new Error('Vault unreachable');
 }
 
+export function generateStrongPassword(length = 20) {
+  const len = Math.max(12, Math.min(64, Number(length) || 20));
+  const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  const lower = 'abcdefghijkmnopqrstuvwxyz';
+  const digits = '23456789';
+  const symbols = '!@#$%^&*-_=+';
+  const all = upper + lower + digits + symbols;
+  const bytes = new Uint32Array(len + 4);
+  globalThis.crypto.getRandomValues(bytes);
+  const chars = [
+    upper[bytes[0] % upper.length],
+    lower[bytes[1] % lower.length],
+    digits[bytes[2] % digits.length],
+    symbols[bytes[3] % symbols.length],
+  ];
+  for (let i = 4; i < len; i++) {
+    chars.push(all[bytes[i] % all.length]);
+  }
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = bytes[(i + 4) % bytes.length] % (i + 1);
+    const tmp = chars[i];
+    chars[i] = chars[j];
+    chars[j] = tmp;
+  }
+  return chars.join('');
+}
+
 export async function probeVaultHealth(vaultUrl, rpId = 'localhost') {
   try {
     const { res, activeVaultUrl, latencyMs } = await fetchFromVaultWithFailover(
@@ -157,10 +184,18 @@ export async function probeVaultHealth(vaultUrl, rpId = 'localhost') {
       },
       800
     );
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 423 || data?.locked === true) {
+      return {
+        vaultState: 'locked',
+        latencyMs,
+        passkeyCount: 0,
+        vaultUrl: activeVaultUrl,
+      };
+    }
     if (!res.ok) {
       return { vaultState: 'closed', latencyMs: null, passkeyCount: null, vaultUrl: activeVaultUrl };
     }
-    const data = await res.json().catch(() => ({}));
     return {
       vaultState: 'open',
       latencyMs,
@@ -340,6 +375,92 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             break;
           }
 
+          case 'unlockTouchId': {
+            const { vaultUrl } = await getVaultSettings();
+            const { res, activeVaultUrl, latencyMs } = await fetchFromVaultWithFailover(
+              vaultUrl,
+              '/api/unlock/touchid',
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  reason: request.params?.reason || 'Mở khóa WebMCP Vault Companion',
+                }),
+              },
+              60000
+            );
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+              throw new Error(data?.error || 'Touch ID unlock failed (' + res.status + ')');
+            }
+            sendResponse({
+              ok: true,
+              vaultState: 'open',
+              latencyMs,
+              vaultUrl: activeVaultUrl,
+              touchId: data,
+            });
+            break;
+          }
+
+          case 'generatePassword': {
+            const password = generateStrongPassword(request.params?.length || 20);
+            let filled = false;
+            let saved = false;
+            const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+            const targetTabId = request.params?.tabId || activeTab?.id;
+            const targetUrl = request.params?.url || activeTab?.url || '';
+
+            if (request.params?.fillTab !== false && targetTabId) {
+              try {
+                const tabRes = await chrome.tabs.sendMessage(
+                  targetTabId,
+                  {
+                    type: 'VAULT_POPUP_CMD',
+                    action: 'fillGeneratedPassword',
+                    cmd: 'fillGeneratedPassword',
+                    password,
+                    saveToVault: request.params?.saveToVault !== false,
+                  },
+                  { frameId: 0 }
+                );
+                filled = Boolean(tabRes?.filled);
+                saved = Boolean(tabRes?.saved);
+              } catch {}
+            }
+
+            if (!saved && request.params?.saveToVault && targetUrl.startsWith('http')) {
+              try {
+                const parsed = new URL(targetUrl);
+                const { vaultUrl } = await getVaultSettings();
+                const username =
+                  request.params?.username ||
+                  'user@' + parsed.hostname.replace(/^www\./, '');
+                const { res } = await fetchFromVaultWithFailover(
+                  vaultUrl,
+                  '/api/credentials/autosave',
+                  {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      rpId: parsed.hostname,
+                      origin: parsed.origin,
+                      web: parsed.origin,
+                      title: parsed.hostname,
+                      username,
+                      password,
+                    }),
+                  },
+                  3000
+                );
+                saved = res.ok;
+              } catch {}
+            }
+
+            sendResponse({ ok: true, password, filled, saved });
+            break;
+          }
+
           default:
             sendResponse({ ok: false, error: 'Unknown popup method: ' + request.method });
         }
@@ -391,11 +512,18 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           passkey_create: '/api/passkey/create',
           credentials_autosave: '/api/credentials/autosave',
           credentials_autofill: '/api/credentials/autofill',
+          unlock_touchid: '/api/unlock/touchid',
         };
         const path = endpointMap[reqMethod];
         if (!path) {
           throw new Error('Unknown vault request method: ' + reqMethod);
         }
+
+        const isBiometricOp =
+          reqMethod === 'unlock_touchid' ||
+          reqMethod === 'passkey_assert' ||
+          reqMethod === 'passkey_create';
+        const reqTimeoutMs = isBiometricOp ? 60000 : 2500;
 
         const { res: vaultRes } = await fetchFromVaultWithFailover(
           vaultUrl,
@@ -410,7 +538,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
               web: verifiedOrigin,
             }),
           },
-          2000
+          reqTimeoutMs
         );
         const data = await vaultRes.json().catch(() => ({}));
         if (!vaultRes.ok) {

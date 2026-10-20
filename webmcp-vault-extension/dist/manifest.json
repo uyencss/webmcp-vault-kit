@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "WebMCP Vault Companion",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Zero-click WebAuthn passkey authenticator, password & 2FA TOTP autofill companion for the local WebMCP Vault.",
   "permissions": [
     "storage",

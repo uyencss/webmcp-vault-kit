@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import process from 'node:process';
+import { spawn, spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
@@ -34,7 +35,12 @@ const KNOWN_BOOLEAN_FLAGS = new Set([
   'status',
   'stop',
   'proxy',
+  'bypass-token',
+  'public',
+  'tailnet',
 ]);
+
+const BOOLEAN_VALUE_LITERALS = new Set(['true', 'false', '1', '0', 'yes', 'no']);
 
 function coerceFlagValue(key, value) {
   if (!KNOWN_BOOLEAN_FLAGS.has(key)) return value;
@@ -60,6 +66,15 @@ function parseFlags(args) {
     }
     const key = arg.slice(2);
     const next = args[i + 1];
+    if (KNOWN_BOOLEAN_FLAGS.has(key)) {
+      if (next && BOOLEAN_VALUE_LITERALS.has(next)) {
+        flags[key] = coerceFlagValue(key, next);
+        i += 1;
+      } else {
+        flags[key] = true;
+      }
+      continue;
+    }
     if (next && !next.startsWith('--')) {
       flags[key] = coerceFlagValue(key, next);
       i += 1;
@@ -79,9 +94,12 @@ Usage:
   webmcp-vault init [--force] [--json]
   webmcp-vault list [--search <text>] [--web <url>] [--vault <vault-id>] [--json]
   webmcp-vault resolve [query] [--web <url>] [--vault <vault-id>] [--json]
-  webmcp-vault get <id-or-query> [--web <url>] [--reveal] [--json]
-  webmcp-vault read <id-or-query> <field> [--json]
-  webmcp-vault read --web <url> <field> [--json]
+  webmcp-vault get <id-or-query> [--web <url>] [--vault <vault-id>] [--reveal] [--json]
+  webmcp-vault read <id-or-query> <field> [--vault <vault-id>] [--json]
+  webmcp-vault read --web <url> <field> [--vault <vault-id>] [--json]
+  webmcp-vault run [--item <id-or-query>] [--vault <vault-id>] -- <cmd> [args...]
+  webmcp-vault ssh-add <id-or-query> [--ttl <seconds>] [--vault <vault-id>] [--json]
+  webmcp-vault keychain-save [--json]
   webmcp-vault create (--stdin-json | --input-json <file>) [--vault <vault-id>] [--json]
   webmcp-vault update <id-or-query> (--stdin-json | --input-json <file>) [--vault <vault-id>] [--json]
   webmcp-vault import <file.csv> [--preview] [--vault <vault-id>] [--json]
@@ -375,7 +393,7 @@ async function run(args) {
   if (subcommand === 'get') {
     const identifier = positional[0];
     if (!identifier && !flags.web) throw new Error('Usage: webmcp-vault get <id-or-query> [--web <url>]');
-    const item = store.getItem(identifier || '', { web: flags.web, reveal: flags.reveal === true });
+    const item = store.getItem(identifier || '', { web: flags.web, vaultId: flags.vault, reveal: flags.reveal === true });
     printJsonOrHuman({ item }, json);
     return;
   }
@@ -390,9 +408,92 @@ async function run(args) {
     if (!field) {
       throw new Error('Usage: webmcp-vault read <id-or-query> <field> or webmcp-vault read --web <url> <field>');
     }
-    const item = store.resolve(identifier || '', { web: flags.web });
+    const item = store.resolve(identifier || '', { web: flags.web, vaultId: flags.vault });
     const value = store.readField(item.id, field);
     printJsonOrHuman({ id: item.id, field, value }, json, value);
+    return;
+  }
+
+  if (subcommand === 'keychain-save') {
+    const { requireKey, saveKeychainKey } = requireFromBin(resolve(ROOT, 'lib', 'vault', 'key-source.js'));
+    const key = requireKey({});
+    const saved = saveKeychainKey(key);
+    printJsonOrHuman(saved, json, `Saved master key to macOS Keychain (${saved.service}/${saved.account}).`);
+    return;
+  }
+
+  if (subcommand === 'ssh-add') {
+    const identifier = positional[0];
+    if (!identifier) throw new Error('Usage: webmcp-vault ssh-add <id-or-query> [--ttl <seconds>] [--vault <vault-id>]');
+    const item = store.resolve(identifier, { vaultId: flags.vault });
+    let privateKey = store.readField(item.id, 'private_key');
+    if (!privateKey.endsWith('\n')) privateKey += '\n';
+    const ttl = flags.ttl && flags.ttl !== true ? String(flags.ttl) : '3600';
+    const res = spawnSync('ssh-add', ['-t', ttl, '-'], {
+      input: privateKey,
+      encoding: 'utf8',
+    });
+    if (res.status !== 0) {
+      throw new Error(`ssh-add failed: ${(res.stderr || res.stdout || '').trim()}`);
+    }
+    printJsonOrHuman({ ok: true, id: item.id, title: item.title, ttlSeconds: Number(ttl) }, json, `Added SSH key "${item.title}" to ssh-agent (TTL ${ttl}s).`);
+    return;
+  }
+
+  if (subcommand === 'run') {
+    const sepIdx = rest.indexOf('--');
+    const flagPart = sepIdx !== -1 ? rest.slice(0, sepIdx) : [];
+    const cmdPart = sepIdx !== -1 ? rest.slice(sepIdx + 1) : positional;
+    const runFlags = sepIdx !== -1 ? parseFlags(flagPart).flags : flags;
+    if (cmdPart.length === 0) {
+      throw new Error('Usage: webmcp-vault run [--item <id-or-query>] [--vault <vault-id>] -- <command> [args...]');
+    }
+    const injectedEnv = { ...process.env };
+    const secretValues = [];
+    if (runFlags.item && runFlags.item !== true) {
+      const resolved = store.resolve(String(runFlags.item), { vaultId: runFlags.vault });
+      const revealed = store.getItem(resolved.id, { reveal: true });
+      if (Array.isArray(revealed.fields)) {
+        for (const f of revealed.fields) {
+          if (f.name && f.value !== undefined) {
+            injectedEnv[f.name] = String(f.value);
+            if (f.secret && f.value && String(f.value).length >= 4) secretValues.push(String(f.value));
+          }
+        }
+      }
+    }
+    for (const [k, v] of Object.entries(injectedEnv)) {
+      if (typeof v === 'string' && v.startsWith('vault://')) {
+        const ref = v.slice('vault://'.length);
+        const slash = ref.lastIndexOf('/');
+        if (slash > 0) {
+          const itemQuery = ref.slice(0, slash);
+          const fieldName = ref.slice(slash + 1);
+          const item = store.resolve(itemQuery, { vaultId: runFlags.vault });
+          const val = store.readField(item.id, fieldName);
+          injectedEnv[k] = val;
+          if (val && val.length >= 4) secretValues.push(val);
+        }
+      }
+    }
+    const maskSecrets = (chunk) => {
+      let str = chunk.toString('utf8');
+      for (const sec of secretValues) {
+        str = str.split(sec).join('[REDACTED]');
+      }
+      return str;
+    };
+    const exitCode = await new Promise((resolveExit, rejectExit) => {
+      const child = spawn(cmdPart[0], cmdPart.slice(1), {
+        env: injectedEnv,
+        stdio: ['inherit', 'pipe', 'pipe'],
+      });
+      child.stdout.on('data', (d) => process.stdout.write(maskSecrets(d)));
+      child.stderr.on('data', (d) => process.stderr.write(maskSecrets(d)));
+      child.on('error', rejectExit);
+      child.on('close', (code) => resolveExit(code ?? 0));
+    });
+    process.exitCode = exitCode;
     return;
   }
 

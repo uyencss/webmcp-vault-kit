@@ -695,3 +695,44 @@ test('integrity: non-boolean flag values are not coerced', () => {
   assert.equal(vaultRes.vault.name, 'false');
 });
 
+test('integrity: boolean flags before positional args do not swallow positionals, and run injects env with secret masking', async () => {
+  const home = tempHome();
+  parseJson(runVault(['init', '--json'], { home }));
+  const created = parseJson(runVault(['create', '--stdin-json', '--json'], {
+    home,
+    input: JSON.stringify({
+      title: 'Positional Reveal Test',
+      web: 'https://pos.example.com',
+      username: 'pos-user',
+      password: 'pos-secret-val',
+    }),
+  }));
+
+  // --reveal BEFORE positional item id
+  const revealed = parseJson(runVault(['get', '--reveal', created.item.id, '--json'], { home }));
+  assert.equal(revealed.item.password, 'pos-secret-val');
+
+  // env item + webmcp-vault run --item ... -- node -e ...
+  parseJson(runVault(['create', '--stdin-json', '--json'], {
+    home,
+    input: JSON.stringify({
+      type: 'env',
+      title: 'app-prod-env',
+      fields: [
+        { name: 'API_SECRET_TOKEN', value: 'super_secret_token_999', secret: true },
+        { name: 'PUBLIC_MODE', value: 'production', secret: false },
+      ],
+    }),
+  }));
+
+  const runRes = await runVaultAsync([
+    'run', '--item', 'app-prod-env', '--',
+    process.execPath, '-e',
+    'console.log("mode=" + process.env.PUBLIC_MODE + " len=" + process.env.API_SECRET_TOKEN.length + " leak=" + process.env.API_SECRET_TOKEN)',
+  ], { home });
+  assert.equal(runRes.status, 0, runRes.stderr);
+  assert.match(runRes.stdout, /mode=production len=22 leak=\[REDACTED\]/);
+  assert.equal(runRes.stdout.includes('super_secret_token_999'), false);
+});
+
+

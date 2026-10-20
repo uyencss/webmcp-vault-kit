@@ -3,6 +3,7 @@ const DEFAULT_VAULT_URL = 'http://127.0.0.1:7876';
 const elAppVersion = document.getElementById('appVersion');
 const elVaultDot = document.getElementById('vaultDot');
 const elVaultStateText = document.getElementById('vaultStateText');
+const elBtnTouchIdUnlock = document.getElementById('btnTouchIdUnlock');
 
 const elTabBtnAccounts = document.getElementById('tabBtnAccounts');
 const elTabBtnSettings = document.getElementById('tabBtnSettings');
@@ -15,6 +16,10 @@ const elVaultSearchInput = document.getElementById('vaultSearchInput');
 const elVaultCandidateList = document.getElementById('vaultCandidateList');
 const elVaultEmptyState = document.getElementById('vaultEmptyState');
 const elBtnOpenInlineSelector = document.getElementById('btnOpenInlineSelector');
+const elBtnGeneratePass = document.getElementById('btnGeneratePass');
+const elGeneratedPassBox = document.getElementById('generatedPassBox');
+const elGeneratedPassValue = document.getElementById('generatedPassValue');
+const elBtnCopyGeneratedPass = document.getElementById('btnCopyGeneratedPass');
 
 const elVaultUrlInput = document.getElementById('vaultUrlInput');
 const elVaultPortBadge = document.getElementById('vaultPortBadge');
@@ -64,10 +69,14 @@ function extractPortLabel(urlStr, fallback) {
 }
 
 function renderVaultPill(vaultState, latencyMs) {
-  elVaultDot.className = 'dot ' + (vaultState === 'open' ? 'open' : 'closed');
   if (vaultState === 'open') {
+    elVaultDot.className = 'dot open';
     elVaultStateText.textContent = latencyMs ? `Online · ${latencyMs}ms` : 'Online';
+  } else if (vaultState === 'locked') {
+    elVaultDot.className = 'dot connecting';
+    elVaultStateText.textContent = 'Locked · Touch ID';
   } else {
+    elVaultDot.className = 'dot closed';
     elVaultStateText.textContent = 'Offline';
   }
 }
@@ -83,14 +92,27 @@ function switchTab(tabName) {
 elTabBtnAccounts.addEventListener('click', () => switchTab('accounts'));
 elTabBtnSettings.addEventListener('click', () => switchTab('settings'));
 
-async function copyTextWithToast(value, label) {
+let clipboardClearTimer = null;
+async function copyTextWithToast(value, label, isSecret = false) {
   if (!value) {
     showToast(`No ${label} available`, true);
     return;
   }
   try {
-    await navigator.clipboard.writeText(String(value));
-    showToast(`Copied ${label}`);
+    const str = String(value);
+    await navigator.clipboard.writeText(str);
+    if (isSecret || /pass|otp|2fa/i.test(label)) {
+      if (clipboardClearTimer) clearTimeout(clipboardClearTimer);
+      clipboardClearTimer = setTimeout(async () => {
+        try {
+          const cur = await navigator.clipboard.readText().catch(() => '');
+          if (!cur || cur === str) await navigator.clipboard.writeText('');
+        } catch {}
+      }, 90000);
+      showToast(`Copied ${label} (tự xóa sau 90s)`);
+    } else {
+      showToast(`Copied ${label}`);
+    }
   } catch (err) {
     showToast(err.message || `Failed to copy ${label}`, true);
   }
@@ -259,6 +281,52 @@ async function refreshStatus({ hydrateInputs = false } = {}) {
 }
 
 elVaultSearchInput?.addEventListener('input', () => renderVaultCandidateItems());
+
+elBtnTouchIdUnlock?.addEventListener('click', async () => {
+  elBtnTouchIdUnlock.disabled = true;
+  elBtnTouchIdUnlock.textContent = '⏳ Touch ID...';
+  const res = await sendPopupRequest('unlockTouchId', {
+    reason: 'Mở khóa WebMCP Vault Companion',
+  });
+  elBtnTouchIdUnlock.disabled = false;
+  elBtnTouchIdUnlock.textContent = '🔓 Touch ID';
+  if (!res.ok) {
+    showToast(res.error || 'Touch ID failed', true);
+    return;
+  }
+  renderVaultPill('open', res.latencyMs);
+  showToast('Đã xác thực Touch ID & mở khóa Vault!');
+  await loadVaultCandidates();
+});
+
+elBtnGeneratePass?.addEventListener('click', async () => {
+  elBtnGeneratePass.disabled = true;
+  const res = await sendPopupRequest('generatePassword', {
+    tabId: currentTab?.id,
+    url: currentTab?.url,
+    length: 20,
+    fillTab: true,
+    saveToVault: true,
+  });
+  elBtnGeneratePass.disabled = false;
+  if (!res.ok || !res.password) {
+    showToast(res.error || 'Failed to generate password', true);
+    return;
+  }
+  if (elGeneratedPassBox && elGeneratedPassValue) {
+    elGeneratedPassValue.textContent = res.password;
+    elGeneratedPassBox.style.display = 'flex';
+  }
+  await copyTextWithToast(res.password, 'Mật khẩu mạnh', true);
+  if (res.saved) {
+    await loadVaultCandidates();
+  }
+});
+
+elBtnCopyGeneratedPass?.addEventListener('click', () => {
+  const val = elGeneratedPassValue?.textContent || '';
+  if (val) copyTextWithToast(val, 'Mật khẩu mạnh', true);
+});
 
 elBtnOpenInlineSelector?.addEventListener('click', async () => {
   if (!currentTab?.id) return;
