@@ -75,7 +75,7 @@ function parseFlags(args) {
       }
       continue;
     }
-    if (next && !next.startsWith('--')) {
+    if (next !== undefined && !next.startsWith('--')) {
       flags[key] = coerceFlagValue(key, next);
       i += 1;
     } else {
@@ -92,16 +92,16 @@ function printUsage() {
 Usage:
   webmcp-vault doctor [--json]
   webmcp-vault init [--force] [--json]
-  webmcp-vault list [--search <text>] [--web <url>] [--vault <vault-id>] [--json]
-  webmcp-vault resolve [query] [--web <url>] [--vault <vault-id>] [--json]
-  webmcp-vault get <id-or-query> [--web <url>] [--vault <vault-id>] [--reveal] [--json]
-  webmcp-vault read <id-or-query> <field> [--vault <vault-id>] [--json]
-  webmcp-vault read --web <url> <field> [--vault <vault-id>] [--json]
+  webmcp-vault list [--search <text>] [--web <url>] [--vault <vault-id>] [--tag <a,b>] [--json]
+  webmcp-vault resolve [query] [--web <url>] [--vault <vault-id>] [--tag <a,b>] [--json]
+  webmcp-vault get <id-or-query> [--web <url>] [--vault <vault-id>] [--tag <a,b>] [--reveal] [--json]
+  webmcp-vault read <id-or-query> <field> [--vault <vault-id>] [--tag <a,b>] [--json]
+  webmcp-vault read --web <url> <field> [--vault <vault-id>] [--tag <a,b>] [--json]
   webmcp-vault run [--item <id-or-query>] [--vault <vault-id>] -- <cmd> [args...]
   webmcp-vault ssh-add <id-or-query> [--ttl <seconds>] [--vault <vault-id>] [--json]
   webmcp-vault keychain-save [--json]
-  webmcp-vault create (--stdin-json | --input-json <file>) [--vault <vault-id>] [--json]
-  webmcp-vault update <id-or-query> (--stdin-json | --input-json <file>) [--vault <vault-id>] [--json]
+  webmcp-vault create (--stdin-json | --input-json <file>) [--vault <vault-id>] [--tags <a,b>] [--json]
+  webmcp-vault update <id-or-query> [(--stdin-json | --input-json <file>)] [--vault <vault-id>] [--tags <a,b>] [--json]
   webmcp-vault import <file.csv> [--preview] [--vault <vault-id>] [--json]
   webmcp-vault env-import <file.env> --title <title> [--vault <vault-id>] [--project <id>] [--preview] [--json]
   webmcp-vault backup [--output <file>] [--force] [--json]
@@ -379,21 +379,37 @@ async function run(args) {
   }
 
   if (subcommand === 'list') {
-    const items = store.listItems({ search: flags.search, web: flags.web, vaultId: flags.vault });
+    const items = store.listItems({
+      search: flags.search,
+      web: flags.web,
+      vaultId: flags.vault,
+      tag: flags.tag ?? flags.tags,
+    });
     printJsonOrHuman({ items, count: items.length }, json);
     return;
   }
 
   if (subcommand === 'resolve') {
-    const item = store.resolve(positional[0] || flags.search || '', { web: flags.web, vaultId: flags.vault });
+    const item = store.resolve(positional[0] || flags.search || '', {
+      web: flags.web,
+      vaultId: flags.vault,
+      tag: flags.tag ?? flags.tags,
+    });
     printJsonOrHuman({ item }, json);
     return;
   }
 
   if (subcommand === 'get') {
     const identifier = positional[0];
-    if (!identifier && !flags.web) throw new Error('Usage: webmcp-vault get <id-or-query> [--web <url>]');
-    const item = store.getItem(identifier || '', { web: flags.web, vaultId: flags.vault, reveal: flags.reveal === true });
+    if (!identifier && !flags.web && flags.tag === undefined && flags.tags === undefined) {
+      throw new Error('Usage: webmcp-vault get <id-or-query> [--web <url>] [--tag <a,b>]');
+    }
+    const item = store.getItem(identifier || '', {
+      web: flags.web,
+      vaultId: flags.vault,
+      tag: flags.tag ?? flags.tags,
+      reveal: flags.reveal === true,
+    });
     printJsonOrHuman({ item }, json);
     return;
   }
@@ -401,14 +417,18 @@ async function run(args) {
   if (subcommand === 'read') {
     let identifier = positional[0];
     let field = positional[1];
-    if (flags.web && positional.length === 1) {
+    if ((flags.web || flags.tag !== undefined || flags.tags !== undefined) && positional.length === 1) {
       identifier = '';
       field = positional[0];
     }
     if (!field) {
       throw new Error('Usage: webmcp-vault read <id-or-query> <field> or webmcp-vault read --web <url> <field>');
     }
-    const item = store.resolve(identifier || '', { web: flags.web, vaultId: flags.vault });
+    const item = store.resolve(identifier || '', {
+      web: flags.web,
+      vaultId: flags.vault,
+      tag: flags.tag ?? flags.tags,
+    });
     const value = store.readField(item.id, field);
     printJsonOrHuman({ id: item.id, field, value }, json, value);
     return;
@@ -501,6 +521,7 @@ async function run(args) {
     const input = await readVaultItemInput(flags);
     if (!input) throw new Error('Use --stdin-json or --input-json <file> for vault writes.');
     if (flags.vault) input.vaultId = String(flags.vault);
+    if (Object.hasOwn(flags, 'tags')) input.tags = flags.tags;
     const item = store.createItem(input);
     printJsonOrHuman({ item }, json, `Created vault item ${item.id}`);
     return;
@@ -606,10 +627,16 @@ async function run(args) {
 
   if (subcommand === 'update') {
     const identifier = positional[0];
-    if (!identifier) throw new Error('Usage: webmcp-vault update <id-or-query> (--stdin-json | --input-json <file>) [--vault <vault-id>]');
-    const input = await readVaultItemInput(flags);
-    if (!input) throw new Error('Use --stdin-json or --input-json <file> for vault writes.');
+    if (!identifier) {
+      throw new Error('Usage: webmcp-vault update <id-or-query> [(--stdin-json | --input-json <file>)] [--vault <vault-id>] [--tags <a,b>]');
+    }
+    const rawInput = await readVaultItemInput(flags);
+    if (!rawInput && !flags.vault && !Object.hasOwn(flags, 'tags')) {
+      throw new Error('Use --stdin-json, --input-json <file>, --vault <id>, or --tags <a,b> for vault writes.');
+    }
+    const input = rawInput || {};
     if (flags.vault) input.vaultId = String(flags.vault);
+    if (Object.hasOwn(flags, 'tags')) input.tags = flags.tags;
     if (flags['drop-fields'] === true) input.dropFields = true;
     const item = store.updateItem(identifier, input);
     printJsonOrHuman({ item }, json, `Updated vault item ${item.id}`);

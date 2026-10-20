@@ -326,7 +326,7 @@
                 type="search"
                 autocomplete="off"
                 aria-label="Search saved logins"
-                placeholder="Search title, user, or site"
+                placeholder="Search title, user, site, or #tag"
               />
             </div>
             <ul class="list" id="itemList"></ul>
@@ -599,6 +599,26 @@
                   <svg class="btn-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14"></path></svg>
                   Add field
                 </button>
+              </div>
+
+              <div class="field wide" id="tagsCard">
+                <label for="tags" class="field-label-with-icon">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+                  <span>Tags</span>
+                </label>
+                <span
+                  class="view-field view-only"
+                  id="tagsViewField"
+                  aria-label="Item tags"
+                ></span>
+                <input
+                  class="mono edit-only"
+                  id="tags"
+                  autocomplete="off"
+                  maxlength="512"
+                  placeholder="ai-pro, 2tb, verified"
+                />
+                <span class="hint edit-only">Comma-separated tags (lowercase, e.g. ai-pro, ai-ultra, 2tb).</span>
               </div>
 
               <div class="field wide type-login-field" id="noteCard">

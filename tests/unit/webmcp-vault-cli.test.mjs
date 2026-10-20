@@ -735,4 +735,60 @@ test('integrity: boolean flags before positional args do not swallow positionals
   assert.equal(runRes.stdout.includes('super_secret_token_999'), false);
 });
 
+test('webmcp vault CLI supports --tags on create/update (including clearing with --tags "") and --tag filtering on list/resolve/get/read', () => {
+  const home = tempHome();
+  parseJson(runVault(['init', '--json'], { home }));
+
+  const item1 = parseJson(runVault(['create', '--stdin-json', '--tags', 'ai-ultra,2tb', '--json'], {
+    home,
+    input: JSON.stringify({
+      title: 'Gmail - harry2906090',
+      web: 'https://accounts.google.com',
+      username: 'harry2906090@gmail.com',
+      password: 'ultra-password',
+    }),
+  })).item;
+  assert.deepEqual(item1.tags, ['ai-ultra', '2tb']);
+
+  const item2 = parseJson(runVault(['create', '--stdin-json', '--json'], {
+    home,
+    input: JSON.stringify({
+      title: 'Gmail - normal',
+      web: 'https://accounts.google.com',
+      username: 'normal@gmail.com',
+      password: 'normal-password',
+    }),
+  })).item;
+  assert.deepEqual(item2.tags, []);
+
+  // Update tags via CLI flag without requiring --stdin-json
+  const updated2 = parseJson(runVault(['update', item2.id, '--tags', 'ai-pro,2tb', '--json'], { home })).item;
+  assert.deepEqual(updated2.tags, ['ai-pro', '2tb']);
+
+  // Filter list by --tag
+  const ultraList = parseJson(runVault(['list', '--tag', 'ai-ultra', '--json'], { home }));
+  assert.equal(ultraList.count, 1);
+  assert.equal(ultraList.items[0].id, item1.id);
+
+  const both2tb = parseJson(runVault(['list', '--tag', '2tb', '--json'], { home }));
+  assert.equal(both2tb.count, 2);
+
+  // Resolve and read disambiguated by --tag
+  const resolvedPro = parseJson(runVault(['resolve', 'Gmail', '--tag', 'ai-pro', '--json'], { home }));
+  assert.equal(resolvedPro.item.id, item2.id);
+
+  const readUltraPass = parseJson(runVault(['read', '--tag', 'ai-ultra', 'password', '--json'], { home }));
+  assert.equal(readUltraPass.id, item1.id);
+  assert.equal(readUltraPass.value, 'ultra-password');
+
+  // Clear tags using --tags ""
+  const cleared2 = parseJson(runVault(['update', item2.id, '--tags', '', '--json'], { home })).item;
+  assert.deepEqual(cleared2.tags, []);
+
+  // Passing --tags with no value errors clearly
+  const bareTags = runVault(['update', item2.id, '--tags', '--json'], { home });
+  assert.notEqual(bareTags.status, 0);
+  assert.match(bareTags.stderr, /tags must be a comma-separated string or an array of strings/);
+});
+
 

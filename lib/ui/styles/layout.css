@@ -229,6 +229,41 @@
   display: block;
   flex: none;
 }
+.item-tags {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+  margin-top: 2px;
+}
+.item-tag-badge {
+  display: inline-block;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.4;
+  background: var(--live-weak);
+  color: var(--live);
+  border: 1px solid color-mix(in srgb, var(--live) 25%, transparent);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.item-tag-badge:hover {
+  background: color-mix(in srgb, var(--live) 22%, var(--surface));
+}
+.view-tags-list {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
 .vault-sidebar-foot {
   display: flex;
   gap: var(--s2);

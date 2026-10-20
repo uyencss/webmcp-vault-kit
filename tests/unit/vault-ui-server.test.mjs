@@ -139,7 +139,7 @@ test('vault UI serves the Lockbox design with strict CSP and no old teal accent'
   assert.match(html, /Vault is locked/);
   assert.match(html, /WEBMCP_VAULT_KEY/);
   assert.match(html, /id="appView"/);
-  assert.match(html, /placeholder="Search title, user, or site"/);
+  assert.match(html, /placeholder="Search title, user, site, or #tag"/);
   assert.match(html, /aria-label="Search saved logins"/);
   assert.match(html, /<ul class="list" id="itemList"><\/ul>/);
   assert.match(html, /id="totpBlock"/);
@@ -307,10 +307,26 @@ test('vault UI API manages vaults, filters items, and moves items on deletion', 
   const createdItem = await (await fetch(`${base}/items`, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ title: 'Work Login', vaultId: work.id }),
+    body: JSON.stringify({ title: 'Work Login', vaultId: work.id, tags: ['ai-ultra', '2tb'] }),
   })).json();
+  assert.deepEqual(createdItem.item.tags, ['ai-ultra', '2tb']);
   const filtered = await (await fetch(`${base}/items?vault=${work.id}`, { headers })).json();
   assert.deepEqual(filtered.items.map((item) => item.id), [createdItem.item.id]);
+
+  const byTag = await (await fetch(`${base}/items?tag=ai-ultra`, { headers })).json();
+  assert.deepEqual(byTag.items.map((item) => item.id), [createdItem.item.id]);
+
+  const byHashSearch = await (await fetch(`${base}/items?search=${encodeURIComponent('#ai-ultra')}`, { headers })).json();
+  assert.deepEqual(byHashSearch.items.map((item) => item.id), [createdItem.item.id]);
+
+  const badTagRes = await fetch(`${base}/items?tag=${encodeURIComponent('bad tag')}`, { headers });
+  assert.equal(badTagRes.status, 400);
+  assert.match((await badTagRes.json()).error, /Invalid tag/);
+
+  const itemListJs = await (await fetch(`http://127.0.0.1:${ui.port}/assets/app/item-list.js`)).text();
+  assert.match(itemListJs, /tagsLine\.className = 'item-tags'/);
+  assert.match(itemListJs, /body\.append\(tagsLine\)/);
+  assert.doesNotMatch(itemListJs, /badges\.append\(tagBadge\)/);
 
   const deleteResponse = await fetch(
     `${base}/vaults/${encodeURIComponent(work.id)}?moveTo=${encodeURIComponent(personal.id)}`,

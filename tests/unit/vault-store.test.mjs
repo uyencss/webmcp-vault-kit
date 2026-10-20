@@ -884,3 +884,101 @@ test('nested vaults: create, update with parentId, prevent circular hierarchy, a
   const foundSubChild = remaining.find((v) => v.id === subChild.id);
   assert.equal(foundSubChild.parentId, parent.id);
 });
+
+test('item tags: normalizeTags, create/update preservation, #tag search, and AND tag filtering', () => {
+  const dataDir = tempHome();
+  const store = createVaultStore({ dataDir, key: 'test-item-tags-key-1234' });
+  store.init();
+
+  const itemUltra = store.createItem({
+    title: 'Gmail - harry2906090',
+    web: 'https://accounts.google.com',
+    username: 'harry2906090@gmail.com',
+    password: 'pw1',
+    tags: ' #AI-Ultra , 2TB , verified , ai-ultra ',
+  });
+  assert.deepEqual(itemUltra.tags, ['ai-ultra', '2tb', 'verified']);
+
+  const itemPro = store.createItem({
+    title: 'Gmail - pro1',
+    web: 'https://accounts.google.com',
+    username: 'pro1@gmail.com',
+    password: 'pw2',
+    tags: ['AI-Pro', '2TB'],
+  });
+  assert.deepEqual(itemPro.tags, ['ai-pro', '2tb']);
+
+  const itemPlain = store.createItem({
+    title: 'Gmail - plain',
+    web: 'https://accounts.google.com',
+    username: 'plain@gmail.com',
+  });
+  assert.deepEqual(itemPlain.tags, []);
+
+  // Typed item also supports tags
+  const envItem = store.createItem({
+    type: 'api_token',
+    title: 'Gemini API Token',
+    fields: [{ name: 'token', value: 'AIzaSyTest', secret: true }],
+    tags: 'ai-ultra, gemini:v1',
+  });
+  assert.deepEqual(envItem.tags, ['ai-ultra', 'gemini:v1']);
+
+  // Updating without tags preserves existing tags
+  const updatedTitleOnly = store.updateItem(itemUltra.id, { title: 'Gmail - harry2906090 (Main)' });
+  assert.deepEqual(updatedTitleOnly.tags, ['ai-ultra', '2tb', 'verified']);
+
+  // Filtering by single tag
+  const ultraOnly = store.listItems({ tag: 'ai-ultra' });
+  assert.deepEqual(
+    ultraOnly.map((i) => i.id).sort(),
+    [itemUltra.id, envItem.id].sort(),
+  );
+
+  // Filtering by multiple tags (AND semantics)
+  const twoTbPro = store.listItems({ tag: '2tb,ai-pro' });
+  assert.deepEqual(twoTbPro.map((i) => i.id), [itemPro.id]);
+
+  // Search by #tag and substring
+  const hashSearch = store.listItems({ search: '#ai-pro' });
+  assert.deepEqual(hashSearch.map((i) => i.id), [itemPro.id]);
+
+  const prefixHashSearch = store.listItems({ search: '#ai-' });
+  assert.equal(prefixHashSearch.length, 3);
+
+  // resolve and getItem with tag disambiguation
+  const resolvedUltra = store.resolve('Gmail', { tag: 'ai-ultra' });
+  assert.equal(resolvedUltra.id, itemUltra.id);
+
+  // Clearing tags with empty string or empty array
+  const cleared = store.updateItem(itemPro.id, { tags: '' });
+  assert.deepEqual(cleared.tags, []);
+  const reTagged = store.updateItem(itemPro.id, { tags: ['ai-pro', '2tb'] });
+  assert.deepEqual(reTagged.tags, ['ai-pro', '2tb']);
+  const clearedArray = store.updateItem(itemPro.id, { tags: [] });
+  assert.deepEqual(clearedArray.tags, []);
+
+  // Tags survive a type change (login -> api_token) when tags are omitted
+  const convertedType = store.updateItem(itemUltra.id, {
+    type: 'api_token',
+    fields: [{ name: 'token', value: 'converted-secret', secret: true }],
+    dropFields: true,
+  });
+  assert.equal(convertedType.type, 'api_token');
+  assert.deepEqual(convertedType.tags, ['ai-ultra', '2tb', 'verified']);
+
+  // Reject invalid tag syntax or > 20 tags
+  assert.throws(
+    () => store.createItem({ title: 'Bad Tag', tags: ['bad tag with spaces'] }),
+    /Invalid tag/,
+  );
+  assert.throws(
+    () => store.listItems({ tag: 'bad tag' }),
+    /Invalid tag/,
+  );
+  const twentyOneTags = Array.from({ length: 21 }, (_, idx) => `tag-${idx}`);
+  assert.throws(
+    () => store.createItem({ title: 'Too Many Tags', tags: twentyOneTags }),
+    /tags cannot exceed 20 entries/,
+  );
+});
