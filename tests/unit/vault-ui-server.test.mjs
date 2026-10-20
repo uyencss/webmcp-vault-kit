@@ -325,7 +325,7 @@ test('vault UI API manages vaults, filters items, and moves items on deletion', 
 
   const itemListJs = await (await fetch(`http://127.0.0.1:${ui.port}/assets/app/item-list.js`)).text();
   assert.match(itemListJs, /tagsLine\.className = 'item-tags'/);
-  assert.match(itemListJs, /body\.append\(tagsLine\)/);
+  assert.match(itemListJs, /head\.append\(tagsLine\)/);
   assert.doesNotMatch(itemListJs, /badges\.append\(tagBadge\)/);
 
   const deleteResponse = await fetch(
