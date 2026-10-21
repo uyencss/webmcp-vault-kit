@@ -2,7 +2,7 @@
 
 import process from 'node:process';
 import { spawn, spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -17,6 +17,28 @@ function getVaultStore() {
 
 function getVaultBroker() {
   return requireFromBin(resolve(ROOT, 'lib', 'broker.js'));
+}
+
+function openVaultMacApp({ background = false } = {}) {
+  const appPath = '/Applications/WebMCP Vault.app';
+  const localAppPath = resolve(ROOT, 'platforms', 'macos', 'build', 'WebMCP Vault.app');
+  let buildError = '';
+  if (!existsSync(appPath) && !existsSync(localAppPath)) {
+    const buildScript = resolve(ROOT, 'platforms', 'macos', 'build.sh');
+    if (existsSync(buildScript)) {
+      const buildRes = spawnSync('bash', [buildScript], { encoding: 'utf8' });
+      if (buildRes.status !== 0) {
+        buildError = (buildRes.stderr || buildRes.stdout || 'Build failed (ensure Xcode Command Line Tools are installed via `xcode-select --install`)').trim();
+      }
+    }
+  }
+  const targetApp = existsSync(appPath) ? appPath : localAppPath;
+  if (existsSync(targetApp)) {
+    const openArgs = background ? ['-g', '-a', targetApp, '--args', '--tray'] : ['-a', targetApp];
+    spawnSync('/usr/bin/open', openArgs, { stdio: 'ignore' });
+    return { ok: true, app: true, appPath: targetApp };
+  }
+  return { ok: false, app: false, error: buildError || 'App bundle not found (ensure Xcode Command Line Tools are installed)' };
 }
 
 const KNOWN_BOOLEAN_FLAGS = new Set([
@@ -38,6 +60,8 @@ const KNOWN_BOOLEAN_FLAGS = new Set([
   'bypass-token',
   'public',
   'tailnet',
+  'app',
+  'no-tray',
 ]);
 
 const BOOLEAN_VALUE_LITERALS = new Set(['true', 'false', '1', '0', 'yes', 'no']);
@@ -118,7 +142,9 @@ Usage:
   webmcp-vault update-vault <vault-id> [--name <name>] [--description <text>] [--icon <icon>] [--json]
   webmcp-vault update-vault <vault-id> (--stdin-json | --input-json <file>) [--json]
   webmcp-vault delete-vault <vault-id> [--move-to <vault-id>] --confirm [--json]
-  webmcp-vault ui [status|stop|ensure] [--daemon] [--ensure] [--status] [--stop] [--host 127.0.0.1] [--port 7876] [--json]
+  webmcp-vault autostart [on|off|status] [--json]
+  webmcp-vault app [--json]
+  webmcp-vault ui [status|stop|ensure] [--daemon] [--ensure] [--status] [--stop] [--app] [--autostart [on|off|status]] [--host 127.0.0.1] [--port 7876] [--json]
 
 Fields for read:
   username, password, otp, note, web, title, otpSecret
@@ -754,6 +780,62 @@ async function run(args) {
     return;
   }
 
+  if (subcommand === 'autostart' || (subcommand === 'ui' && (flags.autostart !== undefined || positional[0] === 'autostart'))) {
+    const rawAction = subcommand === 'autostart'
+      ? (positional[0] || (typeof flags.autostart === 'string' ? flags.autostart : 'status'))
+      : (typeof flags.autostart === 'string' ? flags.autostart : (positional[0] === 'autostart' ? positional[1] || 'status' : 'status'));
+    const action = String(rawAction).toLowerCase();
+    const host = String(flags.host || '127.0.0.1');
+    const port = Number(flags.port || 7876);
+    const { getAutostartInfo, enableAutostart, disableAutostart } = requireFromBin(resolve(ROOT, 'lib', 'autostart.js'));
+
+    if (action === 'on' || action === 'enable' || action === 'true') {
+      const result = enableAutostart({ host, port });
+      printJsonOrHuman(result, json, result.message || 'Autostart enabled.');
+      if (!result.success) process.exit(1);
+      return;
+    }
+    if (action === 'off' || action === 'disable' || action === 'false') {
+      const result = disableAutostart();
+      printJsonOrHuman(result, json, result.message || 'Autostart disabled.');
+      if (!result.success) process.exit(1);
+      return;
+    }
+    if (action === 'status') {
+      const info = getAutostartInfo();
+      const message = info.enabled
+        ? `Autostart is enabled (${info.platform}): ${info.targetPath}`
+        : `Autostart is disabled (${info.platform}): ${info.targetPath}`;
+      printJsonOrHuman(info, json, message);
+      return;
+    }
+    throw new Error(`Unknown autostart action: ${action}. Expected 'on', 'off', or 'status'.`);
+  }
+
+  if (subcommand === 'app' || (subcommand === 'ui' && (flags.app || positional[0] === 'app'))) {
+    const host = String(flags.host || '127.0.0.1');
+    const port = Number(flags.port || 7876);
+    const bypassToken = Boolean(flags['bypass-token'] || flags.public || flags.tailnet || process.env.WEBMCP_VAULT_BYPASS_TOKEN === '1' || host === '0.0.0.0');
+    const { ensureVaultUiServer } = requireFromBin(resolve(ROOT, 'lib', 'ui-server.js'));
+    const uiResult = await ensureVaultUiServer({ host, port, bypassToken });
+
+    if (process.platform === 'darwin') {
+      const appResult = openVaultMacApp();
+      const payload = { ok: appResult.ok, app: appResult.app, appPath: appResult.appPath, url: uiResult.url, error: appResult.error };
+      printJsonOrHuman(
+        payload,
+        json,
+        appResult.ok ? `WebMCP Vault App launched (${appResult.appPath}) -> ${uiResult.url}` : `Failed to launch app: ${appResult.error}`,
+      );
+      if (!appResult.ok) process.exit(1);
+      return;
+    }
+
+    const payload = { ok: true, app: false, message: 'WebMCP Vault native wrapper is available on macOS. UI daemon is running.', url: uiResult.url };
+    printJsonOrHuman(payload, json, payload.message);
+    return;
+  }
+
   if (subcommand === 'ui') {
     const action = positional[0];
     const isDaemon = Boolean(flags.daemon || flags.detach || flags.background || action === 'daemon');
@@ -797,6 +879,14 @@ async function run(args) {
     }
 
     const server = await startVaultUiServer({ host, port, bypassToken });
+    if (process.platform === 'darwin' && flags['no-tray'] !== true && process.env.NODE_TEST_CONTEXT === undefined) {
+      try {
+        const pgrep = spawnSync('/usr/bin/pgrep', ['-f', 'WebMCP Vault.app/Contents/MacOS/WebMCP Vault'], { stdio: 'ignore' });
+        if (pgrep.status !== 0) {
+          openVaultMacApp({ background: true });
+        }
+      } catch {}
+    }
     const payload = { ok: true, url: server.url, host: server.host, port: server.port, token: server.token, pid: process.pid };
     if (json) console.log(JSON.stringify(payload, null, 2));
     else console.log(`WebMCP vault UI: ${server.url}`);

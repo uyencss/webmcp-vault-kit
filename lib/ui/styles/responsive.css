@@ -7,9 +7,19 @@
 }
 @media (max-width: 900px) {
   .app-shell {
-    min-height: 0;
+    height: auto;
+    min-height: 100dvh;
     display: block;
-    padding: var(--s4);
+    padding: 0;
+    overflow: visible;
+  }
+  .app {
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+  html.is-mac-app .bar {
+    padding-left: 86px;
   }
   .main.has-selected-item .vault-sidebar,
   .main.has-selected-item .rail {
