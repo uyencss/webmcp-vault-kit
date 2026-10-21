@@ -42,6 +42,20 @@ html.is-mac-app .lock-shell {
 .popover-only {
   display: none !important;
 }
+html.is-mac-popover,
+html.is-mac-popover body {
+  height: 100dvh !important;
+  max-height: 100dvh !important;
+  overflow: hidden !important;
+}
+html.is-mac-popover .app-shell,
+html.is-mac-popover .app {
+  height: 100dvh !important;
+  max-height: 100dvh !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+}
 html.is-mac-popover .popover-only {
   display: inline-grid !important;
 }
@@ -58,8 +72,8 @@ html.is-mac-popover .bar #lockButton {
   display: none !important;
 }
 html.is-mac-popover .main {
-  flex: 1 1 auto !important;
-  height: 100% !important;
+  flex: 1 1 0% !important;
+  height: auto !important;
   min-height: 0 !important;
   display: flex !important;
   flex-direction: column !important;
@@ -69,11 +83,13 @@ html.is-mac-popover .vault-sidebar {
   display: none !important;
 }
 html.is-mac-popover .rail {
-  flex: 1 1 auto !important;
-  height: 100% !important;
+  flex: 1 1 0% !important;
+  height: auto !important;
+  min-height: 0 !important;
   max-height: none !important;
   border-right: 0 !important;
   border-bottom: 0 !important;
+  overflow: hidden !important;
 }
 html.is-mac-popover .main:not(.has-selected-item) .detail {
   display: none !important;
@@ -82,8 +98,9 @@ html.is-mac-popover .main.has-selected-item .rail {
   display: none !important;
 }
 html.is-mac-popover .main.has-selected-item .detail {
-  flex: 1 1 auto !important;
-  height: 100% !important;
+  flex: 1 1 0% !important;
+  height: auto !important;
+  min-height: 0 !important;
   overflow: hidden !important;
 }
 html.is-mac-popover .detail-scroll {

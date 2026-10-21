@@ -6,22 +6,25 @@
   display: none !important;
 }
 @media (max-width: 900px) {
-  .app-shell {
-    height: auto;
-    min-height: 100dvh;
-    display: block;
-    padding: 0;
-    overflow: visible;
-  }
+  .app-shell,
   .app {
-    height: auto;
+    height: 100dvh;
+    max-height: 100dvh;
     min-height: 100dvh;
-    overflow: visible;
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    overflow: hidden;
   }
   html.is-mac-app .bar {
     padding-left: 86px;
   }
-  .main.has-selected-item .vault-sidebar,
+  .vault-sidebar {
+    display: none !important;
+  }
+  .main:not(.has-selected-item) .detail {
+    display: none !important;
+  }
   .main.has-selected-item .rail {
     display: none !important;
   }
@@ -35,36 +38,41 @@
     margin-bottom: var(--s2);
   }
   .bar {
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
   }
   .path {
     display: none;
   }
   .bar-right {
-    width: 100%;
-    justify-content: space-between;
+    width: auto;
+    justify-content: flex-end;
   }
   .status {
     max-width: none;
     text-align: left;
   }
   .main {
+    flex: 1 1 0%;
+    min-height: 0;
     height: auto;
-    grid-template-columns: 1fr;
-  }
-  .vault-sidebar {
-    max-height: 280px;
-    border-right: 0;
-    border-bottom: var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
   }
   .rail {
+    flex: 1 1 0%;
     height: auto;
-    max-height: min(340px, 45vh);
+    min-height: 0;
+    max-height: none;
     border-right: 0;
-    border-bottom: var(--border);
+    border-bottom: 0;
+    overflow: hidden;
   }
   .detail {
-    overflow: visible;
+    flex: 1 1 0%;
+    height: auto;
+    min-height: 0;
+    overflow: hidden;
   }
   .grid {
     grid-template-columns: 1fr;
