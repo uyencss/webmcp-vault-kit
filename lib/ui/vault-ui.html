@@ -354,6 +354,32 @@
                   placeholder="Search title, user, site, or #tag"
                 />
               </div>
+              <details class="sort-menu" id="vaultFilterMenu">
+                <summary
+                  class="sort-trigger"
+                  id="vaultFilterButton"
+                  aria-label="Filter by vault folder"
+                  title="All items"
+                >
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                  </svg>
+                </summary>
+                <div class="sort-popover" id="vaultFilterPopover">
+                  <div class="sort-header">VAULT SCOPE</div>
+                  <div class="vault-filter-list" id="vaultFilterList"></div>
+                </div>
+              </details>
               <details class="sort-menu" id="sortMenu">
                 <summary
                   class="sort-trigger"
