@@ -39,6 +39,72 @@ html.is-mac-app .bar {
 html.is-mac-app .lock-shell {
   padding-top: 56px;
 }
+.popover-only {
+  display: none !important;
+}
+html.is-mac-popover .popover-only {
+  display: inline-grid !important;
+}
+html.is-mac-popover .bar {
+  padding: var(--s2) var(--s3);
+  min-height: 44px;
+}
+html.is-mac-popover .bar-right {
+  width: auto !important;
+  gap: 4px;
+}
+html.is-mac-popover .bar .status,
+html.is-mac-popover .bar #lockButton {
+  display: none !important;
+}
+html.is-mac-popover .main {
+  flex: 1 1 auto !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+}
+html.is-mac-popover .vault-sidebar {
+  display: none !important;
+}
+html.is-mac-popover .rail {
+  flex: 1 1 auto !important;
+  height: 100% !important;
+  max-height: none !important;
+  border-right: 0 !important;
+  border-bottom: 0 !important;
+}
+html.is-mac-popover .main:not(.has-selected-item) .detail {
+  display: none !important;
+}
+html.is-mac-popover .main.has-selected-item .rail {
+  display: none !important;
+}
+html.is-mac-popover .main.has-selected-item .detail {
+  flex: 1 1 auto !important;
+  height: 100% !important;
+  overflow: hidden !important;
+}
+html.is-mac-popover .detail-scroll {
+  padding: var(--s4) !important;
+}
+html.is-mac-popover .detail-actions {
+  padding: var(--s2) var(--s4) !important;
+}
+html.is-mac-popover .lock-shell {
+  min-height: 100dvh;
+  padding: var(--s3);
+}
+html.is-mac-popover .lockcard {
+  padding: var(--s5);
+  box-shadow: none;
+  border: 0;
+}
+html.is-mac-popover .list-row .item-quick-actions {
+  display: inline-flex;
+  opacity: 0.85;
+}
 .brand {
   min-width: 0;
   display: flex;

@@ -1,9 +1,11 @@
 #import <Cocoa/Cocoa.h>
 #import <WebKit/WebKit.h>
 
-@interface AppDelegate : NSObject <NSApplicationDelegate, NSWindowDelegate, WKNavigationDelegate, WKUIDelegate>
+@interface AppDelegate : NSObject <NSApplicationDelegate, NSWindowDelegate, NSPopoverDelegate, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler>
 @property (strong, nonatomic) NSStatusItem *statusItem;
 @property (strong, nonatomic) NSMenu *statusMenu;
+@property (strong, nonatomic) NSPopover *popover;
+@property (strong, nonatomic) WKWebView *popoverWebView;
 @property (strong, nonatomic) NSWindow *window;
 @property (strong, nonatomic) WKWebView *webView;
 @property (copy, nonatomic) NSString *explicitUrl;
@@ -26,6 +28,7 @@
 
     [self setupMainMenu];
     [self setupStatusItem];
+    [self setupPopover];
     [self setupMainWindow];
     [self loadWebContent];
     if (self.startInTray) {
@@ -126,6 +129,32 @@
     }
 }
 
+- (void)setupPopover {
+    WKWebViewConfiguration *popConfig = [[WKWebViewConfiguration alloc] init];
+    WKUserContentController *popContent = [[WKUserContentController alloc] init];
+    [popContent addScriptMessageHandler:self name:@"openFullApp"];
+    NSString *popScriptSource = @"document.documentElement.classList.add('is-mac-popover');";
+    WKUserScript *popScript = [[WKUserScript alloc] initWithSource:popScriptSource
+                                                     injectionTime:WKUserScriptInjectionTimeAtDocumentStart
+                                                  forMainFrameOnly:YES];
+    [popContent addUserScript:popScript];
+    popConfig.userContentController = popContent;
+
+    self.popoverWebView = [[WKWebView alloc] initWithFrame:NSMakeRect(0, 0, 380, 560) configuration:popConfig];
+    self.popoverWebView.navigationDelegate = self;
+    self.popoverWebView.UIDelegate = self;
+
+    NSViewController *popoverVC = [[NSViewController alloc] init];
+    popoverVC.view = self.popoverWebView;
+    popoverVC.preferredContentSize = NSMakeSize(380, 560);
+
+    self.popover = [[NSPopover alloc] init];
+    self.popover.contentSize = NSMakeSize(380, 560);
+    self.popover.behavior = NSPopoverBehaviorTransient;
+    self.popover.contentViewController = popoverVC;
+    self.popover.delegate = self;
+}
+
 - (void)setupMainWindow {
     NSRect frame = NSMakeRect(0, 0, 1200, 780);
     NSUInteger styleMask = NSWindowStyleMaskTitled |
@@ -145,6 +174,7 @@
 
     WKWebViewConfiguration *webConfig = [[WKWebViewConfiguration alloc] init];
     WKUserContentController *contentController = [[WKUserContentController alloc] init];
+    [contentController addScriptMessageHandler:self name:@"openFullApp"];
     NSString *macAppScriptSource = @"document.documentElement.classList.add('is-mac-app');";
     WKUserScript *macAppScript = [[WKUserScript alloc] initWithSource:macAppScriptSource
                                                         injectionTime:WKUserScriptInjectionTimeAtDocumentStart
@@ -164,6 +194,7 @@
     if (url) {
         NSURLRequest *req = [NSURLRequest requestWithURL:url cachePolicy:NSURLRequestReloadIgnoringLocalCacheData timeoutInterval:10.0];
         [self.webView loadRequest:req];
+        [self.popoverWebView loadRequest:req];
     }
 }
 
@@ -205,6 +236,9 @@
 }
 
 - (void)showMainWindow {
+    if (self.popover.isShown) {
+        [self.popover performClose:nil];
+    }
     [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
     [self.window makeKeyAndOrderFront:nil];
     [NSApp activateIgnoringOtherApps:YES];
@@ -224,17 +258,31 @@
     return YES;
 }
 
+- (void)togglePopover:(NSStatusBarButton *)sender {
+    if (self.popover.isShown) {
+        [self.popover performClose:sender];
+    } else if (sender) {
+        [self.popover showRelativeToRect:sender.bounds ofView:sender preferredEdge:NSRectEdgeMinY];
+        [self.popover.contentViewController.view.window makeKeyWindow];
+        [self.popover.contentViewController.view.window makeFirstResponder:self.popoverWebView];
+        [NSApp activateIgnoringOtherApps:YES];
+    }
+}
+
 - (void)handleStatusItemClick:(NSStatusBarButton *)sender {
     NSEvent *event = [NSApp currentEvent];
     if (event.type == NSEventTypeRightMouseUp) {
         [self.statusMenu popUpMenuPositioningItem:nil atLocation:NSMakePoint(0, sender.bounds.size.height + 4) inView:sender];
         return;
     }
-    if (self.window.isVisible && [self.window isKeyWindow]) {
-        [self.window orderOut:nil];
-        [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
-    } else {
-        [self showMainWindow];
+    [self togglePopover:sender];
+}
+
+- (void)userContentController:(WKUserContentController *)userContentController didReceiveScriptMessage:(WKScriptMessage *)message {
+    if ([message.name isEqualToString:@"openFullApp"]) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self showMainWindow];
+        });
     }
 }
 
