@@ -20,6 +20,7 @@
     "./approval-receipt": "./lib/approval-receipt.js",
     "./broker": "./lib/broker.js",
     "./ui-server": "./lib/ui-server.js",
+    "./autostart": "./lib/autostart.js",
     "./bin": "./bin/webmcp-vault.mjs",
     "./package.json": "./package.json"
   },
