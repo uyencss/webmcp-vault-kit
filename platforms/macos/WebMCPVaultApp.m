@@ -92,22 +92,23 @@
 }
 
 - (void)setupStatusItem {
-    self.statusItem = [[NSStatusBar systemStatusBar] statusItemWithLength:NSVariableStatusItemLength];
+    self.statusItem = [[NSStatusBar systemStatusBar] statusItemWithLength:NSSquareStatusItemLength];
     NSStatusBarButton *button = self.statusItem.button;
     if (button) {
+        button.toolTip = @"WebMCP Vault";
         if (@available(macOS 11.0, *)) {
-            NSImageSymbolConfiguration *config = [NSImageSymbolConfiguration configurationWithPointSize:13 weight:NSFontWeightSemibold];
+            NSImageSymbolConfiguration *config = [NSImageSymbolConfiguration configurationWithPointSize:16 weight:NSFontWeightSemibold];
             NSImage *icon = [[NSImage imageWithSystemSymbolName:@"lock.shield.fill" accessibilityDescription:@"WebMCP Vault"] imageWithSymbolConfiguration:config];
             if (icon) {
                 icon.template = YES;
                 button.image = icon;
-                button.imagePosition = NSImageLeading;
-                button.title = @" Vault";
+                button.imagePosition = NSImageOnly;
+                button.title = @"";
             } else {
-                button.title = @"🔒 Vault";
+                button.title = @"🔒";
             }
         } else {
-            button.title = @"🔒 Vault";
+            button.title = @"🔒";
         }
         button.target = self;
         button.action = @selector(handleStatusItemClick:);
