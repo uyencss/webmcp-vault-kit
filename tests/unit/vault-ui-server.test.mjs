@@ -141,6 +141,10 @@ test('vault UI serves the Lockbox design with strict CSP and no old teal accent'
   assert.match(html, /id="appView"/);
   assert.match(html, /placeholder="Search title, user, site, or #tag"/);
   assert.match(html, /aria-label="Search saved logins"/);
+  assert.match(html, /id="sortMenu"/);
+  assert.match(html, /id="sortButton"/);
+  assert.match(html, /id="includeSubvaultsCheckbox"/);
+  assert.match(html, /id="sortTagsSection"/);
   assert.match(html, /<ul class="list" id="itemList"><\/ul>/);
   assert.match(html, /id="totpBlock"/);
   assert.match(html, /id="totpRingProgress"/);

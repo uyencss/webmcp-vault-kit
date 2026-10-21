@@ -320,14 +320,74 @@
 
           <aside class="rail" aria-label="Saved logins">
             <div class="rail-top">
-              <input
-                class="search"
-                id="search"
-                type="search"
-                autocomplete="off"
-                aria-label="Search saved logins"
-                placeholder="Search title, user, site, or #tag"
-              />
+              <div class="search-box" id="searchBox">
+                <div class="search-tags" id="searchTags"></div>
+                <input
+                  class="search"
+                  id="search"
+                  type="search"
+                  autocomplete="off"
+                  aria-label="Search saved logins"
+                  placeholder="Search title, user, site, or #tag"
+                />
+              </div>
+              <details class="sort-menu" id="sortMenu">
+                <summary
+                  class="sort-trigger"
+                  id="sortButton"
+                  aria-label="Sort and filter options"
+                  title="Sort and filter options"
+                >
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M7 4v16m0 0-3-3m3 3 3-3"></path>
+                    <path d="M13 6h8M13 12h6M13 18h4"></path>
+                  </svg>
+                </summary>
+                <div class="sort-popover">
+                  <div class="sort-header" id="sortHeaderCount">0 ITEMS SORTED BY</div>
+                  <button type="button" class="sort-option" data-sort-by="title" aria-pressed="false">
+                    <span>Title</span>
+                    <span class="sort-check" aria-hidden="true">✓</span>
+                  </button>
+                  <button type="button" class="sort-option" data-sort-by="createdAt" aria-pressed="false">
+                    <span>Date Created</span>
+                    <span class="sort-check" aria-hidden="true">✓</span>
+                  </button>
+                  <button type="button" class="sort-option is-active" data-sort-by="updatedAt" aria-pressed="true">
+                    <span>Date Modified</span>
+                    <span class="sort-check" aria-hidden="true">✓</span>
+                  </button>
+                  <hr class="sort-divider" />
+                  <button type="button" class="sort-option is-active" data-sort-order="desc" aria-pressed="true">
+                    <span id="sortOrderDescLabel">Newest First</span>
+                    <span class="sort-check" aria-hidden="true">✓</span>
+                  </button>
+                  <button type="button" class="sort-option" data-sort-order="asc" aria-pressed="false">
+                    <span id="sortOrderAscLabel">Oldest First</span>
+                    <span class="sort-check" aria-hidden="true">✓</span>
+                  </button>
+                  <div class="sort-tags-section hidden" id="sortTagsSection">
+                    <hr class="sort-divider" />
+                    <div class="sort-header">FILTER BY TAG</div>
+                    <div class="sort-tags-list" id="sortTagsList"></div>
+                  </div>
+                  <hr class="sort-divider" />
+                  <label class="sort-subvault-row">
+                    <input type="checkbox" id="includeSubvaultsCheckbox" />
+                    <span>Include items in subvaults</span>
+                  </label>
+                </div>
+              </details>
             </div>
             <ul class="list" id="itemList"></ul>
             <div class="rail-foot">
@@ -487,6 +547,13 @@
                     autocomplete="new-password"
                     maxlength="8192"
                   />
+                  <button
+                    class="linkbtn generate-btn"
+                    id="passwordGenerateButton"
+                    type="button"
+                  >
+                    Generate
+                  </button>
                   <button
                     class="linkbtn"
                     id="passwordRevealButton"
