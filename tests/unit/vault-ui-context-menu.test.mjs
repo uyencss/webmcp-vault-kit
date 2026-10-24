@@ -111,7 +111,10 @@ test('context-menu: getItemContextMenuEntries handles item combinations', () => 
   for (const entry of entries1) {
     const keys = Object.keys(entry);
     for (const key of keys) {
-      assert.ok(['id', 'label', 'run', 'danger', 'type'].includes(key), `Unexpected key ${key} in context menu entry`);
+      assert.ok(['id', 'label', 'run', 'danger', 'type', 'icon'].includes(key), `Unexpected key ${key} in context menu entry`);
+    }
+    if (entry.type !== 'separator') {
+      assert.ok(entry.icon, `Missing icon for context menu item ${entry.id}`);
     }
     // Verify no secret value was copied or assigned into entry properties
     assert.equal('password' in entry, false);
