@@ -166,3 +166,68 @@ textarea:disabled {
   margin-top: var(--s4);
 }
 
+/* Context Menu */
+.context-menu {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  padding: var(--s1);
+  min-width: 170px;
+  max-width: 260px;
+  background: var(--surface);
+  border: var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-float);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.context-menu[hidden] {
+  display: none !important;
+}
+
+.context-menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 6px var(--s2);
+  border: none;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-medium);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+
+.context-menu-item:hover,
+.context-menu-item:focus-visible {
+  background: var(--live-weak);
+  outline: none;
+}
+
+.context-menu-item.is-danger {
+  color: var(--danger);
+}
+
+.context-menu-item.is-danger:hover,
+.context-menu-item.is-danger:focus-visible {
+  background: var(--danger-wash);
+}
+
+.context-menu-divider {
+  height: 1px;
+  margin: 3px 0;
+  background: var(--line);
+}
+
+.item.is-context-target,
+.vault-button.is-context-target {
+  background: var(--live-weak) !important;
+}
