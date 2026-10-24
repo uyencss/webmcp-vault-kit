@@ -209,7 +209,11 @@ textarea:disabled {
 .context-menu-icon {
   width: 14px;
   height: 14px;
-  flex: none;
+  min-width: 14px;
+  min-height: 14px;
+  flex: 0 0 14px;
+  display: inline-block;
+  vertical-align: middle;
   stroke: var(--muted);
   transition: stroke var(--dur-fast) var(--ease);
 }
