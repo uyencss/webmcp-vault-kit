@@ -122,6 +122,12 @@ html.is-mac-popover .list-row .item-quick-actions {
   display: inline-flex;
   opacity: 0.85;
 }
+html.is-mac-popover .list-row.has-quick-actions .item-badges {
+  display: none;
+}
+html.is-mac-popover .list-row.has-quick-actions .item .name {
+  padding-right: calc(var(--s2) + var(--qa-n, 3) * 24px + 4px);
+}
 .brand {
   min-width: 0;
   display: flex;
@@ -284,22 +290,6 @@ html.is-mac-popover .list-row .item-quick-actions {
   font-family: var(--font-mono);
   font-size: var(--fs-meta);
 }
-.item-row-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--s2);
-  min-width: 0;
-  width: 100%;
-}
-.item-badges {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  flex: 0 0 auto;
-  margin-left: auto;
-  transition: opacity var(--dur-fast) var(--ease);
-}
 .item-type-badge {
   display: inline-flex;
   align-items: center;
@@ -333,19 +323,6 @@ html.is-mac-popover .list-row .item-quick-actions {
   display: block;
   flex: none;
 }
-.item-tags {
-  display: inline-flex;
-  flex-wrap: nowrap;
-  align-items: center;
-  gap: 4px;
-  flex: 0 0 auto;
-  margin-left: auto;
-  min-width: 0;
-  overflow: hidden;
-}
-.item-tags + .item-badges {
-  margin-left: 0;
-}
 .item-tag-badge {
   display: inline-block;
   max-width: 110px;
@@ -378,12 +355,6 @@ html.is-mac-popover .list-row .item-quick-actions {
 }
 .item-tag-badge:hover {
   background: color-mix(in srgb, var(--live) 22%, var(--surface));
-}
-.view-tags-list {
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: center;
 }
 .vault-sidebar-foot {
   display: flex;
@@ -506,10 +477,18 @@ html.is-mac-popover .list-row .item-quick-actions {
   flex: 1 1 auto;
   min-width: 0;
   display: grid;
-  gap: 2px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "name badges"
+    "meta meta"
+    "tags tags";
+  align-items: center;
+}
+.item-row-head {
+  display: contents;
 }
 .item .name {
-  flex: 1 1 auto;
+  grid-area: name;
   min-width: 0;
   overflow: hidden;
   font-size: var(--fs-body);
@@ -517,14 +496,49 @@ html.is-mac-popover .list-row .item-quick-actions {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.item-badges {
+  grid-area: badges;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: var(--s2);
+  transition: opacity var(--dur-fast) var(--ease);
+}
+.item-badges:empty {
+  display: none;
+}
 .item .meta {
+  grid-area: meta;
   min-width: 0;
   overflow: hidden;
+  margin-top: 2px;
   color: var(--muted);
   font-family: var(--font-mono);
   font-size: var(--fs-meta);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.item .meta:empty {
+  display: none;
+}
+.item-tags {
+  grid-area: tags;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+  margin-top: 4px;
+}
+.item-tags .item-tag-badge {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 140px;
+}
+.item-tags .item-tag-more {
+  flex: none;
+  cursor: default;
 }
 .item-avatar-box {
   width: 32px;
@@ -700,8 +714,9 @@ html.is-mac-popover .list-row .item-quick-actions {
 }
 .list-row .item-quick-actions {
   position: absolute;
+  top: calc(var(--s3) - 2px);
   right: var(--s2);
-  bottom: 5px;
+  bottom: auto;
   display: none;
   align-items: center;
   gap: 2px;
@@ -722,8 +737,8 @@ html.is-mac-popover .list-row .item-quick-actions {
   pointer-events: none;
 }
 .quick-btn {
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   display: inline-grid;
   place-items: center;
   padding: 0;
@@ -782,6 +797,9 @@ html.is-mac-popover .list-row .item-quick-actions {
   padding: 7px var(--s2);
   grid-template-columns: 22px minmax(0, 1fr) auto;
 }
+.vault-tree-children .vault-tree-summary.is-subvault {
+  grid-template-columns: 22px minmax(0, 1fr) auto 12px;
+}
 .vault-tree-children .vault-button.is-subvault .vault-glyph {
   width: 22px;
   height: 22px;
@@ -798,4 +816,15 @@ html.is-mac-popover .list-row .item-quick-actions {
   margin-left: 0;
   padding-left: 0;
   border-left: 0;
+}
+.main.sidebar-collapsed .vault-tree-children .vault-button.is-subvault {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  grid-template-columns: 36px;
+}
+.main.sidebar-collapsed .vault-tree-children .vault-button.is-subvault .vault-glyph {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-md);
 }

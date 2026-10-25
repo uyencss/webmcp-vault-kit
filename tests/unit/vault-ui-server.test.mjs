@@ -332,6 +332,14 @@ test('vault UI API manages vaults, filters items, and moves items on deletion', 
   assert.match(itemListJs, /head\.append\(tagsLine\)/);
   assert.doesNotMatch(itemListJs, /badges\.append\(tagBadge\)/);
 
+  const layoutCss = await (await fetch(`http://127.0.0.1:${ui.port}/assets/styles/layout.css`)).text();
+  assert.match(layoutCss, /\.item-row-head\s*\{[\s\S]*?display:\s*contents/);
+  assert.match(layoutCss, /\.item-body\s*\{[\s\S]*?"tags tags"/);
+
+  const fieldsCss = await (await fetch(`http://127.0.0.1:${ui.port}/assets/styles/fields.css`)).text();
+  assert.match(fieldsCss, /\.view-field\s*>\s*\.view-value/);
+  assert.match(fieldsCss, /\.search-tag-label/);
+
   const deleteResponse = await fetch(
     `${base}/vaults/${encodeURIComponent(work.id)}?moveTo=${encodeURIComponent(personal.id)}`,
     { method: 'DELETE', headers },

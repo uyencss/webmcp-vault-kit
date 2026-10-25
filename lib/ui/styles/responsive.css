@@ -5,6 +5,14 @@
 .mobile-back-button {
   display: none !important;
 }
+.detail {
+  container-type: inline-size;
+}
+@container (max-width: 520px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
 @media (max-width: 900px) {
   .app-shell,
   .app {
@@ -112,8 +120,11 @@
     border-radius: 0;
   }
   .bar,
-  .detail {
+  .detail-scroll {
     padding: var(--s4);
+  }
+  .detail-actions {
+    padding: var(--s2) var(--s4);
   }
   .field-row {
     flex-wrap: wrap;

@@ -1,6 +1,6 @@
 .rail-top {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--s2);
 }
 .search-box {
@@ -25,44 +25,49 @@
 .search-tags {
   display: contents;
 }
-.search-tag-pill {
+.search-box .search-tag-pill {
   position: relative;
-  overflow: visible !important;
-  max-width: none !important;
-  padding: 2px 7px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  max-width: 100%;
+  overflow: hidden;
+  padding: 2px 3px 2px 7px;
   font-size: 11px;
   cursor: default;
   user-select: none;
 }
+.search-tag-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .search-tag-remove {
-  position: absolute;
-  top: -5px;
-  right: -5px;
-  width: 14px;
-  height: 14px;
-  min-height: 14px;
+  position: static;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  min-height: 16px;
   padding: 0;
   border-radius: 999px;
-  border: 1.5px solid var(--surface);
-  background: var(--danger);
-  color: #ffffff;
+  border: 0;
+  background: transparent;
+  color: currentColor;
   font-family: var(--font-sans);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   line-height: 1;
-  display: grid;
+  display: inline-grid;
   place-items: center;
-  opacity: 0;
-  transform: scale(0.75);
-  pointer-events: none;
+  opacity: 0.72;
   cursor: pointer;
-  transition: opacity 120ms var(--ease), transform 120ms var(--ease);
+  transition: opacity var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
 }
-.search-tag-pill:hover .search-tag-remove,
-.search-tag-pill:focus-within .search-tag-remove {
+.search-tag-remove:hover,
+.search-tag-remove:focus-visible {
   opacity: 1;
-  transform: scale(1);
-  pointer-events: auto;
+  background: color-mix(in srgb, var(--live) 22%, transparent);
 }
 .search {
   flex: 1 1 72px;
@@ -74,11 +79,17 @@
   border-radius: 0;
   background: transparent;
   color: var(--ink);
+  font-size: 13px;
   outline: none !important;
 }
 .sort-menu {
   position: relative;
   flex: 0 0 auto;
+}
+@media (min-width: 901px) {
+  html:not(.is-mac-popover) .main:not(.sidebar-collapsed) #vaultFilterMenu {
+    display: none;
+  }
 }
 .sort-trigger {
   position: relative;
@@ -125,6 +136,8 @@
   right: 0;
   top: calc(100% + 6px);
   width: 244px;
+  max-height: min(70dvh, 420px);
+  overflow-y: auto;
   z-index: 30;
   padding: 6px;
   border: var(--border);
@@ -227,7 +240,7 @@
   flex: 0 0 auto;
 }
 .sort-tag-pill {
-  max-width: none;
+  max-width: 100%;
 }
 .sort-tag-pill.is-active {
   background: var(--live) !important;
@@ -594,6 +607,38 @@ textarea {
   word-break: break-word;
   padding: 10px var(--s3);
 }
+.view-field > .view-value,
+.view-field > a {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#noteViewField > .view-value {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+#tagsViewField {
+  white-space: normal;
+  cursor: default;
+}
+#tagsViewField:hover {
+  background: var(--sunk);
+  border-color: var(--line);
+}
+.view-tags-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.view-tags-list .item-tag-badge {
+  max-width: 100%;
+}
 .dirty-badge {
   display: none;
   margin-left: var(--s2);
@@ -725,6 +770,7 @@ textarea {
 .field-label-text {
   flex: 0 0 140px;
   max-width: 160px;
+  line-height: 32px;
   font-family: var(--font-mono);
   font-size: var(--fs-body);
   font-weight: var(--fw-strong);
