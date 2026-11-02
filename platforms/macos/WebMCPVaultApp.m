@@ -12,6 +12,7 @@
 @property (assign, nonatomic) NSInteger retryCount;
 @property (assign, nonatomic) BOOL didKickstartDaemon;
 @property (assign, nonatomic) BOOL startInTray;
+@property (assign, nonatomic) NSInteger copiedChangeCount;
 @end
 
 @implementation AppDelegate
@@ -133,6 +134,7 @@
     WKWebViewConfiguration *popConfig = [[WKWebViewConfiguration alloc] init];
     WKUserContentController *popContent = [[WKUserContentController alloc] init];
     [popContent addScriptMessageHandler:self name:@"openFullApp"];
+    [popContent addScriptMessageHandler:self name:@"copyClipboard"];
     NSString *popScriptSource = @"document.documentElement.classList.add('is-mac-popover');";
     WKUserScript *popScript = [[WKUserScript alloc] initWithSource:popScriptSource
                                                      injectionTime:WKUserScriptInjectionTimeAtDocumentStart
@@ -175,6 +177,7 @@
     WKWebViewConfiguration *webConfig = [[WKWebViewConfiguration alloc] init];
     WKUserContentController *contentController = [[WKUserContentController alloc] init];
     [contentController addScriptMessageHandler:self name:@"openFullApp"];
+    [contentController addScriptMessageHandler:self name:@"copyClipboard"];
     NSString *macAppScriptSource = @"document.documentElement.classList.add('is-mac-app');";
     WKUserScript *macAppScript = [[WKUserScript alloc] initWithSource:macAppScriptSource
                                                         injectionTime:WKUserScriptInjectionTimeAtDocumentStart
@@ -283,6 +286,75 @@
         dispatch_async(dispatch_get_main_queue(), ^{
             [self showMainWindow];
         });
+    } else if ([message.name isEqualToString:@"copyClipboard"]) {
+        if (!message.frameInfo.isMainFrame) return;
+        NSURL *expected = [NSURL URLWithString:[self resolveVaultUrl]];
+        NSString *originProtocol = message.frameInfo.securityOrigin.protocol;
+        NSString *originHost = message.frameInfo.securityOrigin.host;
+        NSInteger originPort = message.frameInfo.securityOrigin.port;
+        NSInteger expectedPort = expected.port ? expected.port.integerValue : 0;
+        if (!expected || originHost.length == 0) return;
+        BOOL sameScheme = !expected.scheme.length || [originProtocol isEqualToString:expected.scheme];
+        BOOL sameHost = [originHost isEqualToString:expected.host] ||
+                        ([originHost isEqualToString:@"127.0.0.1"] && [expected.host isEqualToString:@"localhost"]) ||
+                        ([originHost isEqualToString:@"localhost"] && [expected.host isEqualToString:@"127.0.0.1"]);
+        BOOL samePort = (expectedPort == 0 || originPort == expectedPort);
+        if (!sameScheme || !sameHost || !samePort) return;
+        NSString *text = @"";
+        BOOL sensitive = NO;
+        if ([message.body isKindOfClass:[NSDictionary class]]) {
+            NSDictionary *body = (NSDictionary *)message.body;
+            if ([body[@"text"] isKindOfClass:[NSString class]]) {
+                text = body[@"text"];
+            }
+            id sensVal = body[@"sensitive"];
+            if ([sensVal isKindOfClass:[NSNumber class]] || [sensVal isKindOfClass:[NSString class]]) {
+                sensitive = [sensVal boolValue];
+            }
+        } else if ([message.body isKindOfClass:[NSString class]]) {
+            text = (NSString *)message.body;
+        }
+        if (text.length > 65536) return;
+
+        NSPasteboard *pb = [NSPasteboard generalPasteboard];
+        if (text.length == 0) {
+            if (self.copiedChangeCount > 0 && pb.changeCount == self.copiedChangeCount) {
+                [pb clearContents];
+                self.copiedChangeCount = 0;
+            }
+            return;
+        }
+        if (sensitive) {
+            if (@available(macOS 10.12, *)) {
+                [pb prepareForNewContentsWithOptions:NSPasteboardContentsCurrentHostOnly];
+            } else {
+                [pb clearContents];
+            }
+            [pb setString:text forType:NSPasteboardTypeString];
+            [pb setString:@"" forType:@"org.nspasteboard.ConcealedType"];
+            [pb setString:@"" forType:@"org.nspasteboard.TransientType"];
+            NSInteger count = pb.changeCount;
+            self.copiedChangeCount = count;
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(60 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                NSPasteboard *laterPb = [NSPasteboard generalPasteboard];
+                if (self.copiedChangeCount == count && laterPb.changeCount == count) {
+                    [laterPb clearContents];
+                    self.copiedChangeCount = 0;
+                }
+            });
+        } else {
+            [pb clearContents];
+            [pb setString:text forType:NSPasteboardTypeString];
+            self.copiedChangeCount = 0;
+        }
+    }
+}
+
+- (void)applicationWillTerminate:(NSNotification *)notification {
+    NSPasteboard *pb = [NSPasteboard generalPasteboard];
+    if (self.copiedChangeCount > 0 && pb.changeCount == self.copiedChangeCount) {
+        [pb clearContents];
+        self.copiedChangeCount = 0;
     }
 }
 
