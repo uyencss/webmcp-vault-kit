@@ -202,7 +202,18 @@
 }
 
 - (void)webView:(WKWebView *)webView didFinishNavigation:(WKNavigation *)navigation {
-    self.retryCount = 0;
+    [webView evaluateJavaScript:@"document.body ? document.body.innerText : ''" completionHandler:^(id result, NSError *error) {
+        if ([result isKindOfClass:[NSString class]] &&
+            [(NSString *)result containsString:@"Unauthorized vault UI request."] &&
+            self.retryCount < 4) {
+            self.retryCount += 1;
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(400 * NSEC_PER_MSEC)), dispatch_get_main_queue(), ^{
+                [self loadWebContent];
+            });
+            return;
+        }
+        self.retryCount = 0;
+    }];
 }
 
 - (void)webView:(WKWebView *)webView didFailProvisionalNavigation:(WKNavigation *)navigation withError:(NSError *)error {
