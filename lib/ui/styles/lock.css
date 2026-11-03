@@ -5,7 +5,7 @@
   padding: var(--s5);
 }
 .lockcard {
-  width: min(100%, 400px);
+  width: min(100%, 420px);
   padding: var(--s7);
   border: var(--border);
   border-radius: var(--r-lg);
@@ -37,13 +37,16 @@
 }
 .lockrow {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--s2);
   margin-top: var(--s4);
 }
 .lockrow .btn {
-  flex: 1;
+  flex: 1 1 calc(50% - var(--s2));
+  min-width: fit-content;
   justify-content: center;
+  white-space: nowrap;
 }
 .hint {
   margin: var(--s4) 0 0;

@@ -443,7 +443,8 @@ textarea {
 .secret-input.idle .linkbtn {
   display: none;
 }
-.secret-input.idle .linkbtn.generate-btn {
+.secret-input.idle .linkbtn.generate-btn,
+.secret-input.idle #otpSecretCopyButton:not(:disabled) {
   display: inline-block;
 }
 .linkbtn {
@@ -519,8 +520,13 @@ textarea {
   font-weight: var(--fw-strong);
   font-variant-numeric: tabular-nums;
 }
-.totp-copy {
+.totp-actions {
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 /* View/Edit mode toggle */
 .detail.view-mode .edit-only {

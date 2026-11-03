@@ -66,7 +66,7 @@
               </svg>
               Unlock
             </button>
-            <button class="btn ghost" type="button" id="initButton">
+            <button class="btn ghost hidden" type="button" id="initButton">
               <svg
                 class="btn-icon"
                 aria-hidden="true"
@@ -614,6 +614,46 @@
                 </div>
               </div>
 
+              <div class="field type-login-field" id="otpSecretField">
+                <label for="otpSecret" class="field-label-with-icon">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  <span>TOTP Secret</span>
+                </label>
+                <span
+                  class="view-field masked view-only"
+                  id="otpSecretViewField"
+                  role="button"
+                  tabindex="0"
+                  aria-label="Click to copy TOTP secret"
+                  ><span class="view-hint">Click to copy</span></span
+                >
+                <div class="secret-input edit-only">
+                  <input
+                    class="mono"
+                    id="otpSecret"
+                    type="password"
+                    autocomplete="off"
+                    maxlength="4096"
+                  />
+                  <button
+                    class="linkbtn"
+                    id="otpSecretCopyButton"
+                    type="button"
+                    disabled
+                  >
+                    Copy
+                  </button>
+                  <button
+                    class="linkbtn"
+                    id="otpSecretRevealButton"
+                    type="button"
+                    disabled
+                  >
+                    Reveal
+                  </button>
+                </div>
+              </div>
+
               <div class="totp hidden type-login-field" id="totpBlock">
                 <div class="ring" aria-hidden="true">
                   <svg width="64" height="64" viewBox="0 0 64 64">
@@ -648,46 +688,41 @@
                     >expires in <b id="totpSeconds">30s</b></span
                   >
                 </div>
-                <button
-                  class="btn sm ghost totp-copy"
-                  id="copyTotpButton"
-                  type="button"
-                >
-                  <svg
-                    class="btn-icon"
-                    aria-hidden="true"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                  >
-                    <rect x="9" y="9" width="10" height="10" rx="2"></rect>
-                    <path
-                      d="M15 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h3"
-                    ></path>
-                  </svg>
-                  Copy
-                </button>
-              </div>
-
-              <div class="field wide edit-only type-login-field">
-                <label for="otpSecret" class="field-label-with-icon">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                  <span>TOTP Secret</span>
-                </label>
-                <div class="secret-input">
-                  <input
-                    class="mono"
-                    id="otpSecret"
-                    type="password"
-                    autocomplete="off"
-                    maxlength="4096"
-                  />
+                <div class="totp-actions">
                   <button
-                    class="linkbtn"
-                    id="otpSecretRevealButton"
+                    class="btn sm ghost totp-copy-secret"
+                    id="copyTotpSecretButton"
                     type="button"
-                    disabled
+                    title="Copy TOTP setup secret"
                   >
-                    Reveal
+                    <svg
+                      class="btn-icon"
+                      aria-hidden="true"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                    >
+                      <circle cx="8" cy="15" r="3"></circle>
+                      <path d="m10.5 12.5 7-7m-3 3 2 2m-5 1 2 2"></path>
+                    </svg>
+                    Setup key
+                  </button>
+                  <button
+                    class="btn sm ghost totp-copy"
+                    id="copyTotpButton"
+                    type="button"
+                  >
+                    <svg
+                      class="btn-icon"
+                      aria-hidden="true"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                    >
+                      <rect x="9" y="9" width="10" height="10" rx="2"></rect>
+                      <path
+                        d="M15 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h3"
+                      ></path>
+                    </svg>
+                    Copy
                   </button>
                 </div>
               </div>
