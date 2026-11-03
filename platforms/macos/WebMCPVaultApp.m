@@ -75,6 +75,7 @@
     [menubar addItem:appMenuItem];
 
     NSMenu *appMenu = [[NSMenu alloc] init];
+    [appMenu addItemWithTitle:@"Reload Vault UI" action:@selector(reloadWeb) keyEquivalent:@"r"];
     [appMenu addItemWithTitle:@"Close Window" action:@selector(performClose:) keyEquivalent:@"w"];
     [appMenu addItem:[NSMenuItem separatorItem]];
     [appMenu addItemWithTitle:@"Quit WebMCP Vault" action:@selector(terminate:) keyEquivalent:@"q"];
@@ -249,10 +250,19 @@
     return nil;
 }
 
+- (void)ensureFreshWebContent {
+    NSString *resolved = [self resolveVaultUrl];
+    NSString *current = self.webView.URL.absoluteString ?: @"";
+    if (!current.length || ![current isEqualToString:resolved]) {
+        [self loadWebContent];
+    }
+}
+
 - (void)showMainWindow {
     if (self.popover.isShown) {
         [self.popover performClose:nil];
     }
+    [self ensureFreshWebContent];
     [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
     [self.window makeKeyAndOrderFront:nil];
     [NSApp activateIgnoringOtherApps:YES];
@@ -267,6 +277,8 @@
 - (BOOL)applicationShouldHandleReopen:(NSApplication *)sender hasVisibleWindows:(BOOL)flag {
     if (!flag) {
         [self loadWebContent];
+    } else {
+        [self ensureFreshWebContent];
     }
     [self showMainWindow];
     return YES;
@@ -276,6 +288,7 @@
     if (self.popover.isShown) {
         [self.popover performClose:sender];
     } else if (sender) {
+        [self ensureFreshWebContent];
         [self.popover showRelativeToRect:sender.bounds ofView:sender preferredEdge:NSRectEdgeMinY];
         [self.popover.contentViewController.view.window makeKeyWindow];
         [self.popover.contentViewController.view.window makeFirstResponder:self.popoverWebView];

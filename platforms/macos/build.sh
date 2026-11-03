@@ -81,4 +81,9 @@ if [ -d "$APPLICATIONS_DIR" ] && [ -w "$APPLICATIONS_DIR" ]; then
   rm -rf "$APPLICATIONS_DIR/WebMCP Vault.app"
   cp -R "$APP_BUNDLE" "$APPLICATIONS_DIR/WebMCP Vault.app"
   echo "🚀 Đã đồng bộ cài đặt vào $APPLICATIONS_DIR/WebMCP Vault.app"
+  if pgrep -f "WebMCP Vault.app/Contents/MacOS/WebMCP Vault" >/dev/null 2>&1; then
+    killall "WebMCP Vault" 2>/dev/null || true
+    sleep 0.3
+    open -g -a "$APPLICATIONS_DIR/WebMCP Vault.app" --args --tray 2>/dev/null || true
+  fi
 fi
