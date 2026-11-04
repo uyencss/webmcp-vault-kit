@@ -13,7 +13,12 @@ const { createVaultStore } = require('../../lib/store.js');
 
 const PINNED_RUNNER_COMMIT = 'd34f36ad8f43631aa78ecd0e4f72815165cfb047';
 const PINNED_RUNNER_TREE = 'f0496c8a788424dd233f00de1d6518e84a66a72e';
-const RUNNER_REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../webmcp-automation-runner');
+const TEST_DIR = path.dirname(fileURLToPath(import.meta.url));
+const RUNNER_REPO = [
+  path.resolve(TEST_DIR, '../../../../webmcp-automation-kit/packages/webmcp-automation-runner'),
+  path.resolve(TEST_DIR, '../../../packages/webmcp-automation-runner'),
+  path.resolve(TEST_DIR, '../../../webmcp-automation-runner'),
+].find((p) => fs.existsSync(p)) || path.resolve(TEST_DIR, '../../../../webmcp-automation-kit/packages/webmcp-automation-runner');
 
 function runnerGitShow(relativePath) {
   return execFileSync('git', ['-C', RUNNER_REPO, 'show', `${PINNED_RUNNER_COMMIT}:${relativePath}`], { encoding: 'utf8' });
