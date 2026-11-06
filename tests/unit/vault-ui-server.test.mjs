@@ -158,6 +158,32 @@ test('vault UI serves the Lockbox design with strict CSP and no old teal accent'
   assert.doesNotMatch(html, /#0f766e/i);
 });
 
+test('vault UI serves all frontend scripts without 404', async (t) => {
+  const oldHome = process.env.WEBMCP_HOME;
+  process.env.WEBMCP_HOME = tempHome();
+  const ui = await startVaultUiServer({ host: '127.0.0.1', port: 0 });
+  t.after(() => {
+    ui.server.close();
+    if (oldHome === undefined) delete process.env.WEBMCP_HOME;
+    else process.env.WEBMCP_HOME = oldHome;
+  });
+
+  const criticalAssets = [
+    '/assets/app/main.js',
+    '/assets/app/context-menu.js',
+    '/assets/app/controller.js',
+    '/assets/app/state.js',
+    '/assets/app/api.js',
+    '/assets/styles/lock.css',
+  ];
+  for (const assetPath of criticalAssets) {
+    const res = await fetch(`http://127.0.0.1:${ui.port}${assetPath}`);
+    assert.equal(res.status, 200, `Asset ${assetPath} must return 200`);
+    const text = await res.text();
+    assert.ok(text.length > 0, `Asset ${assetPath} must not be empty`);
+  }
+});
+
 test('vault UI can detect an inherited environment unlock key without returning it', async (t) => {
   const oldHome = process.env.WEBMCP_HOME;
   const oldKey = process.env.WEBMCP_VAULT_KEY;
