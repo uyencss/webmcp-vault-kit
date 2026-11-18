@@ -943,6 +943,9 @@
     >
       <div class="csv-preview-body">
         <h2 id="backupDialogTitle">Google Drive Backup</h2>
+        <p class="csv-preview-summary">
+          Encrypted AES-256-GCM snapshots — your master key never leaves this Mac.
+        </p>
 
         <div class="backup-section">
           <label for="backupRemoteSelect">Google Account</label>
@@ -956,7 +959,7 @@
             <code>rclone</code> is not installed on this device. Install <code>rclone</code> (for example <code>brew install rclone</code>) to enable Google Drive backups.
           </div>
           <div class="backup-auth-pending hidden" id="backupAuthPendingBox">
-            <span class="backup-auth-hint" id="backupAuthPendingText">Copy link &amp; paste into the browser profile you want to use:</span>
+            <span class="backup-auth-hint" id="backupAuthPendingText">1. Copy link &amp; sign in with Google in your chosen browser profile (auto-detects on this Mac):</span>
             <div class="backup-auth-url-row">
               <input
                 class="mono"
@@ -972,18 +975,76 @@
                 Cancel
               </button>
             </div>
+            <span class="backup-auth-hint">2. Using a remote/proxied browser? Paste the redirected callback URL (<code>http://127.0.0.1:.../?code=...</code>):</span>
+            <div class="backup-auth-url-row">
+              <input
+                class="mono"
+                id="backupCallbackUrlInput"
+                type="text"
+                placeholder="http://127.0.0.1:53682/?state=...&amp;code=..."
+                autocomplete="off"
+                aria-label="Google OAuth callback URL"
+              />
+              <button class="btn sm ghost" id="submitGdriveCallbackButton" type="button">
+                Complete Sign-In
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="backup-section hidden" id="backupWorkspaceSection">
+          <label for="backupFolderSelect">Backup Folder on Google Drive</label>
+          <div class="backup-folder-row">
+            <select id="backupFolderSelect" aria-label="Google Drive backup folder"></select>
+            <button
+              class="btn sm ghost"
+              id="refreshDriveFoldersButton"
+              type="button"
+              title="Refresh Drive folders"
+            >
+              Refresh
+            </button>
+            <button class="btn sm ghost" id="toggleNewFolderButton" type="button">
+              + New Folder
+            </button>
+          </div>
+          <div class="backup-new-folder-row hidden" id="backupNewFolderRow">
+            <input
+              id="backupNewFolderInput"
+              type="text"
+              placeholder="New folder name (e.g. Vault-Backups or Backups/Vault)"
+              maxlength="160"
+              autocomplete="off"
+              aria-label="New Google Drive folder name"
+            />
+            <button class="btn sm primary" id="createDriveFolderButton" type="button">
+              Create &amp; Use
+            </button>
+          </div>
+
+          <div class="backup-snapshots-box">
+            <div class="backup-snapshots-head">
+              <span id="backupSnapshotsTitle">Snapshots in folder</span>
+              <span class="backup-snapshots-count" id="backupSnapshotsCount"></span>
+            </div>
+            <ul class="csv-preview-list backup-history-list" id="backupHistoryList"></ul>
           </div>
         </div>
 
         <div class="backup-modal-status" id="backupModalStatus" role="status" aria-live="polite"></div>
 
-        <div class="csv-preview-actions">
-          <button class="btn ghost" id="closeBackupDialogButton" type="button">
-            Close
+        <div class="csv-preview-actions backup-footer-actions">
+          <button class="btn sm ghost" id="runLocalBackupButton" type="button">
+            Save Local Copy
           </button>
-          <button class="btn primary" id="runCloudBackupButton" type="button">
-            Backup Now
-          </button>
+          <div class="backup-footer-right">
+            <button class="btn ghost" id="closeBackupDialogButton" type="button">
+              Close
+            </button>
+            <button class="btn primary" id="runCloudBackupButton" type="button">
+              Backup to Folder
+            </button>
+          </div>
         </div>
       </div>
     </dialog>

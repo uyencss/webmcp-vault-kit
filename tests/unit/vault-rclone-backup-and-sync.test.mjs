@@ -27,6 +27,7 @@ function makeTempDir(prefix) {
 function writeFakeRcloneBin(binPath, cloudRoot, logPath) {
   const script = `#!${process.execPath}
 const fs = require('fs');
+const http = require('http');
 const path = require('path');
 
 const CLOUD_ROOT = ${JSON.stringify(cloudRoot)};
@@ -41,18 +42,32 @@ function splitRemotePath(spec) {
 
 const cmd = args[0];
 if (cmd === 'lsjson') {
+  const dirsOnly = args.includes('--dirs-only');
   const target = args[args.length - 1];
   const [remote, dir] = splitRemotePath(target);
-  const fullDir = path.join(CLOUD_ROOT, remote, dir);
+  const fullDir = path.join(CLOUD_ROOT, remote, dir || '');
   if (!fs.existsSync(fullDir)) {
+    if (dirsOnly && !dir) {
+      process.stdout.write('[]');
+      process.exit(0);
+    }
     process.stderr.write('Failed to lsjson: directory not found\\n');
     process.exit(3);
   }
-  const items = fs.readdirSync(fullDir).map((name) => {
-    const st = fs.statSync(path.join(fullDir, name));
-    return { Name: name, Path: name, Size: st.size, IsDir: st.isDirectory(), ModTime: st.mtime.toISOString() };
-  });
+  const items = fs.readdirSync(fullDir)
+    .map((name) => {
+      const st = fs.statSync(path.join(fullDir, name));
+      return { Name: name, Path: name, Size: st.size, IsDir: st.isDirectory(), ModTime: st.mtime.toISOString() };
+    })
+    .filter((it) => (dirsOnly ? it.IsDir : true));
   process.stdout.write(JSON.stringify(items));
+  process.exit(0);
+}
+
+if (cmd === 'mkdir') {
+  const target = args[args.length - 1];
+  const [remote, rel] = splitRemotePath(target);
+  fs.mkdirSync(path.join(CLOUD_ROOT, remote, rel), { recursive: true });
   process.exit(0);
 }
 
@@ -81,7 +96,32 @@ if (cmd === 'authorize' && args[1] === 'drive') {
   }
   let params = {};
   try { params = JSON.parse(Buffer.from(args[2] || '', 'base64url').toString('utf8')); } catch {}
-  if (params.scope === 'drive.slow') {
+  if (params.scope === 'drive.callback') {
+    const srv = http.createServer((req, res) => {
+      const u = new URL(req.url, 'http://127.0.0.1');
+      if (u.pathname === '/auth') {
+        res.writeHead(302, { Location: 'https://accounts.google.com/o/oauth2/auth?client_id=test&state=cb-state-123' });
+        res.end();
+        return;
+      }
+      if (u.searchParams.get('state') === 'cb-state-123' && u.searchParams.get('code') === 'ok-code') {
+        res.writeHead(200, { 'Content-Type': 'text/plain' });
+        res.end('Success');
+        const tokPayload = Buffer.from(JSON.stringify({
+          token: JSON.stringify({ access_token: 'cb-access-tok', token_type: 'Bearer', refresh_token: '1//cb' }),
+        })).toString('base64url');
+        process.stdout.write('Paste the following into your remote machine --->\\n' + tokPayload + '\\n<---End paste\\n');
+        srv.close(() => process.exit(0));
+        return;
+      }
+      res.writeHead(400);
+      res.end('Invalid state');
+    });
+    srv.listen(0, '127.0.0.1', () => {
+      const port = srv.address().port;
+      process.stderr.write(\`NOTICE: Please go to the following link: http://127.0.0.1:\${port}/auth?state=cb-state-123\\n\`);
+    });
+  } else if (params.scope === 'drive.slow') {
     process.stderr.write('NOTICE: Please go to the following link: http://127.0.0.1:53682/auth?state=slow\\n');
     setTimeout(() => process.exit(0), 10000);
   } else {
@@ -395,6 +435,76 @@ test('UI HTTP backup endpoints enforce explicit token, keep /status rclone-free,
     headers,
   })).json();
   assert.equal(cancelled.status, 'cancelled');
+
+  // Custom Drive folder creation, listing, selection, requireExplicitDir, and callback replay
+  const missingDirPush = await fetch(`${base}/api/backup/rclone/push`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ remote: 'gdrive', requireExplicitDir: true }),
+  });
+  assert.equal(missingDirPush.status, 400);
+
+  const mkRes = await (await fetch(`${base}/api/backup/rclone/mkdir`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ remote: 'gdrive', remoteDir: 'My Vault/2026' }),
+  })).json();
+  assert.equal(mkRes.ok, true);
+  assert.equal(mkRes.remoteDir, 'My Vault/2026');
+
+  const rootDirs = await (await fetch(`${base}/api/backup/rclone/dirs?remote=gdrive`, { headers })).json();
+  assert.ok(rootDirs.folders.some((f) => f.name === 'My Vault'));
+  const nestedDirs = await (await fetch(`${base}/api/backup/rclone/dirs?remote=gdrive&parent=My%20Vault`, { headers })).json();
+  assert.ok(nestedDirs.folders.some((f) => f.path === 'My Vault/2026'));
+
+  const selRes = await (await fetch(`${base}/api/backup/rclone/select-dir`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ remote: 'gdrive', remoteDir: 'My Vault/2026' }),
+  })).json();
+  assert.equal(selRes.remoteDir, 'My Vault/2026');
+
+  const customDirPush = await (await fetch(`${base}/api/backup/rclone/push`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ remote: 'gdrive', remoteDir: 'My Vault/2026', requireExplicitDir: true }),
+  })).json();
+  assert.equal(customDirPush.ok, true);
+  assert.equal(customDirPush.remoteDir, 'My Vault/2026');
+
+  // Subsequent push without explicit remoteDir must reuse persisted selectedDir instead of webmcp-vault-backups
+  const defaultReusedPush = await (await fetch(`${base}/api/backup/rclone/push`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ remote: 'gdrive' }),
+  })).json();
+  assert.equal(defaultReusedPush.remoteDir, 'My Vault/2026');
+  assert.equal(defaultReusedPush.skippedDuplicate, true);
+
+  // Dual-mode callback URL replay onto local rclone authorize listener without SSRF
+  const cbStart = await (await fetch(`${base}/api/backup/rclone/auth/start`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ remote: 'gdrivecb', scope: 'drive.callback', autoBackup: false }),
+  })).json();
+  assert.match(String(cbStart.authUrl), /^https:\/\/accounts\.google\.com\/o\/oauth2\/auth/);
+
+  const badStateRes = await fetch(`${base}/api/backup/rclone/auth/callback`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ callbackUrl: 'http://127.0.0.1:1/?state=wrong-state&code=x' }),
+  });
+  assert.ok(badStateRes.status >= 400);
+
+  const cbDone = await (await fetch(`${base}/api/backup/rclone/auth/callback`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ callbackUrl: 'https://evil.example/?state=cb-state-123&code=ok-code' }),
+  })).json();
+  assert.equal(cbDone.status, 'done');
+  assert.equal(cbDone.remoteName, 'gdrivecb');
+  assert.equal(cbDone.backupResult, null);
+  assert.match(fs.readFileSync(confPath, 'utf8'), /^\[gdrivecb\]/m);
 });
 
 test('parseRcloneAuthorizeToken decodes base64url & JSON and resolveDriveAccountEmails caches emails lazily', async () => {

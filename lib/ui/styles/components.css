@@ -446,8 +446,8 @@ textarea:disabled {
 
 /* Backup Modal */
 .backup-dialog {
-  width: min(100% - 32px, 480px);
-  max-height: min(640px, calc(100vh - 32px));
+  width: min(100% - 32px, 540px);
+  max-height: min(740px, calc(100vh - 32px));
   overflow-y: auto;
 }
 .backup-section {
@@ -455,15 +455,19 @@ textarea:disabled {
   gap: var(--s2);
   margin: var(--s3) 0;
 }
-.backup-remote-row {
+.backup-remote-row,
+.backup-folder-row,
+.backup-new-folder-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--s2);
 }
-.backup-remote-row select {
+.backup-remote-row select,
+.backup-folder-row select,
+.backup-new-folder-row input {
   flex: 1 1 200px;
-  min-width: 160px;
+  min-width: 150px;
 }
 .backup-notice {
   padding: var(--s2) var(--s3);
@@ -500,6 +504,29 @@ textarea:disabled {
   min-width: 0;
   font-size: var(--fs-meta);
 }
+.backup-snapshots-box {
+  display: grid;
+  gap: var(--s2);
+  padding: var(--s2) var(--s3);
+  border: var(--border);
+  border-radius: var(--r-md);
+  background: var(--sunk);
+}
+.backup-snapshots-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s2);
+  font-size: var(--fs-label);
+  color: var(--muted);
+}
+.backup-snapshots-count {
+  font-size: var(--fs-meta);
+  color: var(--muted);
+}
+.backup-history-list {
+  max-height: 150px;
+}
 .backup-modal-status {
   min-height: 20px;
   margin: 0 0 var(--s3);
@@ -524,4 +551,17 @@ textarea:disabled {
   border-color: var(--danger-line);
   background: var(--danger-wash);
   color: var(--danger);
+}
+.backup-footer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s2);
+}
+.backup-footer-right {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  margin-left: auto;
 }
