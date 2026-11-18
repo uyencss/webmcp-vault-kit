@@ -171,6 +171,7 @@ test('vault UI serves all frontend scripts without 404', async (t) => {
   const criticalAssets = [
     '/assets/app/main.js',
     '/assets/app/backup-modal.js',
+    '/assets/app/drive-folder-tree.js',
     '/assets/app/context-menu.js',
     '/assets/app/controller.js',
     '/assets/app/state.js',

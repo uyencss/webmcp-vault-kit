@@ -6,6 +6,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { createRequire } from 'node:module';
 import { assertSafeRemoteHost, mergeVaultPayloads } from '../../skills/webmcp-vault/scripts/sync-vault.mjs';
+import { canDropDriveFolder } from '../../lib/ui/app/drive-folder-tree.js';
 
 const require = createRequire(import.meta.url);
 const { createVaultStore, getVaultFile } = require('../../lib/store.js');
@@ -68,6 +69,22 @@ if (cmd === 'mkdir') {
   const target = args[args.length - 1];
   const [remote, rel] = splitRemotePath(target);
   fs.mkdirSync(path.join(CLOUD_ROOT, remote, rel), { recursive: true });
+  process.exit(0);
+}
+
+if (cmd === 'moveto') {
+  const src = args[args.length - 2];
+  const dst = args[args.length - 1];
+  const [srcRemote, srcRel] = splitRemotePath(src);
+  const [dstRemote, dstRel] = splitRemotePath(dst);
+  const fullSrc = path.join(CLOUD_ROOT, srcRemote, srcRel);
+  const fullDst = path.join(CLOUD_ROOT, dstRemote, dstRel);
+  if (!fs.existsSync(fullSrc)) {
+    process.stderr.write('Failed to moveto: source not found\\n');
+    process.exit(3);
+  }
+  fs.mkdirSync(path.dirname(fullDst), { recursive: true });
+  fs.renameSync(fullSrc, fullDst);
   process.exit(0);
 }
 
@@ -480,6 +497,51 @@ test('UI HTTP backup endpoints enforce explicit token, keep /status rclone-free,
   })).json();
   assert.equal(defaultReusedPush.remoteDir, 'My Vault/2026');
   assert.equal(defaultReusedPush.skippedDuplicate, true);
+
+  // Move folder into Archive and back to root; selectedDir must rewrite in sync
+  await fetch(`${base}/api/backup/rclone/mkdir`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ remote: 'gdrive', remoteDir: 'Archive' }),
+  });
+  await fetch(`${base}/api/backup/rclone/select-dir`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ remote: 'gdrive', remoteDir: 'My Vault/2026' }),
+  });
+  const mvRes = await (await fetch(`${base}/api/backup/rclone/mvdir`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ remote: 'gdrive', srcDir: 'My Vault', dstParentDir: 'Archive' }),
+  })).json();
+  assert.equal(mvRes.ok, true);
+  assert.equal(mvRes.dstDir, 'Archive/My Vault');
+  assert.equal(mvRes.selectedDir, 'Archive/My Vault/2026');
+
+  const stAfterMove = await (await fetch(`${base}/api/backup/status`, { headers })).json();
+  assert.equal(stAfterMove.remotes[0].selectedDir, 'Archive/My Vault/2026');
+
+  const selfSubMove = await fetch(`${base}/api/backup/rclone/mvdir`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ remote: 'gdrive', srcDir: 'Archive', dstParentDir: 'Archive/My Vault' }),
+  });
+  assert.ok(selfSubMove.status >= 400);
+
+  const mvBack = await (await fetch(`${base}/api/backup/rclone/mvdir`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ remote: 'gdrive', srcDir: 'Archive/My Vault', dstParentDir: '' }),
+  })).json();
+  assert.equal(mvBack.ok, true);
+  assert.equal(mvBack.dstDir, 'My Vault');
+  assert.equal(mvBack.selectedDir, 'My Vault/2026');
+
+  assert.equal(canDropDriveFolder('A', 'A/B'), false);
+  assert.equal(canDropDriveFolder('A/B', 'A'), false);
+  assert.equal(canDropDriveFolder('A', ''), false);
+  assert.equal(canDropDriveFolder('A/B', ''), true);
+  assert.equal(canDropDriveFolder('A', 'C'), true);
 
   // Dual-mode callback URL replay onto local rclone authorize listener without SSRF
   const cbStart = await (await fetch(`${base}/api/backup/rclone/auth/start`, {

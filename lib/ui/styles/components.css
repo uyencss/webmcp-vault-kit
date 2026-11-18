@@ -446,8 +446,8 @@ textarea:disabled {
 
 /* Backup Modal */
 .backup-dialog {
-  width: min(100% - 32px, 540px);
-  max-height: min(740px, calc(100vh - 32px));
+  width: min(100% - 32px, 560px);
+  max-height: min(760px, calc(100vh - 32px));
   overflow-y: auto;
 }
 .backup-section {
@@ -456,7 +456,6 @@ textarea:disabled {
   margin: var(--s3) 0;
 }
 .backup-remote-row,
-.backup-folder-row,
 .backup-new-folder-row {
   display: flex;
   flex-wrap: wrap;
@@ -464,10 +463,172 @@ textarea:disabled {
   gap: var(--s2);
 }
 .backup-remote-row select,
-.backup-folder-row select,
 .backup-new-folder-row input {
-  flex: 1 1 200px;
-  min-width: 150px;
+  flex: 1 1 180px;
+  min-width: 140px;
+}
+.backup-tree-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s2);
+}
+.backup-tree-heading {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  min-width: 0;
+}
+.backup-tree-title {
+  font-size: var(--fs-label);
+  font-weight: var(--fw-strong);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.backup-selected-pill {
+  padding: 2px var(--s2);
+  border: var(--border);
+  border-radius: var(--r-sm);
+  background: var(--sunk);
+  color: var(--ink);
+  font-size: var(--fs-meta);
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.backup-tree-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s1);
+  flex: none;
+}
+.backup-new-folder-parent {
+  max-width: 150px;
+  padding: 4px var(--s2);
+  border: var(--border);
+  border-radius: var(--r-sm);
+  background: var(--sunk);
+  color: var(--muted);
+  font-size: var(--fs-meta);
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.backup-new-folder-parent:hover {
+  color: var(--ink);
+}
+.backup-folder-tree {
+  max-height: 210px;
+  overflow-y: auto;
+  border: var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  padding: var(--s1);
+}
+.drive-tree-children {
+  padding-left: 16px;
+}
+.backup-folder-tree > .drive-tree-children {
+  padding-left: 12px;
+}
+.drive-tree-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s1);
+  padding: 4px var(--s2);
+  border-radius: var(--r-sm);
+  color: var(--ink);
+  font-size: var(--fs-meta);
+  cursor: pointer;
+  user-select: none;
+  transition: background var(--dur-fast);
+}
+.drive-tree-row:hover {
+  background: var(--sunk);
+}
+.drive-tree-row.active {
+  background: var(--live-weak);
+  font-weight: var(--fw-medium);
+}
+.drive-tree-row.root-focused:not(.active) {
+  background: var(--sunk);
+}
+.drive-tree-row.drag-over {
+  outline: 2px dashed var(--live);
+  background: var(--live-weak);
+}
+.drive-tree-row.is-dragging {
+  opacity: 0.45;
+  cursor: grabbing;
+}
+.drive-tree-chevron {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: transform var(--dur-fast), color var(--dur-fast);
+}
+.drive-tree-chevron:hover {
+  color: var(--ink);
+  background: var(--surface);
+}
+.drive-tree-chevron.is-expanded {
+  transform: rotate(90deg);
+}
+.drive-tree-icon {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  color: var(--muted);
+}
+.drive-tree-row.active .drive-tree-icon {
+  color: var(--live);
+}
+.drive-tree-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.drive-tree-add-sub {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--muted);
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity var(--dur-fast), background var(--dur-fast), color var(--dur-fast);
+}
+.drive-tree-row:hover .drive-tree-add-sub,
+.drive-tree-row:focus-within .drive-tree-add-sub {
+  opacity: 1;
+}
+.drive-tree-add-sub:hover {
+  background: var(--surface);
+  color: var(--ink);
+}
+.drive-tree-empty {
+  padding: var(--s2) var(--s2);
+  color: var(--muted);
+  font-size: var(--fs-meta);
 }
 .backup-notice {
   padding: var(--s2) var(--s3);

@@ -993,34 +993,69 @@
         </div>
 
         <div class="backup-section hidden" id="backupWorkspaceSection">
-          <label for="backupFolderSelect">Backup Folder on Google Drive</label>
-          <div class="backup-folder-row">
-            <select id="backupFolderSelect" aria-label="Google Drive backup folder"></select>
-            <button
-              class="btn sm ghost"
-              id="refreshDriveFoldersButton"
-              type="button"
-              title="Refresh Drive folders"
-            >
-              Refresh
-            </button>
-            <button class="btn sm ghost" id="toggleNewFolderButton" type="button">
-              + New Folder
-            </button>
+          <div class="backup-tree-toolbar">
+            <div class="backup-tree-heading">
+              <span class="backup-tree-title">Google Drive Folders</span>
+              <span class="backup-selected-pill mono" id="backupSelectedPathBadge">None selected</span>
+            </div>
+            <div class="backup-tree-actions">
+              <button
+                class="icon-button"
+                id="toggleNewFolderButton"
+                type="button"
+                aria-label="New folder"
+                title="New folder"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                  <path d="M12 11v6M9 14h6"></path>
+                </svg>
+              </button>
+              <button
+                class="icon-button"
+                id="refreshDriveFoldersButton"
+                type="button"
+                aria-label="Refresh Drive folders"
+                title="Refresh folders"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M21 12a9 9 0 1 1-2.64-6.36"></path>
+                  <path d="M21 3v6h-6"></path>
+                </svg>
+              </button>
+            </div>
           </div>
+
           <div class="backup-new-folder-row hidden" id="backupNewFolderRow">
+            <button
+              class="backup-new-folder-parent mono"
+              id="backupNewFolderParentBadge"
+              type="button"
+              title="Click to target My Drive root"
+            >My Drive /</button>
             <input
               id="backupNewFolderInput"
               type="text"
-              placeholder="New folder name (e.g. Vault-Backups or Backups/Vault)"
-              maxlength="160"
+              placeholder="New folder name..."
+              maxlength="120"
               autocomplete="off"
               aria-label="New Google Drive folder name"
             />
             <button class="btn sm primary" id="createDriveFolderButton" type="button">
-              Create &amp; Use
+              Create
+            </button>
+            <button
+              class="icon-button"
+              id="cancelNewFolderButton"
+              type="button"
+              aria-label="Cancel new folder"
+              title="Cancel"
+            >
+              ✕
             </button>
           </div>
+
+          <div class="backup-folder-tree" id="backupFolderTree" role="tree" aria-label="Google Drive folders"></div>
 
           <div class="backup-snapshots-box">
             <div class="backup-snapshots-head">
