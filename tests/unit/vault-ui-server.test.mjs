@@ -749,4 +749,30 @@ test('vault UI #backupDialog serves segmented tabs, account cards, unified folde
   assert.doesNotMatch(treeJs, /\.style\./);
 });
 
+test('startVaultUiServer on 0.0.0.0 refuses to shadow an active 127.0.0.1 instance or overwrite vault-ui.json', async (t) => {
+  const oldHome = process.env.WEBMCP_HOME;
+  const home = tempHome();
+  process.env.WEBMCP_HOME = home;
+
+  const first = await startVaultUiServer({ host: '127.0.0.1', port: 0 });
+  t.after(() => {
+    first.server.close();
+    if (oldHome === undefined) delete process.env.WEBMCP_HOME;
+    else process.env.WEBMCP_HOME = oldHome;
+  });
+
+  await assert.rejects(
+    () => startVaultUiServer({ host: '0.0.0.0', port: first.port, stateFile: first.stateFile }),
+    (err) => err?.code === 'EADDRINUSE',
+  );
+
+  const saved = JSON.parse(fs.readFileSync(first.stateFile, 'utf8'));
+  assert.equal(saved.token, first.token);
+  assert.equal(saved.port, first.port);
+
+  const pageRes = await fetch(`http://127.0.0.1:${first.port}/?token=${first.token}`);
+  assert.equal(pageRes.status, 200);
+});
+
+
 
