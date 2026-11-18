@@ -14,7 +14,10 @@ const {
   assertEncryptedEnvelopeFile,
   bootstrapRcloneFromVault,
   cancelGdriveAuth,
+  getBackupStatus,
+  parseRcloneAuthorizeToken,
   parseRcloneDriveRemotes,
+  resolveDriveAccountEmails,
 } = require('../../lib/vault/rclone-backup.js');
 
 function makeTempDir(prefix) {
@@ -30,11 +33,6 @@ const CLOUD_ROOT = ${JSON.stringify(cloudRoot)};
 const LOG_PATH = ${JSON.stringify(logPath)};
 const args = process.argv.slice(2);
 fs.appendFileSync(LOG_PATH, JSON.stringify(args) + '\\n');
-
-function flagValue(flag) {
-  const idx = args.indexOf(flag);
-  return idx >= 0 ? args[idx + 1] : '';
-}
 
 function splitRemotePath(spec) {
   const idx = String(spec || '').indexOf(':');
@@ -76,21 +74,25 @@ if (cmd === 'deletefile') {
   process.exit(0);
 }
 
-if (cmd === 'config' && args[1] === 'create') {
-  const remoteName = args[2];
-  const confPath = flagValue('--config') || process.env.RCLONE_CONFIG;
-  if (remoteName === 'gdriveslow') {
-    process.stdout.write('NOTICE: Paste the following into your web browser: http://127.0.0.1:53682/auth?state=slow\\n');
+if (cmd === 'authorize' && args[1] === 'drive') {
+  if (!args.includes('--auth-no-open-browser')) {
+    process.stderr.write('Expected --auth-no-open-browser flag\\n');
+    process.exit(2);
+  }
+  let params = {};
+  try { params = JSON.parse(Buffer.from(args[2] || '', 'base64url').toString('utf8')); } catch {}
+  if (params.scope === 'drive.slow') {
+    process.stderr.write('NOTICE: Please go to the following link: http://127.0.0.1:53682/auth?state=slow\\n');
     setTimeout(() => process.exit(0), 10000);
   } else {
-    process.stdout.write('NOTICE: go to http://127.0.0.1:53682/auth?state=test\\n');
+    process.stderr.write('NOTICE: Please go to the following link: http://127.0.0.1:53682/auth?state=test\\n');
     setTimeout(() => {
-      const prev = fs.existsSync(confPath) ? fs.readFileSync(confPath, 'utf8').trimEnd() : '';
-      const entry = \`[\${remoteName}]\\ntype = drive\\nscope = drive.file\\ntoken = {"access_token":"ok","token_type":"Bearer","refresh_token":"1//test"}\\n\`;
-      fs.mkdirSync(path.dirname(confPath), { recursive: true });
-      fs.writeFileSync(confPath, (prev ? prev + '\\n\\n' : '') + entry, { mode: 0o600 });
+      const tokPayload = Buffer.from(JSON.stringify({
+        token: JSON.stringify({ access_token: 'fake-access-tok', token_type: 'Bearer', refresh_token: '1//test' }),
+      })).toString('base64url');
+      process.stdout.write('Paste the following into your remote machine --->\\n' + tokPayload + '\\n<---End paste\\n');
       process.exit(0);
-    }, 120);
+    }, 100);
   }
 } else {
   process.stderr.write('Unsupported fake rclone command: ' + args.join(' ') + '\\n');
@@ -333,7 +335,7 @@ test('UI HTTP backup endpoints enforce explicit token, keep /status rclone-free,
   assert.ok(badAuth.status >= 400);
   assert.equal(fs.readFileSync(logPath, 'utf8').trim().split('\n').length, logLinesBefore);
 
-  // Auth start -> poll to done with autoBackup
+  // Auth start -> poll to done with autoBackup via rclone authorize --auth-no-open-browser
   const authStart = await (await fetch(`${base}/api/backup/rclone/auth/start`, {
     method: 'POST',
     headers,
@@ -349,12 +351,15 @@ test('UI HTTP backup endpoints enforce explicit token, keep /status rclone-free,
   }
   assert.equal(authDone.status, 'done');
   assert.equal(authDone.backupResult?.ok, true);
+  assert.equal(fs.statSync(confPath).mode & 0o777, 0o600);
+  assert.match(fs.readFileSync(confPath, 'utf8'), /^\[gdrive2\]/m);
+  assert.match(fs.readFileSync(logPath, 'utf8'), /--auth-no-open-browser/);
 
   // Concurrent startGdriveAuth override: stale proc1 close must NOT corrupt new job2
   const slowOverride1 = await (await fetch(`${base}/api/backup/rclone/auth/start`, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ remote: 'gdriveslow' }),
+    body: JSON.stringify({ remote: 'gdriveslow', scope: 'drive.slow' }),
   })).json();
   assert.equal(slowOverride1.status, 'pending');
 
@@ -381,7 +386,7 @@ test('UI HTTP backup endpoints enforce explicit token, keep /status rclone-free,
   const slowStart = await (await fetch(`${base}/api/backup/rclone/auth/start`, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ remote: 'gdriveslow' }),
+    body: JSON.stringify({ remote: 'gdriveslow', scope: 'drive.slow' }),
   })).json();
   assert.equal(slowStart.status, 'pending');
 
@@ -390,6 +395,43 @@ test('UI HTTP backup endpoints enforce explicit token, keep /status rclone-free,
     headers,
   })).json();
   assert.equal(cancelled.status, 'cancelled');
+});
+
+test('parseRcloneAuthorizeToken decodes base64url & JSON and resolveDriveAccountEmails caches emails lazily', async () => {
+  const b64Tok = Buffer.from(JSON.stringify({ access_token: 'a1', refresh_token: 'r1' })).toString('base64url');
+  const wrapped = parseRcloneAuthorizeToken(`Paste the following --->\n${b64Tok}\n<---End paste`);
+  assert.equal(wrapped.tokenObj.access_token, 'a1');
+  const rawJson = parseRcloneAuthorizeToken('{"token":"{\\"access_token\\":\\"a2\\",\\"refresh_token\\":\\"r2\\"}"}');
+  assert.equal(rawJson.tokenObj.access_token, 'a2');
+
+  const root = makeTempDir('webmcp-rclone-email-');
+  const dataDir = path.join(root, 'data');
+  const confPath = path.join(root, 'rclone.conf');
+  fs.mkdirSync(dataDir, { recursive: true });
+  fs.writeFileSync(
+    confPath,
+    '[gdrive]\ntype = drive\nscope = drive\ntoken = {"access_token":"live-tok","refresh_token":"1//ref"}\n',
+    { mode: 0o600 },
+  );
+
+  let fetchCount = 0;
+  const fakeFetch = async () => {
+    fetchCount += 1;
+    return { ok: true, json: async () => ({ user: { emailAddress: 'user@example.com' } }) };
+  };
+
+  const first = await resolveDriveAccountEmails({ dataDir, rcloneConfPath: confPath, fetchImpl: fakeFetch });
+  assert.equal(fetchCount, 1);
+  assert.equal(first.remotes[0].email, 'user@example.com');
+
+  const cachedStatus = getBackupStatus({ dataDir, rcloneConfPath: confPath });
+  assert.equal(cachedStatus.remotes[0].email, 'user@example.com');
+
+  const second = await resolveDriveAccountEmails({ dataDir, rcloneConfPath: confPath, fetchImpl: fakeFetch });
+  assert.equal(fetchCount, 1);
+  assert.equal(second.remotes[0].email, 'user@example.com');
+
+  fs.rmSync(root, { recursive: true, force: true });
 });
 
 test('mergeVaultPayloads performs lossless 2-way merge with passwordHistory, tag union, and deletedAt tombstones', () => {

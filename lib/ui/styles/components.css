@@ -446,14 +446,14 @@ textarea:disabled {
 
 /* Backup Modal */
 .backup-dialog {
-  width: min(100% - 32px, 580px);
-  max-height: min(740px, calc(100vh - 32px));
+  width: min(100% - 32px, 480px);
+  max-height: min(640px, calc(100vh - 32px));
   overflow-y: auto;
 }
 .backup-section {
   display: grid;
   gap: var(--s2);
-  margin-bottom: var(--s4);
+  margin: var(--s3) 0;
 }
 .backup-remote-row {
   display: flex;
@@ -462,8 +462,8 @@ textarea:disabled {
   gap: var(--s2);
 }
 .backup-remote-row select {
-  flex: 1 1 180px;
-  min-width: 140px;
+  flex: 1 1 200px;
+  min-width: 160px;
 }
 .backup-notice {
   padding: var(--s2) var(--s3);
@@ -474,47 +474,31 @@ textarea:disabled {
   font-size: var(--fs-meta);
   line-height: 1.4;
 }
-.backup-auth-panel {
+.backup-auth-pending {
   display: grid;
   gap: var(--s2);
   padding: var(--s3);
   border: var(--border);
   border-radius: var(--r-md);
   background: var(--sunk);
-}
-.backup-auth-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--s2);
-}
-.backup-auth-row input {
-  flex: 1 1 140px;
-  min-width: 120px;
-}
-.backup-auth-pending {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--s2);
-  padding: var(--s2) var(--s3);
-  border: var(--border);
-  border-radius: var(--r-sm);
-  background: var(--surface);
   color: var(--ink);
   font-size: var(--fs-meta);
 }
-.backup-auth-pending-actions {
-  display: inline-flex;
+.backup-auth-hint {
+  color: var(--muted);
+  font-size: var(--fs-meta);
+  line-height: 1.4;
+}
+.backup-auth-url-row {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--s2);
 }
-.backup-actions-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--s2);
-  margin-bottom: var(--s3);
+.backup-auth-url-row input {
+  flex: 1 1 200px;
+  min-width: 0;
+  font-size: var(--fs-meta);
 }
 .backup-modal-status {
   min-height: 20px;
@@ -540,13 +524,4 @@ textarea:disabled {
   border-color: var(--danger-line);
   background: var(--danger-wash);
   color: var(--danger);
-}
-.backup-history-list {
-  max-height: 200px;
-}
-.backup-history-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--s2);
 }
