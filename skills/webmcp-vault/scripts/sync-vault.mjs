@@ -19,12 +19,12 @@
  *   --json                Output results in structured JSON
  */
 
-import { execSync } from 'node:child_process';
+import { execFileSync, execSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, copyFileSync, chmodSync, realpathSync, unlinkSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { homedir, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { createHash } from 'node:crypto';
+import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
@@ -32,10 +32,35 @@ const { readEnvelope, writeEnvelope, encryptVault, decryptVault } = require('../
 const { withFileLock } = require('../../../lib/vault/fs-safe.js');
 const { nowIso } = require('../../../lib/vault/util.js');
 
+const REMOTE_HOST_RE = /^[A-Za-z0-9][A-Za-z0-9._@-]{0,127}$/;
+
 const LOCAL_HOME = homedir();
 const LOCAL_VAULT_DIR = join(LOCAL_HOME, '.webmcp', 'vault');
 const LOCAL_BACKUP_DIR = join(LOCAL_VAULT_DIR, 'backups');
 const LOCAL_STORE_FILE = join(LOCAL_VAULT_DIR, 'credentials.enc.json');
+
+export function assertSafeRemoteHost(remoteHost) {
+  const host = String(remoteHost || '').trim();
+  if (!REMOTE_HOST_RE.test(host)) {
+    throw new Error(`Invalid remote SSH host: ${remoteHost}`);
+  }
+  return host;
+}
+
+function assertSafeRemotePath(remotePath) {
+  const p = String(remotePath || '').trim();
+  if (!p.startsWith('/') || /[\0\r\n"'`$;&|<>]/.test(p)) {
+    throw new Error(`Invalid remote path: ${remotePath}`);
+  }
+  return p;
+}
+
+function ensureLocalPrivateDirs() {
+  mkdirSync(LOCAL_VAULT_DIR, { recursive: true, mode: 0o700 });
+  mkdirSync(LOCAL_BACKUP_DIR, { recursive: true, mode: 0o700 });
+  try { chmodSync(LOCAL_VAULT_DIR, 0o700); } catch {}
+  try { chmodSync(LOCAL_BACKUP_DIR, 0o700); } catch {}
+}
 
 // Local key search priority: ~/.webmcp/vault/vault.key -> ~/.webmcp/vault.key
 function getLocalKeyPath() {
@@ -53,14 +78,15 @@ function sha256File(filePath) {
 }
 
 function runRemoteSsh(remoteHost, cmd) {
+  const host = assertSafeRemoteHost(remoteHost);
   try {
-    const wrappedCmd = `export PATH="\\$HOME/.local/bin:\\$HOME/.nvm/versions/node/v24.19.0/bin:/usr/local/bin:/usr/bin:/bin:\\$PATH"; ${cmd}`;
-    return execSync(`ssh -o BatchMode=yes -o ConnectTimeout=5 ${remoteHost} "${wrappedCmd}"`, {
+    const wrappedCmd = `export PATH="$HOME/.local/bin:$HOME/.nvm/versions/node/v24.19.0/bin:/usr/local/bin:/usr/bin:/bin:$PATH"; ${cmd}`;
+    return execFileSync('ssh', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=5', '--', host, wrappedCmd], {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
     }).trim();
   } catch (err) {
-    throw new Error(`Remote SSH error (${remoteHost}): ${err.stderr || err.message}`);
+    throw new Error(`Remote SSH error (${host}): ${err.stderr || err.message}`);
   }
 }
 
@@ -170,10 +196,14 @@ function getRemoteVaultInfo(remoteHost) {
 
   const b64 = Buffer.from(probeScript, 'utf8').toString('base64');
   const raw = runRemoteSsh(remoteHost, `echo "${b64}" | base64 -d | node`);
-  return JSON.parse(raw);
+  const parsed = JSON.parse(raw);
+  assertSafeRemotePath(parsed.keyPath);
+  assertSafeRemotePath(parsed.storePath);
+  return parsed;
 }
 
 async function doStatus(flags) {
+  assertSafeRemoteHost(flags.remote);
   const local = await getLocalVaultInfo();
   const remote = getRemoteVaultInfo(flags.remote);
 
@@ -209,40 +239,42 @@ async function doStatus(flags) {
 }
 
 async function doSyncKey(flags) {
+  const host = assertSafeRemoteHost(flags.remote);
   const local = await getLocalVaultInfo();
-  const remote = getRemoteVaultInfo(flags.remote);
+  const remote = getRemoteVaultInfo(host);
 
   if (flags.pushKey) {
     // Push local key to remote
     if (!local.keyExists) throw new Error('Local key does not exist. Cannot push.');
-    console.log(`Pushing key from Local (${local.keyPath}) -> Remote (${flags.remote}:${remote.keyPath})...`);
+    console.log(`Pushing key from Local (${local.keyPath}) -> Remote (${host}:${remote.keyPath})...`);
     if (flags.dryRun) {
       console.log(`[Dry-run] Would copy key to remote.`);
       return;
     }
     // Remote backup
-    runRemoteSsh(flags.remote, `[ -f "${remote.keyPath}" ] && cp "${remote.keyPath}" "${remote.keyPath}.bak-$(date +%s)" || true`);
-    execSync(`scp "${local.keyPath}" "${flags.remote}:${remote.keyPath}"`, { stdio: 'inherit' });
-    runRemoteSsh(flags.remote, `chmod 600 "${remote.keyPath}"`);
-    console.log(`✅ Key pushed successfully to ${flags.remote}!`);
+    runRemoteSsh(host, `[ -f "${remote.keyPath}" ] && cp "${remote.keyPath}" "${remote.keyPath}.bak-$(date +%s)" || true`);
+    execFileSync('scp', ['--', local.keyPath, `${host}:${remote.keyPath}`], { stdio: 'inherit' });
+    runRemoteSsh(host, `chmod 600 "${remote.keyPath}"`);
+    console.log(`✅ Key pushed successfully to ${host}!`);
   } else {
     // Pull remote key to local (default)
-    if (!remote.keyExists) throw new Error(`Remote key does not exist on ${flags.remote}. Cannot pull.`);
+    if (!remote.keyExists) throw new Error(`Remote key does not exist on ${host}. Cannot pull.`);
     const targetKeyPath = join(LOCAL_VAULT_DIR, 'vault.key');
-    mkdirSync(LOCAL_VAULT_DIR, { recursive: true, mode: 0o700 });
+    ensureLocalPrivateDirs();
 
     if (existsSync(targetKeyPath)) {
       const backupPath = `${targetKeyPath}.bak-${Date.now()}`;
       copyFileSync(targetKeyPath, backupPath);
+      chmodSync(backupPath, 0o600);
       console.log(`Backed up existing local key to ${backupPath}`);
     }
 
-    console.log(`Pulling key from Remote (${flags.remote}:${remote.keyPath}) -> Local (${targetKeyPath})...`);
+    console.log(`Pulling key from Remote (${host}:${remote.keyPath}) -> Local (${targetKeyPath})...`);
     if (flags.dryRun) {
       console.log(`[Dry-run] Would pull key from remote.`);
       return;
     }
-    execSync(`scp "${flags.remote}:${remote.keyPath}" "${targetKeyPath}"`, { stdio: 'inherit' });
+    execFileSync('scp', ['--', `${host}:${remote.keyPath}`, targetKeyPath], { stdio: 'inherit' });
     chmodSync(targetKeyPath, 0o600);
     // Also keep ~/.webmcp/vault.key updated if it exists
     const fallbackPath = join(LOCAL_HOME, '.webmcp', 'vault.key');
@@ -255,30 +287,31 @@ async function doSyncKey(flags) {
 }
 
 async function doPull(flags) {
+  const host = assertSafeRemoteHost(flags.remote);
   const local = await getLocalVaultInfo();
-  const remote = getRemoteVaultInfo(flags.remote);
+  const remote = getRemoteVaultInfo(host);
 
-  if (!remote.storeExists) throw new Error(`Remote credentials file does not exist on ${flags.remote}.`);
+  if (!remote.storeExists) throw new Error(`Remote credentials file does not exist on ${host}.`);
   if (local.keyHash !== remote.keyHash) {
     throw new Error('Key mismatch between local and remote! Run "node sync-vault.mjs sync-key" first.');
   }
 
-  mkdirSync(LOCAL_VAULT_DIR, { recursive: true, mode: 0o700 });
-  mkdirSync(LOCAL_BACKUP_DIR, { recursive: true, mode: 0o700 });
+  ensureLocalPrivateDirs();
 
   if (existsSync(LOCAL_STORE_FILE)) {
     const backupFile = join(LOCAL_BACKUP_DIR, `credentials.pre-pull.${Date.now()}.enc.json`);
     copyFileSync(LOCAL_STORE_FILE, backupFile);
+    chmodSync(backupFile, 0o600);
     console.log(`Created pre-pull local backup: ${backupFile}`);
   }
 
-  console.log(`Pulling credentials from ${flags.remote}:${remote.storePath} -> ${LOCAL_STORE_FILE}...`);
+  console.log(`Pulling credentials from ${host}:${remote.storePath} -> ${LOCAL_STORE_FILE}...`);
   if (flags.dryRun) {
     console.log(`[Dry-run] Would rsync store from remote.`);
     return;
   }
 
-  execSync(`rsync -avz "${flags.remote}:${remote.storePath}" "${LOCAL_STORE_FILE}"`, { stdio: 'inherit' });
+  execFileSync('rsync', ['-avz', '--', `${host}:${remote.storePath}`, LOCAL_STORE_FILE], { stdio: 'inherit' });
   chmodSync(LOCAL_STORE_FILE, 0o600);
 
   // Verification
@@ -292,35 +325,37 @@ async function doPull(flags) {
 }
 
 async function doPush(flags) {
+  const host = assertSafeRemoteHost(flags.remote);
   const local = await getLocalVaultInfo();
-  const remote = getRemoteVaultInfo(flags.remote);
+  const remote = getRemoteVaultInfo(host);
 
   if (!local.storeExists) throw new Error('Local credentials file does not exist.');
   if (local.keyHash !== remote.keyHash) {
     throw new Error('Key mismatch between local and remote! Run "node sync-vault.mjs sync-key" first.');
   }
 
-  console.log(`Creating pre-push backup on ${flags.remote}...`);
+  console.log(`Creating pre-push backup on ${host}...`);
   if (!flags.dryRun) {
     const remoteBackupCmd = `
-      mkdir -p ~/.webmcp/vault/backups && \
-      [ -f ~/.webmcp/vault/credentials.enc.json ] && \
-      cp ~/.webmcp/vault/credentials.enc.json ~/.webmcp/vault/backups/credentials.pre-push.\$(date +%s).enc.json || true
+      mkdir -m 700 -p ~/.webmcp/vault ~/.webmcp/vault/backups && \
+      chmod 700 ~/.webmcp/vault ~/.webmcp/vault/backups && \
+      if [ -f ~/.webmcp/vault/credentials.enc.json ]; then cp ~/.webmcp/vault/credentials.enc.json ~/.webmcp/vault/backups/credentials.pre-push.$(date +%s).enc.json && chmod 600 ~/.webmcp/vault/backups/credentials.pre-push.*.enc.json; fi
     `;
-    runRemoteSsh(flags.remote, remoteBackupCmd);
+    runRemoteSsh(host, remoteBackupCmd);
   }
 
-  console.log(`Pushing credentials from ${LOCAL_STORE_FILE} -> ${flags.remote}:${remote.storePath}...`);
+  console.log(`Pushing credentials from ${LOCAL_STORE_FILE} -> ${host}:${remote.storePath}...`);
   if (flags.dryRun) {
     console.log(`[Dry-run] Would rsync store to remote.`);
     return;
   }
 
-  execSync(`rsync -avz "${LOCAL_STORE_FILE}" "${flags.remote}:${remote.storePath}"`, { stdio: 'inherit' });
+  execFileSync('rsync', ['-avz', '--', LOCAL_STORE_FILE, `${host}:${remote.storePath}`], { stdio: 'inherit' });
+  runRemoteSsh(host, `chmod 600 "${remote.storePath}"`);
 
   // Remote verification
   console.log(`Verifying remote store after push...`);
-  const updatedRemote = getRemoteVaultInfo(flags.remote);
+  const updatedRemote = getRemoteVaultInfo(host);
   if (updatedRemote.unlocked) {
     console.log(`✅ Push succeeded! Remote vault now contains ${updatedRemote.itemsCount} items across ${updatedRemote.vaultsCount} vault(s).`);
   } else {
@@ -369,9 +404,14 @@ export function mergeVaultPayloads(localVaultInput, remoteVaultInput) {
     }
   }
   const mergedVaults = [...vaultMap.values()];
-  if (mergedVaults.length > 0 && !mergedVaults.some((v) => v.isDefault)) {
-    const fallback = mergedVaults.find((v) => v.id === 'personal') || mergedVaults[0];
-    fallback.isDefault = true;
+  if (mergedVaults.length > 0) {
+    const primary = mergedVaults.find((v) => v.isDefault && v.id === 'personal')
+      || mergedVaults.find((v) => v.isDefault)
+      || mergedVaults.find((v) => v.id === 'personal')
+      || mergedVaults[0];
+    for (const v of mergedVaults) {
+      v.isDefault = v === primary;
+    }
   }
   const validVaultIds = new Set(mergedVaults.map((v) => v.id));
   const defaultVaultId = (mergedVaults.find((v) => v.isDefault) || mergedVaults[0])?.id || 'personal';
@@ -409,10 +449,16 @@ export function mergeVaultPayloads(localVaultInput, remoteVaultInput) {
           winner.deletedAt = loser.deletedAt;
         }
       }
+      if (winner.passkey?.credentialId && loser.passkey?.credentialId && winner.passkey.credentialId === loser.passkey.credentialId) {
+        winner.passkey = {
+          ...winner.passkey,
+          signCount: Math.max(Number(a.passkey.signCount || 0), Number(b.passkey.signCount || 0)),
+        };
+      }
       const history = mergePasswordHistory(a, b, winner, loser);
       if (history.length > 0) winner.passwordHistory = history;
       if (Array.isArray(a.tags) || Array.isArray(b.tags)) {
-        winner.tags = [...new Set([...(a.tags || []), ...(b.tags || [])].map((t) => String(t).trim().toLowerCase()).filter(Boolean))];
+        winner.tags = [...new Set([...(a.tags || []), ...(b.tags || [])].map((t) => String(t).trim().toLowerCase()).filter(Boolean))].slice(0, 20);
       }
       merged = winner;
     }
@@ -439,11 +485,9 @@ export function mergeVaultPayloads(localVaultInput, remoteVaultInput) {
 }
 
 async function doSync(flags) {
-  if (!/^[A-Za-z0-9._@-]+$/.test(flags.remote)) {
-    throw new Error(`Invalid remote host: ${flags.remote}`);
-  }
+  const host = assertSafeRemoteHost(flags.remote);
   const local = await getLocalVaultInfo();
-  const remote = getRemoteVaultInfo(flags.remote);
+  const remote = getRemoteVaultInfo(host);
 
   if (!local.keyExists || !remote.keyExists || local.keyHash !== remote.keyHash) {
     throw new Error('Key mismatch between local and remote! Run "node sync-vault.mjs sync-key" first.');
@@ -458,18 +502,17 @@ async function doSync(flags) {
     throw new Error('Neither local nor remote vault store exists.');
   }
 
-  mkdirSync(LOCAL_VAULT_DIR, { recursive: true, mode: 0o700 });
-  mkdirSync(LOCAL_BACKUP_DIR, { recursive: true, mode: 0o700 });
+  ensureLocalPrivateDirs();
 
   const ts = Date.now();
   const remoteSnapPath = flags.dryRun
-    ? join(tmpdir(), `webmcp-remote-dry-${ts}.enc.json`)
+    ? join(LOCAL_BACKUP_DIR, `remote-dry-sync.${ts}.enc.json`)
     : join(LOCAL_BACKUP_DIR, `remote-pre-sync.${ts}.enc.json`);
 
   let keyBuf = null;
   try {
     if (remote.storeExists) {
-      execSync(`rsync -avz "${flags.remote}:${remote.storePath}" "${remoteSnapPath}"`, { stdio: flags.json ? 'ignore' : 'inherit' });
+      execFileSync('rsync', ['-avz', '--', `${host}:${remote.storePath}`, remoteSnapPath], { stdio: flags.json ? 'ignore' : 'inherit' });
       chmodSync(remoteSnapPath, 0o600);
     }
 
@@ -480,19 +523,27 @@ async function doSync(flags) {
         chmodSync(localPreSync, 0o600);
       }
       if (remote.storeExists) {
-        const remoteBackupCmd = `mkdir -p ~/.webmcp/vault/backups && [ -f ~/.webmcp/vault/credentials.enc.json ] && cp ~/.webmcp/vault/credentials.enc.json ~/.webmcp/vault/backups/credentials.pre-sync.${ts}.enc.json || true`;
-        runRemoteSsh(flags.remote, remoteBackupCmd);
+        const remoteBackupCmd = `mkdir -m 700 -p ~/.webmcp/vault ~/.webmcp/vault/backups && chmod 700 ~/.webmcp/vault ~/.webmcp/vault/backups && if [ -f ~/.webmcp/vault/credentials.enc.json ]; then cp ~/.webmcp/vault/credentials.enc.json ~/.webmcp/vault/backups/credentials.pre-sync.${ts}.enc.json && chmod 600 ~/.webmcp/vault/backups/credentials.pre-sync.${ts}.enc.json; fi`;
+        runRemoteSsh(host, remoteBackupCmd);
+      } else {
+        runRemoteSsh(host, 'mkdir -m 700 -p ~/.webmcp/vault && chmod 700 ~/.webmcp/vault');
       }
     }
 
     keyBuf = readFileSync(local.keyPath);
     const secret = keyBuf.toString('utf8').trim();
-    const localEnv = existsSync(LOCAL_STORE_FILE) ? readEnvelope(LOCAL_STORE_FILE) : null;
-    const remoteEnv = remote.storeExists ? readEnvelope(remoteSnapPath) : null;
-    const localVault = localEnv ? decryptVault(localEnv, secret) : null;
-    const remoteVault = remoteEnv ? decryptVault(remoteEnv, secret) : null;
-
-    const { vault: mergedVault, stats } = mergeVaultPayloads(localVault, remoteVault);
+    const { stats } = withFileLock(LOCAL_STORE_FILE, () => {
+      const localEnv = existsSync(LOCAL_STORE_FILE) ? readEnvelope(LOCAL_STORE_FILE) : null;
+      const remoteEnv = remote.storeExists ? readEnvelope(remoteSnapPath) : null;
+      const localVault = localEnv ? decryptVault(localEnv, secret) : null;
+      const remoteVault = remoteEnv ? decryptVault(remoteEnv, secret) : null;
+      const mergedResult = mergeVaultPayloads(localVault, remoteVault);
+      if (!flags.dryRun) {
+        writeEnvelope(LOCAL_STORE_FILE, encryptVault(mergedResult.vault, secret, localEnv?.kdf || null));
+        chmodSync(LOCAL_STORE_FILE, 0o600);
+      }
+      return { stats: mergedResult.stats };
+    });
 
     if (flags.dryRun) {
       const out = { ok: true, dryRun: true, storesMatch: false, localHash: local.storeHash, remoteHash: remote.storeHash, stats };
@@ -501,16 +552,11 @@ async function doSync(flags) {
       return;
     }
 
-    withFileLock(LOCAL_STORE_FILE, () => {
-      const existingKdf = readEnvelope(LOCAL_STORE_FILE)?.kdf || null;
-      writeEnvelope(LOCAL_STORE_FILE, encryptVault(mergedVault, secret, existingKdf));
-    });
-    chmodSync(LOCAL_STORE_FILE, 0o600);
-
-    execSync(`rsync -avz "${LOCAL_STORE_FILE}" "${flags.remote}:${remote.storePath}"`, { stdio: flags.json ? 'ignore' : 'inherit' });
+    execFileSync('rsync', ['-avz', '--', LOCAL_STORE_FILE, `${host}:${remote.storePath}`], { stdio: flags.json ? 'ignore' : 'inherit' });
+    runRemoteSsh(host, `chmod 600 "${remote.storePath}"`);
 
     const finalLocalHash = sha256File(LOCAL_STORE_FILE);
-    const updatedRemote = getRemoteVaultInfo(flags.remote);
+    const updatedRemote = getRemoteVaultInfo(host);
     const storesMatch = Boolean(finalLocalHash && updatedRemote.storeHash && finalLocalHash === updatedRemote.storeHash);
     const out = { ok: true, dryRun: false, storesMatch, localHash: finalLocalHash, remoteHash: updatedRemote.storeHash, stats };
     if (flags.json) console.log(JSON.stringify(out, null, 2));

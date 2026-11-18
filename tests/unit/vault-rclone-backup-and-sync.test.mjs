@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { createRequire } from 'node:module';
-import { mergeVaultPayloads } from '../../skills/webmcp-vault/scripts/sync-vault.mjs';
+import { assertSafeRemoteHost, mergeVaultPayloads } from '../../skills/webmcp-vault/scripts/sync-vault.mjs';
 
 const require = createRequire(import.meta.url);
 const { createVaultStore, getVaultFile } = require('../../lib/store.js');
@@ -306,6 +306,33 @@ test('UI HTTP backup endpoints enforce explicit token, keep /status rclone-free,
   const callsLog = fs.readFileSync(logPath, 'utf8');
   assert.match(callsLog, /"deletefile"/);
 
+  // retain < 1 (e.g. 0.5) must never delete the newly uploaded snapshot
+  const pushHalf = await (await fetch(`${base}/api/backup/rclone/push`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ remote: 'gdrive', force: true, retain: 0.5 }),
+  })).json();
+  assert.equal(pushHalf.ok, true);
+  const listAfterHalf = await (await fetch(`${base}/api/backup/rclone/list?remote=gdrive`, { headers })).json();
+  assert.ok(listAfterHalf.backups.some((b) => b.name === pushHalf.remoteFile));
+
+  // Leading '-' remote names & SSH hosts must be rejected without calling rclone
+  assert.throws(() => assertSafeRemoteHost('-oProxyCommand=bad'), /Invalid remote SSH host/i);
+  const logLinesBefore = fs.readFileSync(logPath, 'utf8').trim().split('\n').length;
+  const badPush = await fetch(`${base}/api/backup/rclone/push`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ remote: '--rc' }),
+  });
+  assert.ok(badPush.status >= 400);
+  const badAuth = await fetch(`${base}/api/backup/rclone/auth/start`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ remote: '-vv' }),
+  });
+  assert.ok(badAuth.status >= 400);
+  assert.equal(fs.readFileSync(logPath, 'utf8').trim().split('\n').length, logLinesBefore);
+
   // Auth start -> poll to done with autoBackup
   const authStart = await (await fetch(`${base}/api/backup/rclone/auth/start`, {
     method: 'POST',
@@ -322,6 +349,33 @@ test('UI HTTP backup endpoints enforce explicit token, keep /status rclone-free,
   }
   assert.equal(authDone.status, 'done');
   assert.equal(authDone.backupResult?.ok, true);
+
+  // Concurrent startGdriveAuth override: stale proc1 close must NOT corrupt new job2
+  const slowOverride1 = await (await fetch(`${base}/api/backup/rclone/auth/start`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ remote: 'gdriveslow' }),
+  })).json();
+  assert.equal(slowOverride1.status, 'pending');
+
+  const fastOverride2 = await (await fetch(`${base}/api/backup/rclone/auth/start`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ remote: 'gdrive2' }),
+  })).json();
+  assert.equal(fastOverride2.remoteName, 'gdrive2');
+
+  let overrideDone = fastOverride2;
+  for (let i = 0; i < 25 && overrideDone.status === 'pending'; i += 1) {
+    await new Promise((r) => setTimeout(r, 60));
+    overrideDone = await (await fetch(`${base}/api/backup/rclone/auth/status`, { headers })).json();
+  }
+  assert.equal(overrideDone.status, 'done');
+  assert.equal(overrideDone.remoteName, 'gdrive2');
+  await new Promise((r) => setTimeout(r, 80));
+  const afterStaleSettle = await (await fetch(`${base}/api/backup/rclone/auth/status`, { headers })).json();
+  assert.equal(afterStaleSettle.status, 'done');
+  assert.equal(afterStaleSettle.remoteName, 'gdrive2');
 
   // Auth cancel stops pending slow job cleanly
   const slowStart = await (await fetch(`${base}/api/backup/rclone/auth/start`, {
