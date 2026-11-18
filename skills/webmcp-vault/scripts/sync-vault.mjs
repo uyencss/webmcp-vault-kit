@@ -9,6 +9,7 @@
  * Commands:
  *   node sync-vault.mjs status               # Compare local vs remote vault state & hashes
  *   node sync-vault.mjs sync-key [--push]    # Sync encryption key (default: pull from Mac M1)
+ *   node sync-vault.mjs sync                 # 2-way merge local <-> remote encrypted stores
  *   node sync-vault.mjs pull                 # Pull encrypted store from Mac M1 -> local
  *   node sync-vault.mjs push                 # Push encrypted store from local -> Mac M1
  *
@@ -19,10 +20,17 @@
  */
 
 import { execSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync, copyFileSync, chmodSync } from 'node:fs';
-import { homedir } from 'node:os';
+import { existsSync, mkdirSync, readFileSync, copyFileSync, chmodSync, realpathSync, unlinkSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { homedir, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { createHash } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
+
+const require = createRequire(import.meta.url);
+const { readEnvelope, writeEnvelope, encryptVault, decryptVault } = require('../../../lib/vault/envelope.js');
+const { withFileLock } = require('../../../lib/vault/fs-safe.js');
+const { nowIso } = require('../../../lib/vault/util.js');
 
 const LOCAL_HOME = homedir();
 const LOCAL_VAULT_DIR = join(LOCAL_HOME, '.webmcp', 'vault');
@@ -320,6 +328,201 @@ async function doPush(flags) {
   }
 }
 
+function tsMs(iso) {
+  const ms = Date.parse(iso || '');
+  return Number.isFinite(ms) ? ms : 0;
+}
+
+function mergePasswordHistory(a, b, winner, loser) {
+  const seen = new Map();
+  for (const src of [a?.passwordHistory, b?.passwordHistory]) {
+    if (!Array.isArray(src)) continue;
+    for (const entry of src) {
+      if (!entry || typeof entry.value !== 'string' || !entry.value) continue;
+      const changedAt = typeof entry.changedAt === 'string' && entry.changedAt ? entry.changedAt : nowIso();
+      seen.set(`${entry.value}\0${changedAt}`, { value: entry.value, changedAt });
+    }
+  }
+  if ((winner.type || 'login') === 'login' && typeof loser.password === 'string' && loser.password && loser.password !== winner.password) {
+    const changedAt = loser.updatedAt || winner.updatedAt || nowIso();
+    seen.set(`${loser.password}\0${changedAt}`, { value: loser.password, changedAt });
+  }
+  return [...seen.values()]
+    .sort((x, y) => tsMs(x.changedAt) - tsMs(y.changedAt))
+    .slice(-10);
+}
+
+export function mergeVaultPayloads(localVaultInput, remoteVaultInput) {
+  const ts = nowIso();
+  const localVault = localVaultInput || { version: 1, createdAt: ts, updatedAt: ts, vaults: [], items: [] };
+  const remoteVault = remoteVaultInput || { version: 1, createdAt: ts, updatedAt: ts, vaults: [], items: [] };
+
+  const vaultMap = new Map();
+  for (const v of localVault.vaults || []) {
+    if (v?.id) vaultMap.set(v.id, { ...v });
+  }
+  for (const v of remoteVault.vaults || []) {
+    if (!v?.id) continue;
+    const prev = vaultMap.get(v.id);
+    if (!prev || tsMs(v.updatedAt) > tsMs(prev.updatedAt)) {
+      vaultMap.set(v.id, { ...v });
+    }
+  }
+  const mergedVaults = [...vaultMap.values()];
+  if (mergedVaults.length > 0 && !mergedVaults.some((v) => v.isDefault)) {
+    const fallback = mergedVaults.find((v) => v.id === 'personal') || mergedVaults[0];
+    fallback.isDefault = true;
+  }
+  const validVaultIds = new Set(mergedVaults.map((v) => v.id));
+  const defaultVaultId = (mergedVaults.find((v) => v.isDefault) || mergedVaults[0])?.id || 'personal';
+
+  const localItems = new Map((localVault.items || []).filter((it) => it?.id).map((it) => [it.id, it]));
+  const remoteItems = new Map((remoteVault.items || []).filter((it) => it?.id).map((it) => [it.id, it]));
+  const allIds = new Set([...localItems.keys(), ...remoteItems.keys()]);
+
+  const stats = { localOnly: 0, remoteOnly: 0, bothMerged: 0, remoteWon: 0, localWon: 0, totalVaults: mergedVaults.length, totalItems: 0 };
+  const mergedItems = [];
+
+  for (const id of allIds) {
+    const a = localItems.get(id);
+    const b = remoteItems.get(id);
+    let merged;
+    if (a && !b) {
+      merged = { ...a };
+      stats.localOnly += 1;
+    } else if (b && !a) {
+      merged = { ...b };
+      stats.remoteOnly += 1;
+    } else {
+      stats.bothMerged += 1;
+      const aEff = Math.max(tsMs(a.updatedAt), tsMs(a.deletedAt));
+      const bEff = Math.max(tsMs(b.updatedAt), tsMs(b.deletedAt));
+      const remoteWins = bEff > aEff;
+      const winner = remoteWins ? { ...b } : { ...a };
+      const loser = remoteWins ? a : b;
+      if (remoteWins) stats.remoteWon += 1;
+      else stats.localWon += 1;
+
+      if (loser.deletedAt) {
+        const loserDel = tsMs(loser.deletedAt);
+        if (loserDel > tsMs(winner.updatedAt) && loserDel > tsMs(winner.deletedAt)) {
+          winner.deletedAt = loser.deletedAt;
+        }
+      }
+      const history = mergePasswordHistory(a, b, winner, loser);
+      if (history.length > 0) winner.passwordHistory = history;
+      if (Array.isArray(a.tags) || Array.isArray(b.tags)) {
+        winner.tags = [...new Set([...(a.tags || []), ...(b.tags || [])].map((t) => String(t).trim().toLowerCase()).filter(Boolean))];
+      }
+      merged = winner;
+    }
+    if (!merged.vaultId || !validVaultIds.has(merged.vaultId)) {
+      merged.vaultId = defaultVaultId;
+    }
+    mergedItems.push(merged);
+  }
+  stats.totalItems = mergedItems.length;
+
+  const createdCandidates = [localVault.createdAt, remoteVault.createdAt].filter(Boolean);
+  const createdAt = createdCandidates.sort((x, y) => tsMs(x) - tsMs(y))[0] || ts;
+
+  return {
+    vault: {
+      version: Math.max(localVault.version || 1, remoteVault.version || 1),
+      createdAt,
+      updatedAt: ts,
+      vaults: mergedVaults,
+      items: mergedItems,
+    },
+    stats,
+  };
+}
+
+async function doSync(flags) {
+  if (!/^[A-Za-z0-9._@-]+$/.test(flags.remote)) {
+    throw new Error(`Invalid remote host: ${flags.remote}`);
+  }
+  const local = await getLocalVaultInfo();
+  const remote = getRemoteVaultInfo(flags.remote);
+
+  if (!local.keyExists || !remote.keyExists || local.keyHash !== remote.keyHash) {
+    throw new Error('Key mismatch between local and remote! Run "node sync-vault.mjs sync-key" first.');
+  }
+  if (local.storeHash && remote.storeHash && local.storeHash === remote.storeHash) {
+    const out = { ok: true, alreadyInSync: true, storesMatch: true, localHash: local.storeHash, remoteHash: remote.storeHash };
+    if (flags.json) console.log(JSON.stringify(out, null, 2));
+    else console.log('✅ Local and remote vaults are already in sync (0 changes).');
+    return;
+  }
+  if (!local.storeExists && !remote.storeExists) {
+    throw new Error('Neither local nor remote vault store exists.');
+  }
+
+  mkdirSync(LOCAL_VAULT_DIR, { recursive: true, mode: 0o700 });
+  mkdirSync(LOCAL_BACKUP_DIR, { recursive: true, mode: 0o700 });
+
+  const ts = Date.now();
+  const remoteSnapPath = flags.dryRun
+    ? join(tmpdir(), `webmcp-remote-dry-${ts}.enc.json`)
+    : join(LOCAL_BACKUP_DIR, `remote-pre-sync.${ts}.enc.json`);
+
+  let keyBuf = null;
+  try {
+    if (remote.storeExists) {
+      execSync(`rsync -avz "${flags.remote}:${remote.storePath}" "${remoteSnapPath}"`, { stdio: flags.json ? 'ignore' : 'inherit' });
+      chmodSync(remoteSnapPath, 0o600);
+    }
+
+    if (!flags.dryRun) {
+      if (existsSync(LOCAL_STORE_FILE)) {
+        const localPreSync = join(LOCAL_BACKUP_DIR, `credentials.pre-sync.${ts}.enc.json`);
+        copyFileSync(LOCAL_STORE_FILE, localPreSync);
+        chmodSync(localPreSync, 0o600);
+      }
+      if (remote.storeExists) {
+        const remoteBackupCmd = `mkdir -p ~/.webmcp/vault/backups && [ -f ~/.webmcp/vault/credentials.enc.json ] && cp ~/.webmcp/vault/credentials.enc.json ~/.webmcp/vault/backups/credentials.pre-sync.${ts}.enc.json || true`;
+        runRemoteSsh(flags.remote, remoteBackupCmd);
+      }
+    }
+
+    keyBuf = readFileSync(local.keyPath);
+    const secret = keyBuf.toString('utf8').trim();
+    const localEnv = existsSync(LOCAL_STORE_FILE) ? readEnvelope(LOCAL_STORE_FILE) : null;
+    const remoteEnv = remote.storeExists ? readEnvelope(remoteSnapPath) : null;
+    const localVault = localEnv ? decryptVault(localEnv, secret) : null;
+    const remoteVault = remoteEnv ? decryptVault(remoteEnv, secret) : null;
+
+    const { vault: mergedVault, stats } = mergeVaultPayloads(localVault, remoteVault);
+
+    if (flags.dryRun) {
+      const out = { ok: true, dryRun: true, storesMatch: false, localHash: local.storeHash, remoteHash: remote.storeHash, stats };
+      if (flags.json) console.log(JSON.stringify(out, null, 2));
+      else console.log(`[Dry-run] Would merge ${stats.totalItems} item(s) across ${stats.totalVaults} vault(s) (localOnly=${stats.localOnly}, remoteOnly=${stats.remoteOnly}, both=${stats.bothMerged}).`);
+      return;
+    }
+
+    withFileLock(LOCAL_STORE_FILE, () => {
+      const existingKdf = readEnvelope(LOCAL_STORE_FILE)?.kdf || null;
+      writeEnvelope(LOCAL_STORE_FILE, encryptVault(mergedVault, secret, existingKdf));
+    });
+    chmodSync(LOCAL_STORE_FILE, 0o600);
+
+    execSync(`rsync -avz "${LOCAL_STORE_FILE}" "${flags.remote}:${remote.storePath}"`, { stdio: flags.json ? 'ignore' : 'inherit' });
+
+    const finalLocalHash = sha256File(LOCAL_STORE_FILE);
+    const updatedRemote = getRemoteVaultInfo(flags.remote);
+    const storesMatch = Boolean(finalLocalHash && updatedRemote.storeHash && finalLocalHash === updatedRemote.storeHash);
+    const out = { ok: true, dryRun: false, storesMatch, localHash: finalLocalHash, remoteHash: updatedRemote.storeHash, stats };
+    if (flags.json) console.log(JSON.stringify(out, null, 2));
+    else console.log(`✅ 2-way sync complete (${stats.totalItems} items, ${stats.totalVaults} vaults). storesMatch=${storesMatch}`);
+  } finally {
+    if (keyBuf) keyBuf.fill(0);
+    if (flags.dryRun && existsSync(remoteSnapPath)) {
+      try { unlinkSync(remoteSnapPath); } catch {}
+    }
+  }
+}
+
 async function main() {
   const { command, flags } = parseArgs();
 
@@ -330,6 +533,9 @@ async function main() {
         break;
       case 'sync-key':
         await doSyncKey(flags);
+        break;
+      case 'sync':
+        await doSync(flags);
         break;
       case 'pull':
         await doPull(flags);
@@ -344,6 +550,7 @@ async function main() {
 Usage:
   node sync-vault.mjs status               # Check status & hash differences
   node sync-vault.mjs sync-key [--push]    # Sync master key (default: pull from Mac M1)
+  node sync-vault.mjs sync                 # 2-way merge local <-> remote encrypted stores
   node sync-vault.mjs pull                 # Pull encrypted store from Mac M1 to local
   node sync-vault.mjs push                 # Push encrypted store from local to Mac M1
 
@@ -363,4 +570,13 @@ Options:
   }
 }
 
-main();
+const isDirectRun = process.argv[1] && (() => {
+  try {
+    return realpathSync(resolve(process.argv[1])) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+  }
+})();
+if (isDirectRun) {
+  main();
+}

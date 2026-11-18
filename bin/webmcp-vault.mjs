@@ -131,7 +131,7 @@ Usage:
   webmcp-vault update <id-or-query> [(--stdin-json | --input-json <file>)] [--vault <vault-id>] [--tags <a,b>] [--json]
   webmcp-vault import <file.csv> [--preview] [--vault <vault-id>] [--json]
   webmcp-vault env-import <file.env> --title <title> [--vault <vault-id>] [--project <id>] [--preview] [--json]
-  webmcp-vault backup [--output <file>] [--force] [--json]
+  webmcp-vault backup [--output <file>] [--remote <name>] [--force] [--json]
   webmcp-vault rotate-key --new-key-file <file> [--backup-output <file>] [--force-backup] [--json]
   webmcp-vault restore <backup.enc.json> --force [--json]
   webmcp-vault delete <id-or-query> --confirm [--permanent] [--json]
@@ -626,6 +626,29 @@ async function run(args) {
       file: flags.output ? resolve(process.cwd(), String(flags.output)) : undefined,
       force: flags.force === true,
     });
+    if (Object.hasOwn(flags, 'remote')) {
+      const remoteName = typeof flags.remote === 'string' ? flags.remote.trim() : '';
+      if (!remoteName) {
+        throw new Error('Usage: webmcp-vault backup [--output <file>] [--remote <name>] [--force] [--json]');
+      }
+      const { backupToRclone } = requireFromBin(resolve(ROOT, 'lib', 'vault', 'rclone-backup.js'));
+      const remoteResult = await backupToRclone({
+        remote: remoteName,
+        remoteDir: typeof flags['remote-dir'] === 'string' && flags['remote-dir'].trim() ? flags['remote-dir'].trim() : undefined,
+        vaultFile: payload.file,
+        force: flags.force === true,
+      });
+      const combined = { ...payload, remote: remoteResult };
+      const remoteNote = remoteResult.skippedDuplicate
+        ? `Remote ${remoteResult.remotePath} already up to date (sha8=${remoteResult.sha8}).`
+        : `Uploaded to ${remoteResult.remotePath} (sha8=${remoteResult.sha8}).`;
+      printJsonOrHuman(
+        combined,
+        json,
+        `Encrypted backup saved to ${payload.file} (${payload.itemCount} item(s)). ${remoteNote}`,
+      );
+      return;
+    }
     printJsonOrHuman(
       payload,
       json,

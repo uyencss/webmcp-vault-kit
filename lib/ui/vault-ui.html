@@ -231,6 +231,24 @@
                 <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path>
               </svg>
             </button>
+            <button
+              class="icon-button"
+              id="backupButton"
+              type="button"
+              aria-label="Backup Vault"
+              title="Backup Vault (Google Drive & Local)"
+            >
+              <svg
+                class="btn-icon"
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+              >
+                <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"></path>
+                <path d="M12 12v9"></path>
+                <path d="m16 16-4-4-4 4"></path>
+              </svg>
+            </button>
             <button class="btn sm ghost" id="lockButton" type="button">
               <svg
                 class="btn-icon"
@@ -444,9 +462,6 @@
               </button>
               <button class="btn sm ghost" id="importButton" type="button" aria-label="Import CSV" title="Import CSV">
                 <svg class="btn-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M12 15V3m0 0L7 8m5-5 5 5M5 13v6h14v-6"></path></svg>
-              </button>
-              <button class="btn sm ghost" id="backupButton" type="button" aria-label="Backup" title="Backup">
-                <svg class="btn-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M12 3v12m0 0 5-5m-5 5-5-5M5 14v5h14v-5"></path></svg>
               </button>
               <button class="btn sm ghost" id="demoButton" type="button" aria-label="Load demo" title="Load demo">
                 <svg class="btn-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="m12 3 .9 4.1L17 8l-4.1.9L12 13l-.9-4.1L7 8l4.1-.9L12 3ZM5.5 14l.5 2.5L8.5 17 6 17.5 5.5 20 5 17.5 2.5 17 5 16.5 5.5 14Zm13 1 .6 2.4 2.4.6-2.4.6-.6 2.4-.6-2.4-2.4-.6 2.4-.6.6-2.4Z"></path></svg>
@@ -919,6 +934,90 @@
           <button class="btn primary" type="submit">Save vault</button>
         </div>
       </form>
+    </dialog>
+
+    <dialog
+      class="csv-preview-dialog backup-dialog"
+      id="backupDialog"
+      aria-labelledby="backupDialogTitle"
+    >
+      <div class="csv-preview-body">
+        <span class="eyebrow">Zero-knowledge backup</span>
+        <h2 id="backupDialogTitle">Vault Backup &amp; Google Drive</h2>
+        <p class="csv-preview-summary">
+          Uploads encrypted credentials.enc.json (AES-256-GCM) via rclone. Your unlock key stays on this device.
+        </p>
+
+        <div class="backup-section">
+          <label for="backupRemoteSelect">Google Drive remote (rclone)</label>
+          <div class="backup-remote-row">
+            <select id="backupRemoteSelect" aria-label="Google Drive remote"></select>
+            <button class="btn sm ghost" id="toggleAuthGdriveButton" type="button">
+              Connect Google Drive
+            </button>
+            <button class="btn sm ghost" id="importVaultRcloneButton" type="button">
+              Import from Vault
+            </button>
+          </div>
+          <div class="backup-notice hidden" id="backupNoRcloneNotice" role="alert">
+            <code>rclone</code> is not installed on this device. Install <code>rclone</code> (for example <code>brew install rclone</code>) to enable Google Drive backups.
+          </div>
+          <div class="backup-auth-panel hidden" id="backupAuthPanel">
+            <label for="backupNewRemoteName">New remote name</label>
+            <div class="backup-auth-row">
+              <input
+                class="mono"
+                id="backupNewRemoteName"
+                type="text"
+                value="gdrive"
+                placeholder="gdrive"
+                maxlength="32"
+                autocomplete="off"
+                aria-label="Remote name"
+              />
+              <button class="btn sm primary" id="startGdriveAuthButton" type="button">
+                Sign in with Google &amp; Auto-Backup
+              </button>
+            </div>
+            <div class="backup-auth-pending hidden" id="backupAuthPendingBox">
+              <span id="backupAuthPendingText">Waiting for Google Sign-In in browser...</span>
+              <div class="backup-auth-pending-actions">
+                <a
+                  id="backupAuthUrlLink"
+                  class="linkbtn hidden"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >Open Google Sign-In link</a>
+                <button class="btn sm ghost" id="cancelGdriveAuthButton" type="button">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="backup-actions-row">
+          <button class="btn primary" id="runCloudBackupButton" type="button">
+            Backup to Google Drive
+          </button>
+          <button class="btn ghost" id="runLocalBackupButton" type="button">
+            Save Local Snapshot
+          </button>
+          <button class="btn ghost" id="refreshCloudListButton" type="button">
+            View Drive Snapshots
+          </button>
+        </div>
+
+        <div class="backup-modal-status" id="backupModalStatus" role="status" aria-live="polite"></div>
+
+        <ul class="csv-preview-list backup-history-list" id="backupHistoryList"></ul>
+
+        <div class="csv-preview-actions">
+          <button class="btn ghost" id="closeBackupDialogButton" type="button">
+            Done
+          </button>
+        </div>
+      </div>
     </dialog>
 
     <script nonce="{{NONCE}}">

@@ -71,6 +71,7 @@ html.is-mac-popover .bar-right {
   gap: 4px;
 }
 html.is-mac-popover .bar .status,
+html.is-mac-popover .bar #backupButton,
 html.is-mac-popover .bar #lockButton {
   display: none !important;
 }
