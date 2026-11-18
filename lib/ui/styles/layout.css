@@ -63,6 +63,9 @@ html.is-mac-popover .bar {
   padding: var(--s2) var(--s3);
   min-height: 44px;
 }
+html.is-mac-popover .brand h1 {
+  display: none;
+}
 html.is-mac-popover .bar-right {
   width: auto !important;
   gap: 4px;
@@ -686,8 +689,35 @@ html.is-mac-popover .mac-target-bar:not(.hidden) {
   padding: 0 var(--s3);
   justify-content: center;
 }
-.rail-foot .btn.rail-new-btn .btn-label {
+.rail-foot .btn.rail-new-btn .btn-label,
+.rail-foot .btn.rail-empty-trash-btn .btn-label {
   display: inline;
+}
+.rail-foot .btn.rail-empty-trash-btn {
+  flex: 1;
+  width: auto;
+  min-width: 0;
+  padding: 0 var(--s3);
+  justify-content: center;
+}
+.vault-row-trash {
+  margin-top: var(--s2);
+  padding-top: var(--s2);
+  border-top: var(--border);
+}
+.vault-row-trash .vault-glyph {
+  color: var(--muted);
+}
+.vault-row-trash .vault-button.active .vault-glyph {
+  color: var(--danger);
+}
+.detail.is-trash-empty #itemForm {
+  display: none;
+}
+.trash-empty-note {
+  margin: var(--s2) 0 0;
+  color: var(--muted);
+  font-size: var(--fs-meta);
 }
 .detail {
   display: flex;
@@ -787,6 +817,14 @@ html.is-mac-popover .mac-target-bar:not(.hidden) {
 .quick-btn.quick-btn-fill:hover {
   background: color-mix(in srgb, var(--live) 20%, var(--surface));
   color: var(--live);
+}
+.quick-btn.quick-btn-ssh:hover {
+  background: color-mix(in srgb, var(--live) 18%, var(--surface));
+  color: var(--live);
+}
+.quick-btn.quick-btn-restore:hover {
+  background: color-mix(in srgb, var(--ok) 18%, var(--surface));
+  color: var(--ok);
 }
 
 /* Vault Folder Tree View (Collapsible) */

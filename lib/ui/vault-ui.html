@@ -160,30 +160,17 @@
       <div class="app">
         <header class="bar">
           <div class="brand">
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              aria-hidden="true"
-            >
-              <rect
-                x="4"
-                y="10"
-                width="16"
-                height="10"
-                rx="2"
-                stroke="currentColor"
-                stroke-width="1.6"
-              ></rect>
-              <path
-                d="M8 10V7a4 4 0 0 1 8 0"
-                stroke="currentColor"
-                stroke-width="1.6"
-              ></path>
-              <circle cx="12" cy="15" r="1.4" fill="currentColor"></circle>
-            </svg>
             <h1>WebMCP Vault</h1>
+            <div class="mode-switch" id="vaultModeSwitch" role="tablist" aria-label="Vault mode">
+              <button class="mode-switch-btn is-active" id="modeNormalBtn" type="button" role="tab" data-vault-mode="normal" aria-selected="true" aria-pressed="true" title="Normal Vault (⌘⇧D)">
+                <svg class="btn-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none"><rect x="4" y="10" width="16" height="10" rx="2"></rect><path d="M8 10V7a4 4 0 0 1 8 0v3"></path></svg>
+                <span>Vault</span>
+              </button>
+              <button class="mode-switch-btn" id="modeDevBtn" type="button" role="tab" data-vault-mode="dev" aria-selected="false" aria-pressed="false" title="Dev Vault (⌘⇧D)">
+                <svg class="btn-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+                <span>Dev</span>
+              </button>
+            </div>
             <span class="path">~/.webmcp/vault</span>
           </div>
           <div class="bar-right">
@@ -438,12 +425,22 @@
                   </label>
                 </div>
               </details>
+              <div id="devTypeBar" class="dev-type-bar hidden" role="group" aria-label="Filter Dev items by type">
+                <button type="button" class="dev-type-chip is-active" data-dev-type="all" aria-pressed="true">All</button>
+                <button type="button" class="dev-type-chip" data-dev-type="api_token" aria-pressed="false">API Keys</button>
+                <button type="button" class="dev-type-chip" data-dev-type="ssh_key" aria-pressed="false">SSH Keys</button>
+                <button type="button" class="dev-type-chip" data-dev-type="env" aria-pressed="false">.env</button>
+              </div>
             </div>
             <ul class="list" id="itemList"></ul>
             <div class="rail-foot">
               <button class="btn sm primary rail-new-btn" id="newButton" type="button" aria-label="New item" title="New item">
                 <svg class="btn-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14"></path></svg>
                 <span class="btn-label">New item</span>
+              </button>
+              <button class="btn sm danger rail-empty-trash-btn hidden" id="emptyTrashButton" type="button" aria-label="Empty Trash" title="Empty Trash">
+                <svg class="btn-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M4 7h16m-10 4v5m4-5v5M9 7l1-3h4l1 3m-9 0 1 13h10l1-13"></path></svg>
+                <span class="btn-label">Empty Trash</span>
               </button>
               <button class="btn sm ghost" id="importButton" type="button" aria-label="Import CSV" title="Import CSV">
                 <svg class="btn-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M12 15V3m0 0L7 8m5-5 5 5M5 13v6h14v-6"></path></svg>
@@ -798,8 +795,12 @@
                   </button>
                 </div>
               </div>
-
+              <details id="passwordHistorySection" class="field wide type-login-field password-history hidden">
+                <summary class="password-history-summary" id="passwordHistorySummary">Password history</summary>
+                <ul class="password-history-list" id="passwordHistoryList"></ul>
+              </details>
             </form>
+            <p class="trash-empty-note hidden" id="trashEmptyNote">Deleted items stay in Trash for 30 days before permanent removal.</p>
             </div><!-- /.detail-scroll -->
             <div class="detail-actions">
               <div
@@ -812,6 +813,11 @@
                 <svg class="btn-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path><path d="m15 5 4 4"></path></svg>
                 Edit
               </button>
+              <button class="btn ghost view-only hidden" type="button" id="sshAddButton">
+                <svg class="btn-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="m21 2-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.78 7.78 5.5 5.5 0 0 1 7.78-7.78Zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+                Load ssh-add (1h)
+              </button>
+              <button class="btn primary view-only hidden" type="button" id="restoreItemButton">Restore</button>
               <button class="btn primary edit-only" type="button" id="submitButton">
                 <svg class="btn-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="m5 12 4 4L19 6"></path></svg>
                 Save
@@ -823,7 +829,7 @@
               </button>
               <button class="btn danger" type="button" id="deleteButton" disabled>
                 <svg class="btn-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M4 7h16m-10 4v5m4-5v5M9 7l1-3h4l1 3m-9 0 1 13h10l1-13"></path></svg>
-                Delete
+                <span id="deleteButtonLabel">Delete</span>
               </button>
             </div>
           </section>

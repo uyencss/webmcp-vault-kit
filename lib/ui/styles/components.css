@@ -264,3 +264,182 @@ textarea:disabled {
 .vault-button.is-context-target {
   background: var(--live-weak) !important;
 }
+
+/* Vault <-> Dev Mode Switch */
+.mode-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: var(--border);
+  border-radius: 999px;
+  background: var(--paper);
+  flex: none;
+}
+
+.mode-switch-btn {
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: var(--fw-strong);
+  line-height: 1;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
+}
+
+.mode-switch-btn .btn-icon {
+  width: 13px;
+  height: 13px;
+  stroke: currentColor;
+  flex: none;
+}
+
+.mode-switch-btn:hover {
+  color: var(--ink);
+}
+
+.mode-switch-btn.is-active {
+  background: var(--surface);
+  color: var(--live);
+  box-shadow: var(--shadow-card);
+}
+
+/* Dev Type Filter Bar */
+.dev-type-bar {
+  flex: 1 0 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  padding-top: 2px;
+}
+
+.dev-type-chip {
+  height: 24px;
+  padding: 0 9px;
+  border: var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: var(--fw-strong);
+  line-height: 1;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+}
+
+.dev-type-chip:hover {
+  background: var(--sunk);
+  color: var(--ink);
+}
+
+.dev-type-chip.is-active {
+  background: var(--live-weak);
+  border-color: color-mix(in srgb, var(--live) 45%, var(--line));
+  color: var(--live);
+}
+
+/* Password History */
+.password-history {
+  margin-top: var(--s1);
+  padding: var(--s3);
+  border: var(--border);
+  border-radius: var(--r-md);
+  background: var(--sunk);
+}
+
+.password-history-summary {
+  cursor: pointer;
+  user-select: none;
+  color: var(--muted);
+  font-size: var(--fs-label);
+  font-weight: var(--fw-strong);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.password-history-list {
+  margin: var(--s3) 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--s2);
+}
+
+.password-history-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s2);
+  padding: 6px var(--s2);
+  border: var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+}
+
+.password-history-meta {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.password-history-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.password-history-value.masked {
+  color: var(--muted);
+  letter-spacing: 0.06em;
+}
+
+.password-history-time {
+  color: var(--muted);
+  font-size: var(--fs-label);
+}
+
+.password-history-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  flex: none;
+}
+
+.password-history-empty {
+  color: var(--muted);
+  font-size: var(--fs-meta);
+}
+
+.field-row-fill-btn {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  display: inline-grid;
+  place-items: center;
+  border: var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--live);
+  cursor: pointer;
+}
+
+.field-row-fill-btn:hover {
+  background: var(--live-weak);
+}

@@ -62,6 +62,9 @@ const KNOWN_BOOLEAN_FLAGS = new Set([
   'tailnet',
   'app',
   'no-tray',
+  'trash',
+  'permanent',
+  'include-deleted',
 ]);
 
 const BOOLEAN_VALUE_LITERALS = new Set(['true', 'false', '1', '0', 'yes', 'no']);
@@ -116,7 +119,7 @@ function printUsage() {
 Usage:
   webmcp-vault doctor [--json]
   webmcp-vault init [--force] [--json]
-  webmcp-vault list [--search <text>] [--web <url>] [--vault <vault-id>] [--tag <a,b>] [--json]
+  webmcp-vault list [--search <text>] [--web <url>] [--vault <vault-id>] [--tag <a,b>] [--scope <normal|dev>] [--trash] [--json]
   webmcp-vault resolve [query] [--web <url>] [--vault <vault-id>] [--tag <a,b>] [--json]
   webmcp-vault get <id-or-query> [--web <url>] [--vault <vault-id>] [--tag <a,b>] [--reveal] [--json]
   webmcp-vault read <id-or-query> <field> [--vault <vault-id>] [--tag <a,b>] [--json]
@@ -131,7 +134,9 @@ Usage:
   webmcp-vault backup [--output <file>] [--force] [--json]
   webmcp-vault rotate-key --new-key-file <file> [--backup-output <file>] [--force-backup] [--json]
   webmcp-vault restore <backup.enc.json> --force [--json]
-  webmcp-vault delete <id-or-query> --confirm [--json]
+  webmcp-vault delete <id-or-query> --confirm [--permanent] [--json]
+  webmcp-vault restore-item <id-or-query> [--json]
+  webmcp-vault empty-trash --confirm [--json]
   webmcp-vault lease issue (--stdin-json | --input-json <file>) [--json]
   webmcp-vault lease read --lease-id <id> --token <token> --field <field> --site-origin <origin> --profile-binding-id <id> --purpose <purpose> [--json]
   webmcp-vault lease fill (--stdin-json | --input-json <file>) [--gateway-url <loopback-url>] [--gateway-token <token>] [--permit-file <file>] [--json]
@@ -367,6 +372,7 @@ function buildVaultFolderInput(flags) {
   if (flags.parent === 'none' || flags.parent === 'null' || flags['parent-id'] === 'none' || flags['parent-id'] === 'null') {
     input.parentId = null;
   }
+  if (flags.scope && flags.scope !== true) input.scope = String(flags.scope);
   return input;
 }
 
@@ -410,6 +416,9 @@ async function run(args) {
       web: flags.web,
       vaultId: flags.vault,
       tag: flags.tag ?? flags.tags,
+      scope: flags.scope && flags.scope !== true ? String(flags.scope) : undefined,
+      onlyDeleted: flags.trash === true,
+      includeDeleted: flags['include-deleted'] === true,
     });
     printJsonOrHuman({ items, count: items.length }, json);
     return;
@@ -472,17 +481,19 @@ async function run(args) {
     const identifier = positional[0];
     if (!identifier) throw new Error('Usage: webmcp-vault ssh-add <id-or-query> [--ttl <seconds>] [--vault <vault-id>]');
     const item = store.resolve(identifier, { vaultId: flags.vault });
-    let privateKey = store.readField(item.id, 'private_key');
-    if (!privateKey.endsWith('\n')) privateKey += '\n';
-    const ttl = flags.ttl && flags.ttl !== true ? String(flags.ttl) : '3600';
-    const res = spawnSync('ssh-add', ['-t', ttl, '-'], {
-      input: privateKey,
-      encoding: 'utf8',
-    });
-    if (res.status !== 0) {
-      throw new Error(`ssh-add failed: ${(res.stderr || res.stdout || '').trim()}`);
-    }
-    printJsonOrHuman({ ok: true, id: item.id, title: item.title, ttlSeconds: Number(ttl) }, json, `Added SSH key "${item.title}" to ssh-agent (TTL ${ttl}s).`);
+    const privateKey = store.readField(item.id, 'private_key');
+    let passphrase = '';
+    try {
+      passphrase = store.readField(item.id, 'passphrase');
+    } catch {}
+    const { addSshKeyToAgent } = requireFromBin(resolve(ROOT, 'lib', 'vault', 'ssh-agent.js'));
+    const ttlSeconds = flags.ttl && flags.ttl !== true ? Number(flags.ttl) : 3600;
+    const loaded = addSshKeyToAgent({ privateKey, passphrase, ttlSeconds });
+    printJsonOrHuman(
+      { ok: true, id: item.id, title: item.title, ttlSeconds: loaded.ttlSeconds },
+      json,
+      `Added SSH key "${item.title}" to ssh-agent (TTL ${loaded.ttlSeconds}s).`,
+    );
     return;
   }
 
@@ -672,10 +683,25 @@ async function run(args) {
   if (subcommand === 'delete') {
     const identifier = positional[0];
     if (!identifier || flags.confirm !== true) {
-      throw new Error('Usage: webmcp-vault delete <id-or-query> --confirm');
+      throw new Error('Usage: webmcp-vault delete <id-or-query> --confirm [--permanent]');
     }
-    const item = store.deleteItem(identifier);
-    printJsonOrHuman({ ok: true, deleted: item }, json, `Deleted vault item ${item.id}`);
+    const item = store.deleteItem(identifier, { permanent: flags.permanent === true });
+    printJsonOrHuman({ ok: true, deleted: item }, json, `${flags.permanent ? 'Permanently deleted' : 'Moved to Trash'} vault item ${item.id}`);
+    return;
+  }
+
+  if (subcommand === 'restore-item') {
+    const identifier = positional[0];
+    if (!identifier) throw new Error('Usage: webmcp-vault restore-item <id-or-query> [--json]');
+    const item = store.restoreItem(identifier);
+    printJsonOrHuman({ ok: true, item }, json, `Restored vault item ${item.id}`);
+    return;
+  }
+
+  if (subcommand === 'empty-trash') {
+    if (flags.confirm !== true) throw new Error('Usage: webmcp-vault empty-trash --confirm [--json]');
+    const result = store.emptyTrash();
+    printJsonOrHuman({ ok: true, ...result }, json, `Purged ${result.purgedCount} trashed item(s).`);
     return;
   }
 

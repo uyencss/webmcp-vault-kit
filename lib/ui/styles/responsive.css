@@ -48,6 +48,9 @@
   .bar {
     flex-wrap: nowrap;
   }
+  .brand h1 {
+    display: none;
+  }
   .path {
     display: none;
   }

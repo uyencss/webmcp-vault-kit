@@ -437,5 +437,257 @@ describe('WebMCP Vault Companion v1.0.0 — Security & Architecture Suite', () =
     assert.equal(fillRes.candidate.password, 'pw');
     assert.equal(fillRes.candidate.totpCode, '654321');
   });
+
+  it('9. DEF CON 33 DOM hardening blocks low-opacity/occluded inputs and eliminates passive focusin autofill', async () => {
+    const isolatedCode = fs.readFileSync(
+      path.join(extDistDir, 'content-scripts/vault-content.js'),
+      'utf8'
+    );
+
+    const docListeners = new Map();
+    const popupListeners = [];
+    const shadowButtons = [];
+    const bgRequests = [];
+    const toasts = [];
+    let occludedHit = null;
+
+    function makeNode(tagName, attrs = {}, styles = {}, rect = { left: 40, top: 80, width: 220, height: 32, right: 260, bottom: 112 }) {
+      const node = {
+        nodeType: 1,
+        tagName: tagName.toUpperCase(),
+        ...attrs,
+        style: { ...styles },
+        _styles: { display: 'block', visibility: 'visible', opacity: '1', clipPath: 'none', transform: 'none', ...styles },
+        _rect: rect,
+        _children: [],
+        parentElement: null,
+        parentNode: null,
+        isConnected: true,
+        getAttribute: (k) => (attrs[k] !== undefined ? attrs[k] : null),
+        getBoundingClientRect: () => node._rect,
+        closest: () => formEl,
+        contains: (other) => other === node,
+        dispatchEvent: () => true,
+        appendChild: (c) => {
+          c.parentNode = node;
+          node._children.push(c);
+          return c;
+        },
+        attachShadow: () => ({
+          appendChild: (c) => {
+            if (c.tagName === 'BUTTON' || c._buttons) shadowButtons.push(c);
+            const collect = (n) => {
+              if (!n) return;
+              if (n.textContent && n.tagName === 'DIV') toasts.push(n.textContent);
+              for (const ch of n._children || []) collect(ch);
+            };
+            collect(c);
+          },
+        }),
+        addEventListener: () => {},
+        remove: () => {},
+      };
+      return node;
+    }
+
+    const userInput = makeNode('input', { type: 'text', name: 'username', value: '' });
+    const passInput = makeNode('input', { type: 'password', name: 'password', value: '' });
+    const hiddenOpacityInput = makeNode('input', { type: 'password', name: 'trap', value: '' }, { opacity: '0.2' });
+    const tinyInput = makeNode('input', { type: 'password', name: 'tiny', value: '' }, {}, { left: 10, top: 10, width: 8, height: 8, right: 18, bottom: 18 });
+    const formEl = makeNode('form', {});
+    formEl.querySelectorAll = () => [userInput, passInput, hiddenOpacityInput, tinyInput];
+    const overlayEl = makeNode('div', { id: 'clickjack-overlay' });
+    const bodyEl = makeNode('body', {});
+
+    const sandboxWin = {
+      innerWidth: 1280,
+      innerHeight: 800,
+      location: { hostname: 'github.com', origin: 'https://github.com' },
+      HTMLInputElement: function HTMLInputElement() {},
+      HTMLTextAreaElement: function HTMLTextAreaElement() {},
+      Event: class Event { constructor(type) { this.type = type; } },
+      CustomEvent: class CustomEvent { constructor(type, init) { this.type = type; this.detail = init?.detail; } },
+      getComputedStyle: (el) => el._styles || { display: 'block', visibility: 'visible', opacity: '1', clipPath: 'none', transform: 'none' },
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      setTimeout,
+      clearTimeout,
+      document: {
+        activeElement: null,
+        body: bodyEl,
+        createElement: (tag) => makeNode(tag, {}),
+        querySelectorAll: (sel) => (sel.includes('textarea') ? [userInput, passInput] : [userInput, passInput, hiddenOpacityInput, tinyInput]),
+        elementFromPoint: () => occludedHit,
+        addEventListener: (type, fn) => {
+          if (!docListeners.has(type)) docListeners.set(type, []);
+          docListeners.get(type).push(fn);
+        },
+      },
+      chrome: {
+        runtime: {
+          id: 'vault-companion-test-id',
+          onMessage: { addListener: (fn) => popupListeners.push(fn) },
+          sendMessage: (msg, cb) => {
+            bgRequests.push(msg);
+            if (msg.method === 'credentials_autofill') {
+              cb({
+                candidates: [{ id: 'c1', title: 'GitHub', username: 'alice', password: 'pw-secret', totpCode: '112233' }],
+              });
+              return;
+            }
+            cb({});
+          },
+        },
+      },
+    };
+    sandboxWin.window = sandboxWin;
+    vm.runInNewContext(isolatedCode, sandboxWin);
+
+    // 1. Passive focusin MUST NOT fill password silently (DEF CON 33 invariant)
+    occludedHit = passInput;
+    for (const fn of docListeners.get('focusin') || []) {
+      await fn({ target: passInput });
+    }
+    await new Promise((r) => setTimeout(r, 15));
+    assert.equal(passInput.value, '', 'Passive focusin must NEVER fill password without user gesture');
+    assert.equal(userInput.value, '', 'Passive focusin must NEVER fill username without user gesture');
+    assert.equal(bgRequests[0]?.method, 'credentials_autofill');
+
+    // 2. Occluded input blocked via elementFromPoint overlay
+    occludedHit = overlayEl;
+    let fillRes = null;
+    popupListeners[0](
+      {
+        type: 'VAULT_POPUP_CMD',
+        action: 'fillCandidate',
+        candidate: { id: 'c1', type: 'login', title: 'GitHub', username: 'alice', password: 'pw-secret' },
+      },
+      {},
+      (r) => { fillRes = r; }
+    );
+    assert.equal(fillRes.filled, false, 'Occluded input must block credential fill');
+    assert.equal(passInput.value, '');
+
+    // 3. Opacity < 0.75 or micro inputs blocked; unoccluded visible input fills cleanly on explicit command
+    occludedHit = passInput;
+    const trapForm = makeNode('form', {});
+    trapForm.querySelectorAll = () => [hiddenOpacityInput, tinyInput];
+    hiddenOpacityInput.closest = () => trapForm;
+    tinyInput.closest = () => trapForm;
+
+    userInput._rect = { left: 40, top: 40, width: 220, height: 32, right: 260, bottom: 72 };
+    // Point hit follows center of whichever element we verify (simulating non-occluded passInput + userInput)
+    sandboxWin.document.elementFromPoint = (cx, cy) => (cy < 75 ? userInput : passInput);
+    popupListeners[0](
+      {
+        type: 'VAULT_POPUP_CMD',
+        action: 'fillCandidate',
+        candidate: { id: 'c1', type: 'login', title: 'GitHub', username: 'alice', password: 'pw-secret' },
+      },
+      {},
+      (r) => { fillRes = r; }
+    );
+    assert.equal(fillRes.filled, true);
+    assert.equal(userInput.value, 'alice');
+    assert.equal(passInput.value, 'pw-secret');
+
+    // Synthetic Alt+K (isTrusted === false) must be ignored
+    let prevented = false;
+    for (const fn of docListeners.get('keydown') || []) {
+      fn({ altKey: true, key: 'k', code: 'KeyK', isTrusted: false, preventDefault: () => { prevented = true; } });
+    }
+    assert.equal(prevented, false);
+
+    // Ensure low-opacity / tiny inputs were skipped by detectLoginInputs
+    passInput.value = '';
+    hiddenOpacityInput.value = '';
+    sandboxWin.document.querySelectorAll = () => [hiddenOpacityInput, tinyInput];
+    sandboxWin.document.elementFromPoint = () => hiddenOpacityInput;
+    popupListeners[0](
+      {
+        type: 'VAULT_POPUP_CMD',
+        action: 'fillCandidate',
+        candidate: { id: 'c1', type: 'login', title: 'GitHub', username: 'alice', password: 'pw-secret' },
+      },
+      {},
+      (r) => { fillRes = r; }
+    );
+    assert.equal(hiddenOpacityInput.value, '', 'opacity < 0.75 trap input must never receive credentials');
+    assert.equal(tinyInput.value, '', 'tiny trap input must never receive credentials');
+  });
+
+  it('10. Dev Vault scope search/fill (api_token, ssh public_key, envKey) & POST /api/lock work via background', async () => {
+    const bg = await import(
+      `../../webmcp-vault-extension/dist/background.js?t=${Date.now() + 4}`
+    );
+
+    const calls = [];
+    fetchResponder = async (url, init) => {
+      const body = init?.body ? JSON.parse(init.body) : null;
+      calls.push({ url, method: init?.method || 'GET', body });
+      if (url.endsWith('/api/lock')) {
+        return { ok: true, status: 200, json: async () => ({ locked: true }) };
+      }
+      if (url.endsWith('/api/credentials/search')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            count: 2,
+            items: [
+              { id: 'tok-1', type: 'api_token', title: 'GitHub PAT', hasBearer: true },
+              { id: 'env-1::OPENAI_API_KEY', itemId: 'env-1', envKey: 'OPENAI_API_KEY', type: 'env', title: 'OPENAI_API_KEY' },
+            ],
+          }),
+        };
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          candidate: {
+            id: body.itemId,
+            type: body.envKey ? 'env' : 'ssh_key',
+            fillValue: body.envKey ? 'sk-dev-val' : 'ssh-ed25519 AAAAC3test',
+            keyValueLine: body.envKey ? 'OPENAI_API_KEY="sk-dev-val"' : '',
+            mode: 'pass_only',
+          },
+        }),
+      };
+    };
+
+    const devSearch = await bg.queryVaultSearch('http://127.0.0.1:7876', {
+      query: 'openai',
+      targetUrl: 'https://console.example.com',
+      scope: 'dev',
+      limit: 25,
+    });
+    assert.equal(devSearch.ok, true);
+    assert.equal(calls[0].body.scope, 'dev');
+    assert.equal(devSearch.items.length, 2);
+
+    const envFill = await bg.fetchAutofillItemById('http://127.0.0.1:7876', 'env-1', {
+      scope: 'dev',
+      envKey: 'OPENAI_API_KEY',
+    });
+    assert.equal(envFill.ok, true);
+    assert.equal(calls[1].body.scope, 'dev');
+    assert.equal(calls[1].body.envKey, 'OPENAI_API_KEY');
+    assert.equal(envFill.candidate.fillValue, 'sk-dev-val');
+
+    // Verify popup vaultLock message calls POST /api/lock
+    const popupHandler = messageListeners[messageListeners.length - 1];
+    const lockRes = await new Promise((resolve) => {
+      popupHandler(
+        { type: 'WEBMCP_VAULT_POPUP', method: 'vaultLock' },
+        { url: 'chrome-extension://vault-companion-test-id/popup.html' },
+        resolve
+      );
+    });
+    assert.equal(lockRes.ok, true);
+    assert.equal(lockRes.locked, true);
+    assert.equal(lockRes.vaultState, 'locked');
+    assert.equal(calls[2].url, 'http://127.0.0.1:7876/api/lock');
+  });
 });
 

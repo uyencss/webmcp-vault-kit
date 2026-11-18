@@ -1,5 +1,5 @@
 // ============================================================
-// WebMCP Vault Companion — Background Service Worker (v1.0.0)
+// WebMCP Vault Companion — Background Service Worker (v1.3.0)
 // ============================================================
 
 export const DEFAULT_VAULT_URL = 'http://127.0.0.1:7876';
@@ -263,7 +263,10 @@ export async function queryDomainCandidates(vaultUrl, targetUrl, usernameHint = 
   };
 }
 
-export async function queryVaultSearch(vaultUrl, { query = '', targetUrl = '', limit = 30 } = {}) {
+export async function queryVaultSearch(
+  vaultUrl,
+  { query = '', targetUrl = '', limit = 30, scope = 'normal', type = '' } = {}
+) {
   let rpId = '';
   let origin = '';
   if (targetUrl) {
@@ -275,12 +278,16 @@ export async function queryVaultSearch(vaultUrl, { query = '', targetUrl = '', l
       }
     } catch {}
   }
+  const cleanScope = scope === 'dev' ? 'dev' : 'normal';
+  const cleanType = typeof type === 'string' ? type.trim() : '';
   const r = await postVaultJson(vaultUrl, '/api/credentials/search', {
     query: String(query || ''),
     rpId,
     origin,
     web: origin,
     limit,
+    scope: cleanScope,
+    type: cleanType,
   });
   if (!r.ok) {
     return { ok: false, locked: r.locked, items: [], error: r.error };
@@ -294,12 +301,22 @@ export async function queryVaultSearch(vaultUrl, { query = '', targetUrl = '', l
   };
 }
 
-export async function fetchAutofillItemById(vaultUrl, itemId) {
+export async function fetchAutofillItemById(
+  vaultUrl,
+  itemId,
+  { scope = 'normal', envKey = '' } = {}
+) {
   const targetId = String(itemId || '').trim();
   if (!targetId) {
     return { ok: false, locked: false, error: 'itemId is required.' };
   }
-  const r = await postVaultJson(vaultUrl, '/api/credentials/fill-item', { itemId: targetId });
+  const cleanScope = scope === 'dev' ? 'dev' : 'normal';
+  const cleanEnvKey = typeof envKey === 'string' ? envKey.trim() : '';
+  const r = await postVaultJson(vaultUrl, '/api/credentials/fill-item', {
+    itemId: targetId,
+    scope: cleanScope,
+    envKey: cleanEnvKey,
+  });
   if (!r.ok) {
     return { ok: false, locked: r.locked, error: r.error };
   }
@@ -385,8 +402,25 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
               targetTabId = activeTab?.id || null;
             }
             const { vaultUrl } = await getVaultSettings();
+            const scope = request.params?.scope === 'dev' ? 'dev' : 'normal';
+            if (scope === 'dev') {
+              const res = await queryVaultSearch(vaultUrl, {
+                query: request.params?.query ?? '',
+                targetUrl,
+                limit: request.params?.limit ?? 30,
+                scope: 'dev',
+                type: request.params?.type || '',
+              });
+              sendResponse({
+                ...res,
+                scope: 'dev',
+                candidates: res.items || [],
+                tabId: targetTabId,
+              });
+              break;
+            }
             const res = await queryDomainCandidates(vaultUrl, targetUrl, request.params?.usernameHint || '');
-            sendResponse({ ...res, tabId: targetTabId });
+            sendResponse({ ...res, scope: 'normal', tabId: targetTabId });
             break;
           }
 
@@ -401,6 +435,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
               query: request.params?.query ?? '',
               targetUrl,
               limit: request.params?.limit ?? 30,
+              scope: request.params?.scope || 'normal',
+              type: request.params?.type || '',
             });
             sendResponse(res);
             break;
@@ -408,7 +444,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
           case 'vaultGetFillItem': {
             const { vaultUrl } = await getVaultSettings();
-            const res = await fetchAutofillItemById(vaultUrl, request.params?.itemId);
+            const res = await fetchAutofillItemById(vaultUrl, request.params?.itemId, {
+              scope: request.params?.scope || 'normal',
+              envKey: request.params?.envKey || '',
+            });
             sendResponse(res);
             break;
           }
@@ -422,17 +461,50 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             if (!targetTabId) {
               throw new Error('No active tab to fill credentials.');
             }
+            const action = request.params?.action || request.params?.cmd || 'fillCandidate';
             const tabRes = await chrome.tabs.sendMessage(
               targetTabId,
               {
                 type: 'VAULT_POPUP_CMD',
-                action: request.params?.action || request.params?.cmd || 'fillCandidate',
-                cmd: request.params?.action || request.params?.cmd || 'fillCandidate',
+                action,
+                cmd: action,
                 candidate: request.params?.candidate || null,
+                scope: request.params?.scope === 'dev' ? 'dev' : 'normal',
+                secondaryFormat: Boolean(request.params?.secondaryFormat),
               },
               { frameId: 0 }
             );
-            sendResponse({ ok: true, tabId: targetTabId, filled: tabRes?.filled !== false });
+            sendResponse({
+              ok: tabRes?.ok !== false && tabRes?.filled !== false,
+              tabId: targetTabId,
+              filled: tabRes?.filled !== false,
+              ...(tabRes?.error ? { error: tabRes.error } : {}),
+            });
+            break;
+          }
+
+          case 'vaultLock': {
+            const { vaultUrl } = await getVaultSettings();
+            const { res, activeVaultUrl } = await fetchFromVaultWithFailover(
+              vaultUrl,
+              '/api/lock',
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: '{}',
+              },
+              1500
+            );
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+              throw new Error(data?.error || 'Failed to lock Vault (' + res.status + ')');
+            }
+            sendResponse({
+              ok: true,
+              locked: data?.locked !== false,
+              vaultState: 'locked',
+              vaultUrl: activeVaultUrl,
+            });
             break;
           }
 

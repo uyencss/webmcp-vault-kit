@@ -1,10 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 import { copyText, clearPendingClipboard } from '../../lib/ui/app/status.js';
 import { state } from '../../lib/ui/app/state.js';
 import { extractOtpSetupSecret, copyCurrentOtpSecret } from '../../lib/ui/app/view-fields.js';
 import { refreshEnvironmentUnlock } from '../../lib/ui/app/controller.js';
 import { hasNativeMacAutofill, autofillMacItem } from '../../lib/ui/app/item-list.js';
+import { scopedVaults, defaultDevVault } from '../../lib/ui/app/vaults.js';
 
 function withDomMocks(fn) {
   const prevWindow = globalThis.window;
@@ -468,12 +471,138 @@ test('autofillMacItem: reveals login secret and invokes native macOS autofillTar
       assert.equal(statusNodes.status.textContent, 'AutoFill → Zoom Work');
       assert.equal(statusNodes.status.dataset.kind, 'success');
 
-      // Typed non-login items are skipped without fetching
+      // Typed non-login items are skipped without fetching when in normal mode
+      state.mode = 'normal';
       const skipped = await autofillMacItem({ id: 'token-1', type: 'api_token' });
       assert.equal(skipped, false);
       assert.equal(posted.length, 1);
     } finally {
+      state.mode = 'normal';
       globalThis.fetch = prevFetch;
     }
   });
+});
+
+test('autofillMacItem (dev mode): uses pass_only fill-item for api_token, envKey, and ssh public_key only', async () => {
+  await withDomMocks(async ({ statusNodes }) => {
+    const prevFetch = globalThis.fetch;
+    const prevMode = state.mode;
+    const posted = [];
+    const fillCalls = [];
+
+    globalThis.document.documentElement = {
+      classList: { contains: (cls) => cls === 'is-mac-popover' },
+    };
+    globalThis.window = {
+      webkit: {
+        messageHandlers: {
+          autofillTarget: {
+            postMessage: (msg) => posted.push(msg),
+          },
+        },
+      },
+    };
+    globalThis.fetch = async (url, init) => {
+      fillCalls.push({ url: String(url), body: init?.body ? JSON.parse(init.body) : null });
+      const body = init?.body ? JSON.parse(init.body) : {};
+      if (body.itemId === 'ssh-1') {
+        return {
+          ok: true,
+          json: async () => ({
+            candidate: {
+              id: 'ssh-1',
+              type: 'ssh_key',
+              title: 'Homelab Key',
+              fillValue: 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAItest',
+              mode: 'pass_only',
+            },
+          }),
+        };
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          candidate: {
+            id: body.itemId,
+            type: body.envKey ? 'env' : 'api_token',
+            title: body.envKey ? `Proj (${body.envKey})` : 'GitHub PAT',
+            fillValue: body.envKey ? 'sk-env-123' : 'ghp_dev_token',
+            mode: 'pass_only',
+          },
+        }),
+      };
+    };
+
+    try {
+      state.mode = 'dev';
+      const okTok = await autofillMacItem({ id: 'tok-1', type: 'api_token', title: 'GitHub PAT' });
+      assert.equal(okTok, true);
+      assert.equal(fillCalls[0].url, '/api/credentials/fill-item');
+      assert.deepEqual(fillCalls[0].body, { itemId: 'tok-1', scope: 'dev' });
+      assert.deepEqual(posted[0], { username: '', password: 'ghp_dev_token', otp: '', mode: 'pass_only' });
+
+      const okEnv = await autofillMacItem({ id: 'env-1', type: 'env', title: 'Proj', envKey: 'OPENAI_API_KEY' });
+      assert.equal(okEnv, true);
+      assert.deepEqual(fillCalls[1].body, { itemId: 'env-1', scope: 'dev', envKey: 'OPENAI_API_KEY' });
+      assert.deepEqual(posted[1], { username: '', password: 'sk-env-123', otp: '', mode: 'pass_only' });
+
+      // SSH key WITHOUT public_key must fail-closed BEFORE calling fill-item or postMessage
+      const sshNoPub = await autofillMacItem({
+        id: 'ssh-empty',
+        type: 'ssh_key',
+        fields: [{ name: 'private_key', hasValue: true }],
+      });
+      assert.equal(sshNoPub, false);
+      assert.equal(fillCalls.length, 2);
+      assert.equal(statusNodes.status.dataset.kind, 'error');
+
+      // SSH key WITH public_key autofills ONLY public_key via pass_only
+      const okSsh = await autofillMacItem({
+        id: 'ssh-1',
+        type: 'ssh_key',
+        fields: [
+          { name: 'public_key', hasValue: true },
+          { name: 'private_key', hasValue: true },
+        ],
+      });
+      assert.equal(okSsh, true);
+      assert.equal(fillCalls.length, 3);
+      assert.deepEqual(posted[2], {
+        username: '',
+        password: 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAItest',
+        otp: '',
+        mode: 'pass_only',
+      });
+    } finally {
+      state.mode = prevMode;
+      globalThis.fetch = prevFetch;
+    }
+  });
+});
+
+test('Dev Vault switch markup and vault scope helpers separate normal and dev vaults', () => {
+  const prevVaults = state.vaults;
+  const prevMode = state.mode;
+  try {
+    state.vaults = [
+      { id: 'personal', name: 'Personal', scope: 'normal', isDefault: true },
+      { id: 'dev-api', name: 'API Keys', scope: 'dev', isDefaultDev: true },
+      { id: 'dev-ssh', name: 'SSH Keys', scope: 'dev' },
+    ];
+    assert.deepEqual(scopedVaults('normal').map((v) => v.id), ['personal']);
+    assert.deepEqual(scopedVaults('dev').map((v) => v.id), ['dev-api', 'dev-ssh']);
+    state.mode = 'dev';
+    assert.equal(defaultDevVault()?.id, 'dev-api');
+
+    const html = fs.readFileSync(path.resolve('lib/ui/vault-ui.html'), 'utf8');
+    assert.ok(html.includes('id="vaultModeSwitch"'));
+    assert.ok(html.includes('id="modeNormalBtn"'));
+    assert.ok(html.includes('id="modeDevBtn"'));
+    assert.ok(html.includes('id="passwordHistorySection"'));
+    assert.ok(html.includes('id="emptyTrashButton"'));
+    assert.ok(html.includes('id="restoreItemButton"'));
+  } finally {
+    state.vaults = prevVaults;
+    state.mode = prevMode;
+  }
 });
