@@ -336,12 +336,7 @@ test('CLI supports --scope, --trash, restore-item, empty-trash, and --permanent 
   const devVault = JSON.parse(runCli(['create-vault', '--name', 'Dev Vault', '--scope', 'dev', '--json'], { home }).stdout).vault;
   assert.equal(devVault.scope, 'dev');
 
-  const created = JSON.parse(
-    runCli(['create', '--vault', devVault.id, '--stdin-json', '--json'], {
-      home,
-    }).stdout || '{}',
-  );
-  // Create via store or stdin-json with spawnSync input:
+  // Create typed api_token via stdin-json:
   const mkApi = spawnSync(process.execPath, [CLI_PATH, 'create', '--vault', devVault.id, '--stdin-json', '--json'], {
     env: { ...process.env, WEBMCP_HOME: home, WEBMCP_VAULT_KEY: 'cli-test-master-key-32-bytes-minimum!!' },
     input: JSON.stringify({ type: 'api_token', title: 'CLI Dev Token', fields: [{ name: 'token', value: 'tok-123', secret: true }] }),
@@ -366,5 +361,4 @@ test('CLI supports --scope, --trash, restore-item, empty-trash, and --permanent 
   assert.equal(runCli(['delete', tokenItem.id, '--confirm', '--json'], { home }).status, 0);
   const emptied = JSON.parse(runCli(['empty-trash', '--confirm', '--json'], { home }).stdout);
   assert.equal(emptied.purgedCount, 1);
-  assert.equal(created.id, undefined);
 });

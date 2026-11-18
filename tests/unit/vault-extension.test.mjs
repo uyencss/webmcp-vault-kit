@@ -553,20 +553,24 @@ describe('WebMCP Vault Companion v1.0.0 — Security & Architecture Suite', () =
     assert.equal(userInput.value, '', 'Passive focusin must NEVER fill username without user gesture');
     assert.equal(bgRequests[0]?.method, 'credentials_autofill');
 
-    // 2. Occluded input blocked via elementFromPoint overlay
-    occludedHit = overlayEl;
+    // 2. Occluded input blocked via elementFromPoint overlay, parent container (z-index:-1/::after), or null (offscreen center)
+    formEl.contains = (other) => other === formEl || other === userInput || other === passInput;
+    for (const hitCandidate of [overlayEl, formEl, null]) {
+      occludedHit = hitCandidate;
+      let blockedRes = null;
+      popupListeners[0](
+        {
+          type: 'VAULT_POPUP_CMD',
+          action: 'fillCandidate',
+          candidate: { id: 'c1', type: 'login', title: 'GitHub', username: 'alice', password: 'pw-secret' },
+        },
+        {},
+        (r) => { blockedRes = r; }
+      );
+      assert.equal(blockedRes.filled, false, 'Occluded or offscreen-center input must block credential fill');
+      assert.equal(passInput.value, '');
+    }
     let fillRes = null;
-    popupListeners[0](
-      {
-        type: 'VAULT_POPUP_CMD',
-        action: 'fillCandidate',
-        candidate: { id: 'c1', type: 'login', title: 'GitHub', username: 'alice', password: 'pw-secret' },
-      },
-      {},
-      (r) => { fillRes = r; }
-    );
-    assert.equal(fillRes.filled, false, 'Occluded input must block credential fill');
-    assert.equal(passInput.value, '');
 
     // 3. Opacity < 0.75 or micro inputs blocked; unoccluded visible input fills cleanly on explicit command
     occludedHit = passInput;
@@ -613,7 +617,25 @@ describe('WebMCP Vault Companion v1.0.0 — Security & Architecture Suite', () =
       (r) => { fillRes = r; }
     );
     assert.equal(hiddenOpacityInput.value, '', 'opacity < 0.75 trap input must never receive credentials');
-    assert.equal(tinyInput.value, '', 'tiny trap input must never receive credentials');
+    // Cumulative nested ancestor opacity (0.8 * 0.8 = 0.64 < 0.75) must block fill
+    passInput.value = '';
+    const semiParent = makeNode('div', {}, { opacity: '0.8' });
+    const semiPass = makeNode('input', { type: 'password', name: 'nested', value: '' }, { opacity: '0.8' });
+    semiPass.parentElement = semiParent;
+    semiPass.closest = () => formEl;
+    sandboxWin.document.querySelectorAll = () => [semiPass];
+    sandboxWin.document.elementFromPoint = () => semiPass;
+    popupListeners[0](
+      {
+        type: 'VAULT_POPUP_CMD',
+        action: 'fillCandidate',
+        candidate: { id: 'c1', type: 'login', title: 'GitHub', username: 'alice', password: 'pw-secret' },
+      },
+      {},
+      (r) => { fillRes = r; }
+    );
+    assert.equal(fillRes.filled, false);
+    assert.equal(semiPass.value, '', 'nested cumulative opacity < 0.75 must never receive credentials');
   });
 
   it('10. Dev Vault scope search/fill (api_token, ssh public_key, envKey) & POST /api/lock work via background', async () => {

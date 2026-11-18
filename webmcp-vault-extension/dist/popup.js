@@ -551,6 +551,8 @@ elBtnLockPopup?.addEventListener('click', async () => {
   renderVaultPill('locked');
   cachedCandidates = [];
   globalSearchResults = [];
+  if (elGeneratedPassValue) elGeneratedPassValue.textContent = '';
+  if (elGeneratedPassBox) elGeneratedPassBox.style.display = 'none';
   if (elVaultEmptyState) {
     elVaultEmptyState.textContent = 'Vault đã khóa. Bấm Touch ID để mở khóa.';
   }

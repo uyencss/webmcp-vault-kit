@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { copyText, clearPendingClipboard } from '../../lib/ui/app/status.js';
 import { state } from '../../lib/ui/app/state.js';
 import { extractOtpSetupSecret, copyCurrentOtpSecret } from '../../lib/ui/app/view-fields.js';
@@ -594,7 +595,8 @@ test('Dev Vault switch markup and vault scope helpers separate normal and dev va
     state.mode = 'dev';
     assert.equal(defaultDevVault()?.id, 'dev-api');
 
-    const html = fs.readFileSync(path.resolve('lib/ui/vault-ui.html'), 'utf8');
+    const uiHtmlPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../lib/ui/vault-ui.html');
+    const html = fs.readFileSync(uiHtmlPath, 'utf8');
     assert.ok(html.includes('id="vaultModeSwitch"'));
     assert.ok(html.includes('id="modeNormalBtn"'));
     assert.ok(html.includes('id="modeDevBtn"'));

@@ -244,14 +244,24 @@
     }
     if (typeof window.getComputedStyle === 'function') {
       let cur = el;
+      let cumOpacity = 1;
       while (cur && cur.nodeType === 1) {
         const style = window.getComputedStyle(cur);
         if (style) {
           if (style.display === 'none' || style.visibility === 'hidden') return false;
           const opacity = parseFloat(style.opacity || '1');
-          if (!Number.isNaN(opacity) && opacity < 0.75) return false;
+          if (!Number.isNaN(opacity)) {
+            cumOpacity *= opacity;
+            if (cumOpacity < 0.75) return false;
+          }
           const clipPath = String(style.clipPath || '').trim();
-          if (clipPath === 'inset(100%)' || /^inset\(\s*100%/i.test(clipPath)) return false;
+          const clip = String(style.clip || '').trim();
+          if (
+            /^(?:inset\((?:5\d|[6-9]\d|100)%|circle\(\s*0)/i.test(clipPath) ||
+            /^rect\(\s*0(?:px)?,\s*0(?:px)?,\s*0(?:px)?,\s*0(?:px)?\s*\)$/i.test(clip)
+          ) {
+            return false;
+          }
           const transform = String(style.transform || '').trim();
           if (
             /^(matrix|scale(?:X|Y)?)\(\s*0(\.0+)?\s*[,)]/i.test(transform) ||
@@ -261,6 +271,7 @@
           }
         }
         cur = cur.parentElement || cur.parentNode;
+        if (cur && cur.nodeType === 11) cur = cur.host || null;
       }
     }
     return true;
@@ -280,12 +291,11 @@
     const cx = rect.left + rect.width / 2;
     const cy = rect.top + rect.height / 2;
     const hit = document.elementFromPoint(cx, cy);
-    if (!hit) return true;
+    if (!hit) return false;
     const rootHost = typeof el.getRootNode === 'function' ? el.getRootNode()?.host : null;
     return Boolean(
       hit === el ||
       el.contains?.(hit) ||
-      hit.contains?.(el) ||
       (rootHost && hit === rootHost) ||
       hit === activeFieldBadgeHost ||
       activeFieldBadgeHost?.contains?.(hit) ||
@@ -687,23 +697,10 @@
 
     const searchInput = document.createElement('input');
     searchInput.type = 'search';
-    searchInput.placeholder =
-      currentScope === 'dev'
-        ? 'Tìm API token, SSH pubkey, biến .ENV...'
-        : 'Tìm username, tên, domain, #tag...';
-    searchInput.style.cssText = [
-      'width:100%',
-      'box-sizing:border-box',
-      'background:#1e293b',
-      'color:#f8fafc',
-      'border:1px solid #334155',
-      'border-radius:6px',
-      'padding:6px 8px',
-      'margin-bottom:6px',
-      'outline:none',
-      'font:inherit',
-      'flex-shrink:0',
-    ].join(';');
+    searchInput.placeholder = currentScope === 'dev'
+      ? 'Tìm API token, SSH pubkey, biến .ENV...'
+      : 'Tìm username, tên, domain, #tag...';
+    searchInput.style.cssText = 'width:100%;box-sizing:border-box;background:#1e293b;color:#f8fafc;border:1px solid #334155;border-radius:6px;padding:6px 8px;margin-bottom:6px;outline:none;font:inherit;flex-shrink:0;';
     card.appendChild(searchInput);
 
     const listContainer = document.createElement('div');
