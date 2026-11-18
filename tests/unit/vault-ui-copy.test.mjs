@@ -8,7 +8,7 @@ import { state } from '../../lib/ui/app/state.js';
 import { extractOtpSetupSecret, copyCurrentOtpSecret } from '../../lib/ui/app/view-fields.js';
 import { refreshEnvironmentUnlock } from '../../lib/ui/app/controller.js';
 import { hasNativeMacAutofill, autofillMacItem } from '../../lib/ui/app/item-list.js';
-import { scopedVaults, defaultDevVault } from '../../lib/ui/app/vaults.js';
+import { scopedVaults, defaultDevVault, formatVaultPath } from '../../lib/ui/app/vaults.js';
 
 function withDomMocks(fn) {
   const prevWindow = globalThis.window;
@@ -594,6 +594,14 @@ test('Dev Vault switch markup and vault scope helpers separate normal and dev va
     assert.deepEqual(scopedVaults('dev').map((v) => v.id), ['dev-api', 'dev-ssh']);
     state.mode = 'dev';
     assert.equal(defaultDevVault()?.id, 'dev-api');
+    assert.equal(formatVaultPath({ id: 'dev-api', name: 'API Keys', parentId: null }), 'API Keys');
+    assert.equal(
+      formatVaultPath(
+        { id: 'dev-gh', name: 'GITHUB', parentId: 'dev-api' },
+        [...state.vaults, { id: 'dev-gh', name: 'GITHUB', parentId: 'dev-api' }],
+      ),
+      'API Keys / GITHUB',
+    );
 
     const uiHtmlPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../lib/ui/vault-ui.html');
     const html = fs.readFileSync(uiHtmlPath, 'utf8');

@@ -362,3 +362,45 @@ test('CLI supports --scope, --trash, restore-item, empty-trash, and --permanent 
   const emptied = JSON.parse(runCli(['empty-trash', '--confirm', '--json'], { home }).stdout);
   assert.equal(emptied.purgedCount, 1);
 });
+
+test('vault name uniqueness is scoped to (scope, parentId) siblings', () => {
+  const dataDir = tempHome();
+  const store = createVaultStore({ dataDir, key: 'vault-sibling-name-test-key' });
+  store.init();
+
+  const normalDev = store.createVault({ name: 'DEV', scope: 'normal' });
+  const normalGh = store.createVault({ name: 'GITHUB', parentId: normalDev.id });
+
+  const devRootGh = store.createVault({ name: 'GITHUB', scope: 'dev' });
+  const apiKeys = store.createVault({ name: 'API Keys', scope: 'dev' });
+  const sshKeys = store.createVault({ name: 'SSH Keys', scope: 'dev' });
+  const envs = store.createVault({ name: 'Environments', scope: 'dev' });
+
+  const apiGh = store.createVault({ name: 'GITHUB', parentId: apiKeys.id });
+  const sshGh = store.createVault({ name: 'GITHUB', parentId: sshKeys.id });
+  const nestedGh = store.createVault({ name: 'GITHUB', parentId: apiGh.id });
+
+  assert.equal(normalGh.scope, 'normal');
+  assert.equal(devRootGh.scope, 'dev');
+  assert.equal(apiGh.scope, 'dev');
+  assert.equal(sshGh.scope, 'dev');
+  assert.equal(nestedGh.parentId, apiGh.id);
+
+  // Exact same (scope, parentId) still rejects duplicate names (case-insensitive)
+  assert.throws(
+    () => store.createVault({ name: ' github ', parentId: apiKeys.id }),
+    /already exists/i,
+  );
+  assert.throws(
+    () => store.createVault({ name: 'github', scope: 'dev' }),
+    /already exists/i,
+  );
+
+  // Reparenting into a parent that already has "GITHUB" rejects, while reparenting into Environments succeeds
+  assert.throws(
+    () => store.updateVault(sshGh.id, { parentId: apiKeys.id }),
+    /already exists/i,
+  );
+  const movedGh = store.updateVault(sshGh.id, { parentId: envs.id });
+  assert.equal(movedGh.parentId, envs.id);
+});
