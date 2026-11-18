@@ -716,3 +716,37 @@ test('vault UI server /api/credentials/search & /fill-item support chrome-extens
   assert.match(fillJson.candidate.totpCode, /^\d{6}$/);
 });
 
+test('vault UI #backupDialog serves segmented tabs, account cards, unified folder tree, zero em-dashes, and zero inline styles', () => {
+  const html = fs.readFileSync(path.join(ROOT, 'lib', 'ui', 'vault-ui.html'), 'utf8');
+  const backupJs = fs.readFileSync(path.join(ROOT, 'lib', 'ui', 'app', 'backup-modal.js'), 'utf8');
+  const treeJs = fs.readFileSync(path.join(ROOT, 'lib', 'ui', 'app', 'drive-folder-tree.js'), 'utf8');
+  const compCss = fs.readFileSync(path.join(ROOT, 'lib', 'ui', 'styles', 'components.css'), 'utf8');
+
+  const dialogMatch = html.match(/<dialog[\s\S]*?id="backupDialog"[\s\S]*?<\/dialog>/);
+  assert.ok(dialogMatch, 'backupDialog markup must exist');
+  const dialogHtml = dialogMatch[0];
+
+  assert.match(dialogHtml, /id="backupTabDrive"/);
+  assert.match(dialogHtml, /id="backupTabSnapshots"/);
+  assert.match(dialogHtml, /id="backupAccountList"/);
+  assert.match(dialogHtml, /id="backupFolderTree"/);
+  assert.match(dialogHtml, /id="backupCallbackDetails"/);
+  assert.match(dialogHtml, /id="backupNewFolderRow"/);
+  assert.match(dialogHtml, /id="backupMoveFolderRow"/);
+  assert.match(dialogHtml, /id="backupQuickFolderRow"/);
+  assert.match(dialogHtml, /id="runCloudBackupButton"/);
+  assert.doesNotMatch(dialogHtml, /\sstyle=/i);
+
+  for (const [label, content] of [
+    ['vault-ui.html', html],
+    ['backup-modal.js', backupJs],
+    ['drive-folder-tree.js', treeJs],
+    ['components.css', compCss],
+  ]) {
+    assert.equal(content.includes('\u2014'), false, `${label} must not contain em-dash (\u2014)`);
+  }
+  assert.doesNotMatch(backupJs, /\.style\./);
+  assert.doesNotMatch(treeJs, /\.style\./);
+});
+
+

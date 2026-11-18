@@ -941,143 +941,263 @@
       id="backupDialog"
       aria-labelledby="backupDialogTitle"
     >
-      <div class="csv-preview-body">
-        <h2 id="backupDialogTitle">Google Drive Backup</h2>
-        <p class="csv-preview-summary">
-          Encrypted AES-256-GCM snapshots — your master key never leaves this Mac.
-        </p>
+      <div class="backup-modal-shell">
+        <div class="backup-modal-header">
+          <div>
+            <h2 id="backupDialogTitle">Google Drive Backup</h2>
+            <p class="backup-modal-sub">
+              AES-256-GCM encrypted snapshots. Your master key stays on this Mac.
+            </p>
+          </div>
+          <button
+            class="icon-button backup-close-btn"
+            id="closeBackupDialogHeaderButton"
+            type="button"
+            aria-label="Close"
+            title="Close"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M18 6 6 18M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
 
-        <div class="backup-section">
-          <label for="backupRemoteSelect">Google Account</label>
-          <div class="backup-remote-row">
-            <select id="backupRemoteSelect" aria-label="Google Account"></select>
-            <button class="btn sm ghost" id="startGdriveAuthButton" type="button">
-              + Add Account
-            </button>
-          </div>
-          <div class="backup-notice hidden" id="backupNoRcloneNotice" role="alert">
-            <code>rclone</code> is not installed on this device. Install <code>rclone</code> (for example <code>brew install rclone</code>) to enable Google Drive backups.
-          </div>
-          <div class="backup-auth-pending hidden" id="backupAuthPendingBox">
-            <span class="backup-auth-hint" id="backupAuthPendingText">1. Copy link &amp; sign in with Google in your chosen browser profile (auto-detects on this Mac):</span>
-            <div class="backup-auth-url-row">
-              <input
-                class="mono"
-                id="backupAuthUrlInput"
-                type="text"
-                readonly
-                aria-label="Google Sign-In URL"
-              />
-              <button class="btn sm primary" id="copyGdriveAuthUrlButton" type="button">
-                Copy Link
-              </button>
-              <button class="btn sm ghost" id="cancelGdriveAuthButton" type="button">
-                Cancel
+        <div class="backup-notice hidden" id="backupNoRcloneNotice" role="alert">
+          <code>rclone</code> is not installed on this device. Install <code>rclone</code> (for example <code>brew install rclone</code>) to enable Google Drive backups.
+        </div>
+
+        <div class="backup-segmented" role="tablist" aria-label="Backup sections">
+          <button
+            class="backup-seg-btn active"
+            id="backupTabDrive"
+            type="button"
+            role="tab"
+            aria-selected="true"
+            aria-controls="backupDrivePane"
+          >
+            Backup to Drive
+          </button>
+          <button
+            class="backup-seg-btn"
+            id="backupTabSnapshots"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            aria-controls="backupSnapshotsPane"
+          >
+            <span>Snapshots</span>
+            <span class="backup-tab-count hidden" id="backupSnapshotsTabCount">0</span>
+          </button>
+        </div>
+
+        <div class="backup-pane" id="backupDrivePane" role="tabpanel" aria-labelledby="backupTabDrive">
+          <div class="backup-block">
+            <div class="backup-block-head">
+              <span class="backup-block-label">Google Account</span>
+              <button class="btn sm ghost" id="startGdriveAuthButton" type="button">
+                + Add Account
               </button>
             </div>
-            <span class="backup-auth-hint">2. Using a remote/proxied browser? Paste the redirected callback URL (<code>http://127.0.0.1:.../?code=...</code>):</span>
-            <div class="backup-auth-url-row">
+
+            <div class="backup-auth-card hidden" id="backupAuthPendingBox">
+              <div class="backup-auth-url-row">
+                <input
+                  class="mono"
+                  id="backupAuthUrlInput"
+                  type="text"
+                  readonly
+                  aria-label="Google Sign-In URL"
+                />
+                <button class="btn sm primary" id="copyGdriveAuthUrlButton" type="button">
+                  Copy Link
+                </button>
+                <button
+                  class="icon-button"
+                  id="refreshGdriveAuthButton"
+                  type="button"
+                  aria-label="New sign-in link"
+                  title="Generate fresh link"
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M21 12a9 9 0 1 1-2.64-6.36"></path>
+                    <path d="M21 3v6h-6"></path>
+                  </svg>
+                </button>
+                <button
+                  class="icon-button"
+                  id="cancelGdriveAuthButton"
+                  type="button"
+                  aria-label="Cancel sign-in"
+                  title="Cancel"
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M18 6 6 18M6 6l12 12"></path>
+                  </svg>
+                </button>
+              </div>
+              <p class="backup-auth-hint" id="backupAuthPendingText">
+                Open link in your chosen browser profile. Connects automatically after Allow.
+              </p>
+              <details class="backup-callback-details" id="backupCallbackDetails">
+                <summary>Remote or proxied browser? Paste callback URL</summary>
+                <div class="backup-auth-callback-row">
+                  <input
+                    class="mono"
+                    id="backupCallbackUrlInput"
+                    type="text"
+                    placeholder="http://127.0.0.1:53682/?state=...&amp;code=..."
+                    autocomplete="off"
+                    aria-label="Google OAuth callback URL"
+                  />
+                  <button class="btn sm" id="submitGdriveCallbackButton" type="button">
+                    Complete
+                  </button>
+                </div>
+              </details>
+            </div>
+
+            <div
+              class="backup-account-list"
+              id="backupAccountList"
+              role="listbox"
+              aria-label="Google Drive accounts"
+            ></div>
+          </div>
+
+          <div class="backup-folder-card hidden" id="backupWorkspaceSection">
+            <div class="backup-folder-head">
+              <div class="backup-folder-dest">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                </svg>
+                <span class="backup-folder-dest-label">Save to</span>
+                <span class="backup-selected-path mono" id="backupSelectedPathBadge">Choose a folder</span>
+              </div>
+              <div class="backup-tree-actions">
+                <button
+                  class="icon-button"
+                  id="toggleNewFolderButton"
+                  type="button"
+                  aria-label="New folder"
+                  title="New folder"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                    <path d="M12 11v6M9 14h6"></path>
+                  </svg>
+                </button>
+                <button
+                  class="icon-button"
+                  id="refreshDriveFoldersButton"
+                  type="button"
+                  aria-label="Refresh Drive folders"
+                  title="Refresh folders"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M21 12a9 9 0 1 1-2.64-6.36"></path>
+                    <path d="M21 3v6h-6"></path>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <div class="backup-inline-bar hidden" id="backupNewFolderRow">
+              <span class="backup-inline-prefix mono" id="backupNewFolderParentLabel">My Drive /</span>
+              <button class="backup-inline-chip hidden" id="resetNewFolderRootButton" type="button">
+                Use Root
+              </button>
               <input
-                class="mono"
-                id="backupCallbackUrlInput"
+                id="backupNewFolderInput"
                 type="text"
-                placeholder="http://127.0.0.1:53682/?state=...&amp;code=..."
+                placeholder="New folder name..."
+                maxlength="120"
                 autocomplete="off"
-                aria-label="Google OAuth callback URL"
+                aria-label="New Google Drive folder name"
               />
-              <button class="btn sm ghost" id="submitGdriveCallbackButton" type="button">
-                Complete Sign-In
+              <button class="btn sm primary" id="createDriveFolderButton" type="button">
+                Create
+              </button>
+              <button
+                class="icon-button"
+                id="cancelNewFolderButton"
+                type="button"
+                aria-label="Cancel new folder"
+                title="Cancel"
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M18 6 6 18M6 6l12 12"></path>
+                </svg>
+              </button>
+            </div>
+
+            <div class="backup-inline-bar hidden" id="backupMoveFolderRow">
+              <span class="backup-inline-prefix" id="backupMoveFolderLabel">Move to</span>
+              <select id="backupMoveTargetSelect" aria-label="Destination parent folder"></select>
+              <button class="btn sm primary" id="confirmMoveDriveFolderButton" type="button">
+                Move
+              </button>
+              <button
+                class="icon-button"
+                id="cancelMoveDriveFolderButton"
+                type="button"
+                aria-label="Cancel folder move"
+                title="Cancel"
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M18 6 6 18M6 6l12 12"></path>
+                </svg>
+              </button>
+            </div>
+
+            <div class="backup-folder-tree" id="backupFolderTree" role="tree" aria-label="Google Drive folders"></div>
+
+            <div class="backup-quick-folder hidden" id="backupQuickFolderRow">
+              <span>Need a clean default folder?</span>
+              <button class="btn sm ghost" id="quickDefaultFolderButton" type="button">
+                Use /webmcp-vault-backups
               </button>
             </div>
           </div>
         </div>
 
-        <div class="backup-section hidden" id="backupWorkspaceSection">
-          <div class="backup-tree-toolbar">
-            <div class="backup-tree-heading">
-              <span class="backup-tree-title">Google Drive Folders</span>
-              <span class="backup-selected-pill mono" id="backupSelectedPathBadge">None selected</span>
-            </div>
-            <div class="backup-tree-actions">
-              <button
-                class="icon-button"
-                id="toggleNewFolderButton"
-                type="button"
-                aria-label="New folder"
-                title="New folder"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
-                  <path d="M12 11v6M9 14h6"></path>
-                </svg>
-              </button>
-              <button
-                class="icon-button"
-                id="refreshDriveFoldersButton"
-                type="button"
-                aria-label="Refresh Drive folders"
-                title="Refresh folders"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <path d="M21 12a9 9 0 1 1-2.64-6.36"></path>
-                  <path d="M21 3v6h-6"></path>
-                </svg>
-              </button>
-            </div>
-          </div>
-
-          <div class="backup-new-folder-row hidden" id="backupNewFolderRow">
-            <button
-              class="backup-new-folder-parent mono"
-              id="backupNewFolderParentBadge"
-              type="button"
-              title="Click to target My Drive root"
-            >My Drive /</button>
-            <input
-              id="backupNewFolderInput"
-              type="text"
-              placeholder="New folder name..."
-              maxlength="120"
-              autocomplete="off"
-              aria-label="New Google Drive folder name"
-            />
-            <button class="btn sm primary" id="createDriveFolderButton" type="button">
-              Create
-            </button>
+        <div class="backup-pane hidden" id="backupSnapshotsPane" role="tabpanel" aria-labelledby="backupTabSnapshots">
+          <div class="backup-snapshots-toolbar">
+            <span class="backup-block-label" id="backupSnapshotsTitle">Cloud Snapshots</span>
             <button
               class="icon-button"
-              id="cancelNewFolderButton"
+              id="refreshSnapshotsButton"
               type="button"
-              aria-label="Cancel new folder"
-              title="Cancel"
+              aria-label="Refresh snapshots"
+              title="Refresh snapshots"
             >
-              ✕
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M21 12a9 9 0 1 1-2.64-6.36"></path>
+                <path d="M21 3v6h-6"></path>
+              </svg>
             </button>
           </div>
-
-          <div class="backup-folder-tree" id="backupFolderTree" role="tree" aria-label="Google Drive folders"></div>
-
-          <div class="backup-snapshots-box">
-            <div class="backup-snapshots-head">
-              <span id="backupSnapshotsTitle">Snapshots in folder</span>
-              <span class="backup-snapshots-count" id="backupSnapshotsCount"></span>
+          <ul class="csv-preview-list backup-history-list" id="backupHistoryList"></ul>
+          <div class="backup-local-bar">
+            <div class="backup-local-copy-meta">
+              <strong>Local offline snapshot</strong>
+              <span id="backupLocalCopyMeta">Saves encrypted envelope to ~/.webmcp/vault/backups/</span>
             </div>
-            <ul class="csv-preview-list backup-history-list" id="backupHistoryList"></ul>
+            <button class="btn sm" id="runLocalBackupButton" type="button">
+              Save Local Copy
+            </button>
           </div>
         </div>
 
         <div class="backup-modal-status" id="backupModalStatus" role="status" aria-live="polite"></div>
 
-        <div class="csv-preview-actions backup-footer-actions">
-          <button class="btn sm ghost" id="runLocalBackupButton" type="button">
-            Save Local Copy
-          </button>
+        <div class="backup-modal-footer">
+          <span class="backup-footer-summary" id="backupFooterSummary"></span>
           <div class="backup-footer-right">
             <button class="btn ghost" id="closeBackupDialogButton" type="button">
               Close
             </button>
             <button class="btn primary" id="runCloudBackupButton" type="button">
-              Backup to Folder
+              Backup Now
             </button>
           </div>
         </div>
