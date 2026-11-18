@@ -81,6 +81,14 @@ test('enableAutostart creates plist and 0700 vault directory, then disableAutost
   assert.match(content, /io\.webmcp-vault/);
   assert.match(content, /127\.0\.0\.1/);
 
+  const trayPlistPath = path.join(home, 'Library', 'LaunchAgents', 'io.webmcp-vault.tray.plist');
+  assert.equal(enableResult.trayTargetPath, trayPlistPath);
+  assert.equal(fs.existsSync(trayPlistPath), true);
+  assert.equal(fs.statSync(trayPlistPath).mode & 0o777, 0o600);
+  const trayContent = fs.readFileSync(trayPlistPath, 'utf8');
+  assert.match(trayContent, /io\.webmcp-vault\.tray/);
+  assert.match(trayContent, /--tray/);
+
   const disableResult = disableAutostart({
     homeDir: home,
     rootDir: ROOT,
@@ -91,6 +99,7 @@ test('enableAutostart creates plist and 0700 vault directory, then disableAutost
   assert.equal(disableResult.success, true);
   assert.equal(disableResult.enabled, false);
   assert.equal(fs.existsSync(plistPath), false);
+  assert.equal(fs.existsSync(trayPlistPath), false);
 });
 
 test('CLI autostart status works via subprocess', () => {

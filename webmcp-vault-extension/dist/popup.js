@@ -31,7 +31,11 @@ const elBtnSaveSettings = document.getElementById('btnSaveSettings');
 const elToastMsg = document.getElementById('toastMsg');
 
 let currentTab = null;
+let currentVaultState = 'closed';
 let cachedCandidates = [];
+let globalSearchResults = [];
+let searchDebounceTimer = null;
+let searchSeq = 0;
 let toastTimer = null;
 
 function showToast(text, isError = false) {
@@ -69,6 +73,7 @@ function extractPortLabel(urlStr, fallback) {
 }
 
 function renderVaultPill(vaultState, latencyMs) {
+  currentVaultState = vaultState || 'closed';
   if (vaultState === 'open') {
     elVaultDot.className = 'dot open';
     elVaultStateText.textContent = latencyMs ? `Online · ${latencyMs}ms` : 'Online';
@@ -118,14 +123,39 @@ async function copyTextWithToast(value, label, isSecret = false) {
   }
 }
 
-function renderVaultCandidateItems() {
+async function resolveFullCandidate(item) {
+  if (!item) return null;
+  if (item.password || item.totpCode) return item;
+  const res = await sendPopupRequest('vaultGetFillItem', { itemId: item.id });
+  if (!res?.ok || !res?.candidate) {
+    showToast(res?.error || 'Failed to load credential from Vault', true);
+    return null;
+  }
+  return res.candidate;
+}
+
+function getCurrentHostLabel() {
+  try {
+    return currentTab?.url ? new URL(currentTab.url).hostname : '';
+  } catch {
+    return '';
+  }
+}
+
+function mergePopupItems(localMatches, remoteItems) {
+  const seen = new Set();
+  return [...localMatches, ...remoteItems].filter((e) => e?.id && !seen.has(e.id) && seen.add(e.id));
+}
+
+function renderVaultCandidateItems(overrideList = null) {
   if (!elVaultCandidateList || !elVaultEmptyState) return;
   const q = (elVaultSearchInput?.value || '').trim().toLowerCase();
-  const filtered = cachedCandidates.filter((item) => {
+  const localMatches = cachedCandidates.filter((item) => {
     if (!q) return true;
     const hay = `${item.username || ''} ${item.title || ''} ${item.id || ''}`.toLowerCase();
     return hay.includes(q);
   });
+  const filtered = Array.isArray(overrideList) ? overrideList : localMatches;
 
   if (elVaultMatchCount) {
     elVaultMatchCount.textContent = String(filtered.length);
@@ -154,16 +184,19 @@ function renderVaultCandidateItems() {
 
     const titleEl = document.createElement('div');
     titleEl.className = 'vault-item-title';
-    titleEl.textContent = item.title || item.id;
+    titleEl.textContent =
+      item.domainMatched === false && item.host
+        ? `${item.host}${item.title && item.title !== item.host ? ' · ' + item.title : ''}`
+        : (item.title || item.id);
 
     info.appendChild(userEl);
     info.appendChild(titleEl);
     top.appendChild(info);
 
-    if (item.totpCode) {
+    if (item.totpCode || item.hasOtp) {
       const otpPill = document.createElement('span');
       otpPill.className = 'vault-otp-pill';
-      otpPill.textContent = `OTP ${item.totpCode}`;
+      otpPill.textContent = item.totpCode ? `OTP ${item.totpCode}` : '2FA';
       top.appendChild(otpPill);
     }
 
@@ -176,16 +209,21 @@ function renderVaultCandidateItems() {
     btnFill.textContent = 'Fill';
     btnFill.addEventListener('click', async () => {
       btnFill.disabled = true;
+      const full = await resolveFullCandidate(item);
+      if (!full) {
+        btnFill.disabled = false;
+        return;
+      }
       const res = await sendPopupRequest('vaultFill', {
         tabId: currentTab?.id,
         action: 'fillCandidate',
-        candidate: item,
+        candidate: full,
       });
       btnFill.disabled = false;
       if (!res.ok) {
         showToast(res.error || 'Cannot fill on this page', true);
       } else {
-        showToast(`Filled ${item.username || item.title}`);
+        showToast(`Filled ${full.username || full.title}`);
       }
     });
     actions.appendChild(btnFill);
@@ -198,19 +236,25 @@ function renderVaultCandidateItems() {
       actions.appendChild(btnUser);
     }
 
-    if (item.password) {
+    if (item.password || item.hasPassword) {
       const btnPass = document.createElement('button');
       btnPass.type = 'button';
       btnPass.textContent = 'Copy Pass';
-      btnPass.addEventListener('click', () => copyTextWithToast(item.password, 'Password'));
+      btnPass.addEventListener('click', async () => {
+        const full = await resolveFullCandidate(item);
+        if (full) await copyTextWithToast(full.password, 'Password', true);
+      });
       actions.appendChild(btnPass);
     }
 
-    if (item.totpCode) {
+    if (item.totpCode || item.hasOtp) {
       const btnOtp = document.createElement('button');
       btnOtp.type = 'button';
       btnOtp.textContent = 'Copy OTP';
-      btnOtp.addEventListener('click', () => copyTextWithToast(item.totpCode, '2FA OTP'));
+      btnOtp.addEventListener('click', async () => {
+        const full = await resolveFullCandidate(item);
+        if (full) await copyTextWithToast(full.totpCode, '2FA OTP', true);
+      });
       actions.appendChild(btnOtp);
     }
 
@@ -220,21 +264,45 @@ function renderVaultCandidateItems() {
   }
 }
 
+async function loadRecentFallbackIfEmpty() {
+  const hostLabel = getCurrentHostLabel();
+  if ((elVaultSearchInput?.value || '').trim()) return;
+  if (cachedCandidates.length > 0 || currentVaultState !== 'open') return;
+  const seq = ++searchSeq;
+  const res = await sendPopupRequest('vaultSearch', {
+    query: '',
+    url: currentTab?.url || '',
+    limit: 15,
+  });
+  if (seq !== searchSeq || (elVaultSearchInput?.value || '').trim()) return;
+  if (!res?.ok) {
+    if (res?.locked) {
+      renderVaultPill('locked');
+      if (elVaultEmptyState) elVaultEmptyState.textContent = res.error || 'Vault is locked.';
+    }
+    return;
+  }
+  globalSearchResults = Array.isArray(res.items) ? res.items : [];
+  if (globalSearchResults.length > 0 && elVaultDomainLabel) {
+    elVaultDomainLabel.textContent = `Recent Vault Logins (0 on ${hostLabel || 'tab'})`;
+  }
+  renderVaultCandidateItems(globalSearchResults);
+}
+
 async function loadVaultCandidates() {
   if (!currentTab?.url) {
     cachedCandidates = [];
+    globalSearchResults = [];
     if (elVaultDomainLabel) elVaultDomainLabel.textContent = 'Matching Logins';
     if (elVaultEmptyState) {
       elVaultEmptyState.textContent = 'Open an HTTP/HTTPS tab to view Vault accounts.';
     }
     renderVaultCandidateItems();
+    await loadRecentFallbackIfEmpty();
     return;
   }
 
-  let hostLabel = '';
-  try {
-    hostLabel = new URL(currentTab.url).hostname;
-  } catch {}
+  const hostLabel = getCurrentHostLabel();
   if (elVaultDomainLabel) {
     elVaultDomainLabel.textContent = hostLabel ? `Logins · ${hostLabel}` : 'Matching Logins';
   }
@@ -246,6 +314,8 @@ async function loadVaultCandidates() {
 
   if (!res.ok) {
     cachedCandidates = [];
+    globalSearchResults = [];
+    if (res.locked) renderVaultPill('locked');
     if (elVaultEmptyState) {
       elVaultEmptyState.textContent = res.error || 'Vault Kit offline or unreachable.';
     }
@@ -254,10 +324,15 @@ async function loadVaultCandidates() {
   }
 
   cachedCandidates = Array.isArray(res.candidates) ? res.candidates : [];
+  globalSearchResults = [];
   if (elVaultEmptyState) {
     elVaultEmptyState.textContent = hostLabel
       ? `No matching credentials for ${hostLabel}.`
       : 'No matching credentials for this domain.';
+  }
+  if (cachedCandidates.length === 0 && !(elVaultSearchInput?.value || '').trim()) {
+    await loadRecentFallbackIfEmpty();
+    if (globalSearchResults.length > 0) return;
   }
   renderVaultCandidateItems();
 }
@@ -280,7 +355,65 @@ async function refreshStatus({ hydrateInputs = false } = {}) {
   }
 }
 
-elVaultSearchInput?.addEventListener('input', () => renderVaultCandidateItems());
+elVaultSearchInput?.addEventListener('input', () => {
+  const q = (elVaultSearchInput.value || '').trim();
+  if (searchDebounceTimer) {
+    clearTimeout(searchDebounceTimer);
+    searchDebounceTimer = null;
+  }
+  const seq = ++searchSeq;
+  const hostLabel = getCurrentHostLabel();
+  if (!q) {
+    if (cachedCandidates.length > 0) {
+      if (elVaultDomainLabel) {
+        elVaultDomainLabel.textContent = hostLabel ? `Logins · ${hostLabel}` : 'Matching Logins';
+      }
+      renderVaultCandidateItems();
+    } else if (globalSearchResults.length > 0) {
+      if (elVaultDomainLabel) {
+        elVaultDomainLabel.textContent = `Recent Vault Logins (0 on ${hostLabel || 'tab'})`;
+      }
+      renderVaultCandidateItems(globalSearchResults);
+    } else {
+      renderVaultCandidateItems();
+      loadRecentFallbackIfEmpty();
+    }
+    return;
+  }
+
+  if (elVaultDomainLabel) {
+    elVaultDomainLabel.textContent = hostLabel ? `Logins · ${hostLabel}` : 'Matching Logins';
+  }
+  const qLower = q.toLowerCase();
+  const localMatches = cachedCandidates.filter((item) =>
+    `${item.username || ''} ${item.title || ''} ${item.id || ''}`.toLowerCase().includes(qLower)
+  );
+  if (localMatches.length > 0) {
+    renderVaultCandidateItems(localMatches);
+  }
+  searchDebounceTimer = setTimeout(async () => {
+    const res = await sendPopupRequest('vaultSearch', {
+      query: q,
+      url: currentTab?.url || '',
+      limit: 30,
+    });
+    if (seq !== searchSeq) return;
+    if (!res?.ok) {
+      if (res?.locked) renderVaultPill('locked');
+      if (elVaultEmptyState) {
+        elVaultEmptyState.textContent = res?.error || 'Vault unreachable.';
+      }
+      renderVaultCandidateItems(localMatches);
+      return;
+    }
+    const remoteItems = Array.isArray(res.items) ? res.items : [];
+    const merged = mergePopupItems(localMatches, remoteItems);
+    if (merged.length === 0 && elVaultEmptyState) {
+      elVaultEmptyState.textContent = `No accounts matching "${q}".`;
+    }
+    renderVaultCandidateItems(merged);
+  }, 120);
+});
 
 elBtnTouchIdUnlock?.addEventListener('click', async () => {
   elBtnTouchIdUnlock.disabled = true;
@@ -297,6 +430,9 @@ elBtnTouchIdUnlock?.addEventListener('click', async () => {
   renderVaultPill('open', res.latencyMs);
   showToast('Đã xác thực Touch ID & mở khóa Vault!');
   await loadVaultCandidates();
+  if ((elVaultSearchInput?.value || '').trim()) {
+    elVaultSearchInput.dispatchEvent(new Event('input', { bubbles: true }));
+  }
 });
 
 elBtnGeneratePass?.addEventListener('click', async () => {
@@ -395,6 +531,9 @@ elBtnSaveSettings?.addEventListener('click', async () => {
   renderVaultPill(res.vaultState, res.latencyMs);
   showToast('Saved Vault Companion settings');
   await loadVaultCandidates();
+  if ((elVaultSearchInput?.value || '').trim()) {
+    elVaultSearchInput.dispatchEvent(new Event('input', { bubbles: true }));
+  }
 });
 
 document.addEventListener('DOMContentLoaded', async () => {

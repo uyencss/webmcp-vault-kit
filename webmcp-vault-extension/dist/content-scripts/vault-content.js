@@ -455,6 +455,13 @@
 
   function fillCandidate(item, fields = detectLoginInputs()) {
     if (!item) return false;
+    if (
+      (fields?.userEl && fields.userEl.isConnected === false) ||
+      (fields?.passEl && fields.passEl.isConnected === false) ||
+      (fields?.otpEl && fields.otpEl.isConnected === false)
+    ) {
+      fields = detectLoginInputs();
+    }
     lastAutofillCandidate = item;
     let filledAny = false;
     if (fields.userEl && item.username) {
@@ -475,17 +482,19 @@
     return filledAny;
   }
 
-  function showInlineSelector(anchorEl, candidates, fields) {
+  function showInlineSelector(anchorEl, candidates, fields, opts = {}) {
     closeInlineMenu();
-    const list = Array.isArray(candidates) ? candidates : [];
-    if (!anchorEl || typeof document === 'undefined' || !document.body || (!list.length && !fields?.passEl)) return;
+    const list = Array.isArray(candidates)
+      ? candidates.map((c) => ({ ...c, domainMatched: Boolean(c.domainMatched ?? (c.password || c.totpCode)) }))
+      : [];
+    if (!anchorEl || typeof document === 'undefined' || !document.body) return;
 
     const rect = anchorEl.getBoundingClientRect();
     const host = document.createElement('div');
     host.style.cssText = [
       'position:fixed',
-      `top:${Math.min(window.innerHeight - 240, Math.max(8, rect.bottom + 6))}px`,
-      `left:${Math.min(window.innerWidth - 300, Math.max(8, rect.left))}px`,
+      `top:${Math.min(window.innerHeight - 350, Math.max(8, rect.bottom + 6))}px`,
+      `left:${Math.min(window.innerWidth - 330, Math.max(8, rect.left))}px`,
       'z-index:2147483647',
     ].join(';');
     const shadow = host.attachShadow({ mode: 'closed' });
@@ -497,61 +506,310 @@
       'border:1px solid #3b82f6',
       'border-radius:10px',
       'padding:10px',
-      'width:280px',
-      'max-height:260px',
-      'overflow-y:auto',
+      'width:310px',
+      'max-height:340px',
+      'display:flex',
+      'flex-direction:column',
       'font:12px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif',
       'box-shadow:0 16px 32px rgba(0,0,0,0.55)',
     ].join(';');
 
     const hdr = document.createElement('div');
-    hdr.style.cssText = 'display:flex;justify-content:space-between;align-items:center;font-weight:600;color:#93c5fd;margin-bottom:6px;';
-    hdr.textContent = `WebMCP Vault (${list.length}) · Alt+K`;
+    hdr.style.cssText = 'display:flex;justify-content:space-between;align-items:center;font-weight:600;color:#93c5fd;margin-bottom:6px;flex-shrink:0;';
+    const hdrLabel = document.createElement('span');
+    hdrLabel.textContent = `WebMCP Vault (${list.length}) · Alt+K`;
     const closeBtn = document.createElement('button');
+    closeBtn.type = 'button';
     closeBtn.textContent = '✕';
     closeBtn.style.cssText = 'background:transparent;border:none;color:#94a3b8;cursor:pointer;font-size:12px;';
     closeBtn.addEventListener('click', () => closeInlineMenu());
+    hdr.appendChild(hdrLabel);
     hdr.appendChild(closeBtn);
     card.appendChild(hdr);
 
-    for (const item of list) {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.style.cssText = [
+    const searchInput = document.createElement('input');
+    searchInput.type = 'search';
+    searchInput.placeholder = 'Tìm username, tên, domain, #tag...';
+    searchInput.style.cssText = [
+      'width:100%',
+      'box-sizing:border-box',
+      'background:#1e293b',
+      'color:#f8fafc',
+      'border:1px solid #334155',
+      'border-radius:6px',
+      'padding:6px 8px',
+      'margin-bottom:6px',
+      'outline:none',
+      'font:inherit',
+      'flex-shrink:0',
+    ].join(';');
+    card.appendChild(searchInput);
+
+    const listContainer = document.createElement('div');
+    listContainer.style.cssText = 'overflow-y:auto;max-height:215px;flex:1 1 auto;min-height:0;';
+    card.appendChild(listContainer);
+
+    let searchTimer = null;
+    let searchSeq = 0;
+    let renderedItems = [];
+    let renderedButtons = [];
+    let activeIdx = 0;
+    let isLocked = Boolean(opts.locked);
+
+    const updateActiveHighlight = () => {
+      renderedButtons.forEach((btn, idx) => {
+        const active = idx === activeIdx;
+        btn.style.borderColor = active ? '#3b82f6' : '#334155';
+        btn.style.background = active ? '#1e3a5f' : '#1e293b';
+      });
+      if (renderedButtons[activeIdx]?.scrollIntoView) {
+        renderedButtons[activeIdx].scrollIntoView({ block: 'nearest' });
+      }
+    };
+
+    const renderTouchIdUnlock = () => {
+      listContainer.textContent = '';
+      renderedItems = [];
+      renderedButtons = [];
+      const unlockBtn = document.createElement('button');
+      unlockBtn.type = 'button';
+      unlockBtn.style.cssText = [
         'display:block',
         'width:100%',
-        'text-align:left',
-        'background:#1e293b',
-        'color:#f8fafc',
-        'border:1px solid #334155',
+        'text-align:center',
+        'background:rgba(59,130,246,0.16)',
+        'color:#93c5fd',
+        'border:1px solid rgba(59,130,246,0.55)',
         'border-radius:6px',
-        'padding:7px 9px',
-        'margin-top:5px',
+        'padding:9px 10px',
         'cursor:pointer',
-        'font:inherit',
+        'font:600 12px/1.3 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif',
       ].join(';');
-      const titleRow = document.createElement('div');
-      titleRow.style.cssText = 'font-weight:600;display:flex;justify-content:space-between;align-items:center;gap:6px;';
-      const nameSpan = document.createElement('span');
-      nameSpan.textContent = item.username || item.title;
-      titleRow.appendChild(nameSpan);
-      if (item.totpCode) {
-        const otpBadge = document.createElement('span');
-        otpBadge.style.cssText = 'background:#1d4ed8;color:#dbeafe;padding:1px 5px;border-radius:4px;font-size:10px;';
-        otpBadge.textContent = '2FA ' + item.totpCode;
-        titleRow.appendChild(otpBadge);
-      }
-      const subRow = document.createElement('div');
-      subRow.style.cssText = 'font-size:11px;color:#94a3b8;margin-top:2px;';
-      subRow.textContent = item.title;
-      btn.appendChild(titleRow);
-      btn.appendChild(subRow);
-      btn.addEventListener('mousedown', (e) => {
+      unlockBtn.textContent = '🔓 Vault đang khóa — Mở bằng Touch ID';
+      unlockBtn.addEventListener('mousedown', async (e) => {
         e.preventDefault();
+        unlockBtn.disabled = true;
+        unlockBtn.textContent = '⏳ Đang xác thực Touch ID...';
+        const res = await sendBgRequest('unlock_touchid', {
+          reason: 'Mở khóa WebMCP Vault Companion',
+        });
+        if (!res?.error && res?.unlocked === true) {
+          closeInlineMenu();
+          runPasswordAutofill({ forceMenu: true, anchorEl });
+          return;
+        }
+        unlockBtn.disabled = false;
+        unlockBtn.textContent = '🔓 Vault đang khóa — Mở bằng Touch ID';
+        showVaultToast(res?.doctor?.unlockError || res?.error || 'Touch ID không mở khóa được Vault', true);
+      });
+      listContainer.appendChild(unlockBtn);
+    };
+
+    async function selectAndFill(item) {
+      if (!item) return;
+      if (item.password || item.totpCode) {
         fillCandidate(item, fields);
         closeInlineMenu();
+        return;
+      }
+      const full = await sendBgRequest('credentials_fill_item', { itemId: item.id });
+      if (full?.candidate) {
+        fillCandidate(full.candidate, fields);
+        closeInlineMenu();
+        return;
+      }
+      if (full?.locked) {
+        isLocked = true;
+        renderTouchIdUnlock();
+        return;
+      }
+      showVaultToast(full?.error || 'Không thể lấy thông tin tài khoản từ Vault', true);
+    }
+
+    const renderItems = (items, subLabel = '') => {
+      if (activeInlineMenuHost !== host) return;
+      listContainer.textContent = '';
+      renderedItems = Array.isArray(items) ? items : [];
+      renderedButtons = [];
+      activeIdx = 0;
+      hdrLabel.textContent = `WebMCP Vault (${renderedItems.length}) · Alt+K`;
+
+      if (subLabel && renderedItems.length > 0) {
+        const hint = document.createElement('div');
+        hint.style.cssText = 'font-size:10.5px;color:#94a3b8;padding:2px 2px 3px;';
+        hint.textContent = subLabel;
+        listContainer.appendChild(hint);
+      }
+
+      if (renderedItems.length === 0) {
+        const empty = document.createElement('div');
+        empty.style.cssText = 'font-size:11px;color:#64748b;padding:8px 4px;text-align:center;';
+        empty.textContent = searchInput.value.trim()
+          ? 'Không tìm thấy tài khoản phù hợp.'
+          : 'Chưa có tài khoản phù hợp cho trang này.';
+        listContainer.appendChild(empty);
+        return;
+      }
+
+      renderedItems.forEach((item, idx) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.style.cssText = [
+          'display:block',
+          'width:100%',
+          'text-align:left',
+          'background:#1e293b',
+          'color:#f8fafc',
+          'border:1px solid #334155',
+          'border-radius:6px',
+          'padding:7px 9px',
+          'margin-top:5px',
+          'cursor:pointer',
+          'font:inherit',
+        ].join(';');
+        const titleRow = document.createElement('div');
+        titleRow.style.cssText = 'font-weight:600;display:flex;justify-content:space-between;align-items:center;gap:6px;';
+        const nameSpan = document.createElement('span');
+        nameSpan.style.cssText = 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+        nameSpan.textContent = item.username || item.title;
+        titleRow.appendChild(nameSpan);
+
+        const badgeWrap = document.createElement('span');
+        badgeWrap.style.cssText = 'display:inline-flex;align-items:center;gap:4px;flex-shrink:0;';
+        if (!item.domainMatched && item.host) {
+          const hostPill = document.createElement('span');
+          hostPill.style.cssText = 'background:#334155;color:#cbd5e1;padding:1px 5px;border-radius:4px;font-size:10px;max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+          hostPill.textContent = item.host;
+          badgeWrap.appendChild(hostPill);
+        }
+        if (item.totpCode || item.hasOtp) {
+          const otpBadge = document.createElement('span');
+          otpBadge.style.cssText = 'background:#1d4ed8;color:#dbeafe;padding:1px 5px;border-radius:4px;font-size:10px;';
+          otpBadge.textContent = item.totpCode ? '2FA ' + item.totpCode : 'OTP';
+          badgeWrap.appendChild(otpBadge);
+        }
+        if (badgeWrap.childNodes.length) {
+          titleRow.appendChild(badgeWrap);
+        }
+
+        const subRow = document.createElement('div');
+        subRow.style.cssText = 'font-size:11px;color:#94a3b8;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+        subRow.textContent = !item.domainMatched && item.host
+          ? (item.title ? `${item.title} · ${item.host}` : item.host)
+          : (item.title || item.host || '');
+
+        btn.appendChild(titleRow);
+        btn.appendChild(subRow);
+        btn.addEventListener('mouseenter', () => {
+          activeIdx = idx;
+          updateActiveHighlight();
+        });
+        btn.addEventListener('mousedown', (e) => {
+          e.preventDefault();
+          selectAndFill(item);
+        });
+        listContainer.appendChild(btn);
+        renderedButtons.push(btn);
       });
-      card.appendChild(btn);
+      updateActiveHighlight();
+    };
+
+    const mergeCandidates = (localMatches, remoteItems) => {
+      const seen = new Set();
+      return [...localMatches, ...remoteItems]
+        .filter((e) => e?.id && !seen.has(e.id) && seen.add(e.id))
+        .sort((a, b) => Number(Boolean(b.domainMatched)) - Number(Boolean(a.domainMatched)));
+    };
+
+    const fetchSearchResults = (seq, query, limit, onItems) => {
+      sendBgRequest('credentials_search', { query, limit }).then((res) => {
+        if (seq !== searchSeq || activeInlineMenuHost !== host) return;
+        if (res?.locked) {
+          isLocked = true;
+          renderTouchIdUnlock();
+          return;
+        }
+        onItems(Array.isArray(res?.items) ? res.items : []);
+      });
+    };
+
+    const runQuery = (rawQuery) => {
+      if (isLocked) return;
+      const query = String(rawQuery || '').trim();
+      const qLower = query.toLowerCase();
+      if (searchTimer) {
+        clearTimeout(searchTimer);
+        searchTimer = null;
+      }
+      const seq = ++searchSeq;
+
+      const localMatches = qLower
+        ? list.filter((item) =>
+            `${item.username || ''} ${item.title || ''} ${item.web || ''} ${item.host || ''}`
+              .toLowerCase()
+              .includes(qLower)
+          )
+        : list;
+
+      if (!query) {
+        if (list.length > 0) {
+          renderItems(list);
+          return;
+        }
+        fetchSearchResults(seq, '', 12, (items) => {
+          renderItems(items, items.length ? 'Gần đây trong Vault (gõ để tìm tất cả)' : '');
+        });
+        return;
+      }
+
+      if (localMatches.length > 0) {
+        renderItems(localMatches);
+      }
+      searchTimer = setTimeout(() => {
+        fetchSearchResults(seq, query, 25, (remoteItems) => {
+          renderItems(mergeCandidates(localMatches, remoteItems));
+        });
+      }, 120);
+    };
+
+    searchInput.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if (e.isComposing || e.keyCode === 229) return;
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closeInlineMenu();
+        return;
+      }
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (renderedButtons.length) {
+          activeIdx = (activeIdx + 1) % renderedButtons.length;
+          updateActiveHighlight();
+        }
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (renderedButtons.length) {
+          activeIdx = (activeIdx - 1 + renderedButtons.length) % renderedButtons.length;
+          updateActiveHighlight();
+        }
+        return;
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const picked = renderedItems[activeIdx] || renderedItems[0];
+        if (picked) selectAndFill(picked);
+      }
+    });
+    searchInput.addEventListener('keyup', (e) => e.stopPropagation());
+    searchInput.addEventListener('keypress', (e) => e.stopPropagation());
+    searchInput.addEventListener('input', () => runQuery(searchInput.value));
+
+    if (isLocked) {
+      renderTouchIdUnlock();
+    } else {
+      runQuery('');
     }
 
     if (fields?.passEl) {
@@ -568,6 +826,7 @@
         'padding:7px 9px',
         'margin-top:6px',
         'cursor:pointer',
+        'flex-shrink:0',
         'font:600 11.5px/1.3 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif',
       ].join(';');
       genBtn.textContent = '⚡ Tạo mật khẩu mạnh (20 ký tự) & Lưu Vault';
@@ -582,6 +841,11 @@
     shadow.appendChild(card);
     document.body.appendChild(host);
     activeInlineMenuHost = host;
+    if (opts.autoFocusSearch && !isLocked && typeof requestAnimationFrame === 'function') {
+      requestAnimationFrame(() => {
+        if (activeInlineMenuHost === host) searchInput.focus();
+      });
+    }
   }
 
   let autofillInFlight = false;
@@ -598,17 +862,20 @@
         origin: window.location?.origin || '',
         usernameHint,
       });
+      const isLocked = Boolean(res?.locked);
       const candidates = Array.isArray(res?.candidates) ? res.candidates : [];
       const targetAnchor = anchorEl || fields.userEl || fields.passEl || fields.otpEl;
-      if (candidates.length === 0) {
-        if ((forceMenu || fields.isRegistration) && fields.passEl) {
-          showInlineSelector(targetAnchor, [], fields);
+      if (forceMenu) {
+        if (targetAnchor) {
+          showInlineSelector(targetAnchor, candidates, fields, { autoFocusSearch: true, locked: isLocked });
         }
         return;
       }
 
-      if (forceMenu) {
-        showInlineSelector(targetAnchor, candidates, fields);
+      if (candidates.length === 0) {
+        if (fields.isRegistration && fields.passEl && targetAnchor) {
+          showInlineSelector(targetAnchor, [], fields, { autoFocusSearch: false, locked: isLocked });
+        }
         return;
       }
 
@@ -621,7 +888,7 @@
         if (otpCand) {
           if (!fields.otpEl.value) fillCandidate(otpCand, fields);
         } else {
-          showInlineSelector(fields.otpEl, candidates, fields);
+          showInlineSelector(fields.otpEl, candidates, fields, { autoFocusSearch: false, locked: isLocked });
         }
         return;
       }
@@ -635,10 +902,10 @@
         if (userEmpty && passEmpty) {
           fillCandidate(candidates[0], fields);
         } else {
-          showInlineSelector(targetAnchor, candidates, fields);
+          showInlineSelector(targetAnchor, candidates, fields, { autoFocusSearch: false, locked: isLocked });
         }
       } else {
-        showInlineSelector(targetAnchor, candidates, fields);
+        showInlineSelector(targetAnchor, candidates, fields, { autoFocusSearch: false, locked: isLocked });
       }
     } catch {
       // Never disrupt host page

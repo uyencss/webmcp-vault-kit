@@ -982,3 +982,71 @@ test('item tags: normalizeTags, create/update preservation, #tag search, and AND
     /tags cannot exceed 20 entries/,
   );
 });
+
+test('searchAutofillItems returns redacted logins sorted by domain match and getAutofillItemById reveals single-item secrets', () => {
+  const dataDir = tempHome();
+  const store = createVaultStore({ dataDir, key: 'autofill-search-key' });
+  store.init();
+
+  const ghSecondary = store.createItem({
+    title: 'GitHub Alt',
+    web: 'https://github.com',
+    username: 'alt-dev',
+    password: 'gh-alt-password',
+    tags: ['work'],
+  });
+  const ghMain = store.createItem({
+    title: 'GitHub (Main)',
+    web: 'https://github.com/login',
+    username: 'main-dev',
+    password: 'gh-main-password',
+    otpSecret: 'JBSWY3DPEHPK3PXP',
+  });
+  const googleOther = store.createItem({
+    title: 'Google Console',
+    web: 'https://accounts.google.com',
+    username: 'ops@example.com',
+    password: 'google-secret-password',
+    note: 'private recovery note',
+    tags: ['cloud'],
+  });
+  const apiTokenItem = store.createItem({
+    type: 'api_token',
+    title: 'GitHub API Token',
+    fields: [{ name: 'token', value: 'ghp_secret', secret: true }],
+  });
+
+  // Search matching both github & api token excludes api_token, prioritizes domain match & Main, and redacts all secrets
+  const allGithub = store.searchAutofillItems({ query: 'github', rpId: 'github.com', origin: 'https://github.com' });
+  assert.equal(allGithub.length, 2);
+  assert.equal(allGithub[0].id, ghMain.id);
+  assert.equal(allGithub[0].domainMatched, true);
+  assert.equal(allGithub[0].hasPassword, true);
+  assert.equal(allGithub[0].hasOtp, true);
+  assert.equal(allGithub[1].id, ghSecondary.id);
+  assert.equal(JSON.stringify(allGithub).includes('gh-main-password'), false);
+  assert.equal(JSON.stringify(allGithub).includes('JBSWY3DPEHPK3PXP'), false);
+  assert.equal(Object.hasOwn(allGithub[0], 'password'), false);
+  assert.equal(Object.hasOwn(allGithub[0], 'totpCode'), false);
+
+  // Cross-domain search by tag or username works
+  const crossDomain = store.searchAutofillItems({ query: '#cloud', rpId: 'github.com' });
+  assert.equal(crossDomain.length, 1);
+  assert.equal(crossDomain[0].id, googleOther.id);
+  assert.equal(crossDomain[0].host, 'accounts.google.com');
+  assert.equal(crossDomain[0].domainMatched, false);
+
+  // Single-item reveal returns password and generated TOTP without raw otpSecret or note
+  const single = store.getAutofillItemById(googleOther.id);
+  assert.equal(single.id, googleOther.id);
+  assert.equal(single.username, 'ops@example.com');
+  assert.equal(single.password, 'google-secret-password');
+  assert.equal(Object.hasOwn(single, 'otpSecret'), false);
+  assert.equal(Object.hasOwn(single, 'note'), false);
+
+  const singleWithOtp = store.getAutofillItemById(ghMain.id);
+  assert.match(singleWithOtp.totpCode, /^\d{6}$/);
+
+  assert.throws(() => store.getAutofillItemById(apiTokenItem.id), /not a login credential/i);
+  assert.throws(() => store.getAutofillItemById('missing-id'), /Item not found/);
+});

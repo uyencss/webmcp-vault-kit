@@ -626,3 +626,91 @@ test('ensureVaultUiServer starts background daemon and reuses running instance',
   else process.env.WEBMCP_HOME = oldHome;
 });
 
+test('vault UI server /api/credentials/search & /fill-item support chrome-extension origin and report locked state cleanly', async (t) => {
+  const oldHome = process.env.WEBMCP_HOME;
+  const oldKey = process.env.WEBMCP_VAULT_KEY;
+  const oldKeyFile = process.env.WEBMCP_VAULT_KEY_FILE;
+  delete process.env.WEBMCP_VAULT_KEY;
+  delete process.env.WEBMCP_VAULT_KEY_FILE;
+  process.env.WEBMCP_HOME = tempHome();
+
+  const ui = await startVaultUiServer({ host: '127.0.0.1', port: 0 });
+  t.after(() => {
+    ui.server.close();
+    if (oldHome === undefined) delete process.env.WEBMCP_HOME;
+    else process.env.WEBMCP_HOME = oldHome;
+    if (oldKey === undefined) delete process.env.WEBMCP_VAULT_KEY;
+    else process.env.WEBMCP_VAULT_KEY = oldKey;
+    if (oldKeyFile === undefined) delete process.env.WEBMCP_VAULT_KEY_FILE;
+    else process.env.WEBMCP_VAULT_KEY_FILE = oldKeyFile;
+  });
+
+  const adminHeaders = {
+    'Content-Type': 'application/json',
+    'x-webmcp-vault-token': ui.token,
+    'x-webmcp-vault-key': 'ext-search-key',
+  };
+  await fetch(`http://127.0.0.1:${ui.port}/api/init`, { method: 'POST', headers: adminHeaders });
+
+  const created = await (await fetch(`http://127.0.0.1:${ui.port}/api/items`, {
+    method: 'POST',
+    headers: adminHeaders,
+    body: JSON.stringify({
+      title: 'Subdomain Account',
+      web: 'https://portal.example.org',
+      username: 'alice@example.org',
+      password: 'super-secret-ext-pass',
+      otpSecret: 'JBSWY3DPEHPK3PXP',
+    }),
+  })).json();
+
+  const extHeaders = {
+    'Content-Type': 'application/json',
+    Origin: 'chrome-extension://test-extension-id',
+  };
+
+  // Without session unlock or key header -> 401 + { locked: true }
+  const lockedRes = await fetch(`http://127.0.0.1:${ui.port}/api/credentials/search`, {
+    method: 'POST',
+    headers: extHeaders,
+    body: JSON.stringify({ query: 'alice' }),
+  });
+  assert.equal(lockedRes.status, 401);
+  const lockedJson = await lockedRes.json();
+  assert.equal(lockedJson.locked, true);
+
+  // Unlock session via /api/doctor with key header
+  const docRes = await fetch(`http://127.0.0.1:${ui.port}/api/doctor`, {
+    headers: {
+      'x-webmcp-vault-token': ui.token,
+      'x-webmcp-vault-key': 'ext-search-key',
+    },
+  });
+  assert.equal(docRes.status, 200);
+
+  // Extension search succeeds without UI token and redacts secrets
+  const searchRes = await fetch(`http://127.0.0.1:${ui.port}/api/credentials/search`, {
+    method: 'POST',
+    headers: extHeaders,
+    body: JSON.stringify({ query: 'alice', rpId: 'other.com', origin: 'https://other.com' }),
+  });
+  assert.equal(searchRes.status, 200);
+  const searchJson = await searchRes.json();
+  assert.equal(searchJson.count, 1);
+  assert.equal(searchJson.items[0].id, created.item.id);
+  assert.equal(searchJson.items[0].domainMatched, false);
+  assert.equal(searchJson.items[0].hasPassword, true);
+  assert.equal(JSON.stringify(searchJson).includes('super-secret-ext-pass'), false);
+
+  // Single-item reveal via /api/credentials/fill-item
+  const fillRes = await fetch(`http://127.0.0.1:${ui.port}/api/credentials/fill-item`, {
+    method: 'POST',
+    headers: extHeaders,
+    body: JSON.stringify({ itemId: created.item.id }),
+  });
+  assert.equal(fillRes.status, 200);
+  const fillJson = await fillRes.json();
+  assert.equal(fillJson.candidate.password, 'super-secret-ext-pass');
+  assert.match(fillJson.candidate.totpCode, /^\d{6}$/);
+});
+

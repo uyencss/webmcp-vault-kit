@@ -207,6 +207,34 @@ export async function probeVaultHealth(vaultUrl, rpId = 'localhost') {
   }
 }
 
+async function postVaultJson(vaultUrl, path, body, timeoutMs = 1500) {
+  try {
+    const { res, activeVaultUrl } = await fetchFromVaultWithFailover(
+      vaultUrl,
+      path,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      },
+      timeoutMs
+    );
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return {
+        ok: false,
+        locked: Boolean(res.status === 423 || data?.locked === true),
+        data,
+        activeVaultUrl,
+        error: data?.error || `Vault request failed (${res.status})`,
+      };
+    }
+    return { ok: true, data, activeVaultUrl };
+  } catch (err) {
+    return { ok: false, locked: false, data: {}, error: err.message };
+  }
+}
+
 export async function queryDomainCandidates(vaultUrl, targetUrl, usernameHint = '') {
   let parsed;
   try {
@@ -217,42 +245,69 @@ export async function queryDomainCandidates(vaultUrl, targetUrl, usernameHint = 
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
     return { ok: true, hostname: '', origin: '', candidates: [] };
   }
-  try {
-    const { res, activeVaultUrl } = await fetchFromVaultWithFailover(
-      vaultUrl,
-      '/api/credentials/autofill',
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          rpId: parsed.hostname,
-          origin: parsed.origin,
-          web: parsed.origin,
-          usernameHint,
-        }),
-      },
-      1500
-    );
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      throw new Error(data?.error || 'Vault autofill query failed (' + res.status + ')');
-    }
-    return {
-      ok: true,
-      hostname: parsed.hostname,
-      origin: parsed.origin,
-      activeVaultUrl,
-      candidates: Array.isArray(data?.candidates) ? data.candidates : [],
-    };
-  } catch (err) {
-    return {
-      ok: false,
-      hostname: parsed.hostname,
-      origin: parsed.origin,
-      candidates: [],
-      error: err.message,
-    };
+  const r = await postVaultJson(vaultUrl, '/api/credentials/autofill', {
+    rpId: parsed.hostname,
+    origin: parsed.origin,
+    web: parsed.origin,
+    usernameHint,
+  });
+  if (!r.ok) {
+    return { ok: false, locked: r.locked, hostname: parsed.hostname, origin: parsed.origin, candidates: [], error: r.error };
   }
+  return {
+    ok: true,
+    hostname: parsed.hostname,
+    origin: parsed.origin,
+    activeVaultUrl: r.activeVaultUrl,
+    candidates: Array.isArray(r.data?.candidates) ? r.data.candidates : [],
+  };
+}
+
+export async function queryVaultSearch(vaultUrl, { query = '', targetUrl = '', limit = 30 } = {}) {
+  let rpId = '';
+  let origin = '';
+  if (targetUrl) {
+    try {
+      const parsed = new URL(targetUrl);
+      if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+        rpId = parsed.hostname;
+        origin = parsed.origin;
+      }
+    } catch {}
+  }
+  const r = await postVaultJson(vaultUrl, '/api/credentials/search', {
+    query: String(query || ''),
+    rpId,
+    origin,
+    web: origin,
+    limit,
+  });
+  if (!r.ok) {
+    return { ok: false, locked: r.locked, items: [], error: r.error };
+  }
+  const items = Array.isArray(r.data?.items) ? r.data.items : [];
+  return {
+    ok: true,
+    items,
+    count: typeof r.data?.count === 'number' ? r.data.count : items.length,
+    activeVaultUrl: r.activeVaultUrl,
+  };
+}
+
+export async function fetchAutofillItemById(vaultUrl, itemId) {
+  const targetId = String(itemId || '').trim();
+  if (!targetId) {
+    return { ok: false, locked: false, error: 'itemId is required.' };
+  }
+  const r = await postVaultJson(vaultUrl, '/api/credentials/fill-item', { itemId: targetId });
+  if (!r.ok) {
+    return { ok: false, locked: r.locked, error: r.error };
+  }
+  return {
+    ok: true,
+    candidate: r.data?.candidate || null,
+    activeVaultUrl: r.activeVaultUrl,
+  };
 }
 
 async function updateTabBadge(tabId, url) {
@@ -335,6 +390,29 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             break;
           }
 
+          case 'vaultSearch': {
+            let targetUrl = request.params?.url || '';
+            if (!targetUrl) {
+              const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+              targetUrl = activeTab?.url || '';
+            }
+            const { vaultUrl } = await getVaultSettings();
+            const res = await queryVaultSearch(vaultUrl, {
+              query: request.params?.query ?? '',
+              targetUrl,
+              limit: request.params?.limit ?? 30,
+            });
+            sendResponse(res);
+            break;
+          }
+
+          case 'vaultGetFillItem': {
+            const { vaultUrl } = await getVaultSettings();
+            const res = await fetchAutofillItemById(vaultUrl, request.params?.itemId);
+            sendResponse(res);
+            break;
+          }
+
           case 'vaultFill': {
             let targetTabId = request.params?.tabId;
             if (!targetTabId) {
@@ -390,8 +468,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
               60000
             );
             const data = await res.json().catch(() => ({}));
-            if (!res.ok) {
-              throw new Error(data?.error || 'Touch ID unlock failed (' + res.status + ')');
+            if (!res.ok || data?.unlocked !== true) {
+              throw new Error(
+                data?.doctor?.unlockError ||
+                  data?.error ||
+                  'Touch ID đã xác thực nhưng không mở khóa được Vault (' + res.status + ')'
+              );
             }
             sendResponse({
               ok: true,
@@ -512,6 +594,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           passkey_create: '/api/passkey/create',
           credentials_autosave: '/api/credentials/autosave',
           credentials_autofill: '/api/credentials/autofill',
+          credentials_search: '/api/credentials/search',
+          credentials_fill_item: '/api/credentials/fill-item',
           unlock_touchid: '/api/unlock/touchid',
         };
         const path = endpointMap[reqMethod];
@@ -542,6 +626,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         );
         const data = await vaultRes.json().catch(() => ({}));
         if (!vaultRes.ok) {
+          if (vaultRes.status === 423 || data?.locked === true) {
+            sendResponse({ error: data?.error || 'Vault is locked', locked: true });
+            return;
+          }
           throw new Error(data?.error || 'Vault request failed (' + vaultRes.status + ')');
         }
         sendResponse(data);

@@ -377,5 +377,65 @@ describe('WebMCP Vault Companion v1.0.0 — Security & Architecture Suite', () =
     assert.ok(popupHtml.includes('id="btnTouchIdUnlock"'), 'popup.html must have Touch ID button');
     assert.ok(popupHtml.includes('id="btnGeneratePass"'), 'popup.html must have Password Generator button');
   });
+
+  it('8. queryVaultSearch, fetchAutofillItemById, and 401 locked payload handling work across vault states', async () => {
+    const bg = await import(
+      `../../webmcp-vault-extension/dist/background.js?t=${Date.now() + 3}`
+    );
+
+    // 401 with { locked: true } maps cleanly to vaultState: 'locked' and locked: true
+    fetchResponder = async () => ({
+      ok: false,
+      status: 401,
+      json: async () => ({ error: 'WEBMCP_VAULT_KEY is required.', locked: true }),
+    });
+    const health = await bg.probeVaultHealth('http://127.0.0.1:7876', 'github.com');
+    assert.equal(health.vaultState, 'locked');
+
+    const lockedSearch = await bg.queryVaultSearch('http://127.0.0.1:7876', {
+      query: 'alice',
+      targetUrl: 'https://example.com',
+    });
+    assert.equal(lockedSearch.ok, false);
+    assert.equal(lockedSearch.locked, true);
+
+    // Search + single-item fetch roundtrip
+    let lastReq = null;
+    fetchResponder = async (url, init) => {
+      lastReq = { url, body: JSON.parse(init.body) };
+      if (url.endsWith('/api/credentials/search')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            count: 1,
+            items: [{ id: 'item-1', title: 'Portal', host: 'portal.org', username: 'alice', hasPassword: true, hasOtp: true, domainMatched: false }],
+          }),
+        };
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          candidate: { id: 'item-1', username: 'alice', password: 'pw', totpCode: '654321' },
+        }),
+      };
+    };
+
+    const searchRes = await bg.queryVaultSearch('http://127.0.0.1:7876', {
+      query: 'alice',
+      targetUrl: 'https://unrelated.test/login',
+      limit: 15,
+    });
+    assert.equal(searchRes.ok, true);
+    assert.equal(searchRes.items.length, 1);
+    assert.equal(lastReq.body.rpId, 'unrelated.test');
+    assert.equal(lastReq.body.limit, 15);
+
+    const fillRes = await bg.fetchAutofillItemById('http://127.0.0.1:7876', 'item-1');
+    assert.equal(fillRes.ok, true);
+    assert.equal(fillRes.candidate.password, 'pw');
+    assert.equal(fillRes.candidate.totpCode, '654321');
+  });
 });
 

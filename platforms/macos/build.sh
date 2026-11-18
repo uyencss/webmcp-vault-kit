@@ -15,6 +15,8 @@ echo "🔨 Đang biên dịch WebMCP Vault native macOS binary..."
 clang -O2 \
   -framework Cocoa \
   -framework WebKit \
+  -framework Carbon \
+  -framework ApplicationServices \
   -fobjc-arc \
   "$SCRIPT_DIR/WebMCPVaultApp.m" \
   -o "$MACOS_DIR/WebMCP Vault"
@@ -65,6 +67,8 @@ cat << 'EOF' > "$CONTENTS/Info.plist"
     <string>AppIcon</string>
     <key>NSHighResolutionCapable</key>
     <true/>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>WebMCP Vault uses Accessibility to autofill credentials into active apps.</string>
     <key>NSAppTransportSecurity</key>
     <dict>
         <key>NSAllowsLocalNetworking</key>
@@ -74,14 +78,33 @@ cat << 'EOF' > "$CONTENTS/Info.plist"
 </plist>
 EOF
 
+xattr -cr "$APP_BUNDLE" 2>/dev/null || true
+SIGN_ID="${CODESIGN_IDENTITY:-}"
+if [ -z "$SIGN_ID" ]; then
+  SIGN_ID="$(security find-identity -v -p codesigning 2>/dev/null | awk '/^[[:space:]]*[0-9]+\)/ {print $2; exit}')"
+fi
+SIGN_ID="${SIGN_ID:--}"
+echo "🔏 Signing bundle with identity: $SIGN_ID"
+codesign --force --deep --identifier "io.webmcp.vault.app" --sign "$SIGN_ID" "$APP_BUNDLE"
+
+LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
+if [ -x "$LSREGISTER" ]; then
+  "$LSREGISTER" -u "$APP_BUNDLE" >/dev/null 2>&1 || true
+fi
+
 echo "📦 Đã đóng gói thành công bundle: $APP_BUNDLE"
 
 APPLICATIONS_DIR="/Applications"
 if [ -d "$APPLICATIONS_DIR" ] && [ -w "$APPLICATIONS_DIR" ]; then
   rm -rf "$APPLICATIONS_DIR/WebMCP Vault.app"
   cp -R "$APP_BUNDLE" "$APPLICATIONS_DIR/WebMCP Vault.app"
+  if [ -x "$LSREGISTER" ]; then
+    "$LSREGISTER" -f "$APPLICATIONS_DIR/WebMCP Vault.app" >/dev/null 2>&1 || true
+  fi
   echo "🚀 Đã đồng bộ cài đặt vào $APPLICATIONS_DIR/WebMCP Vault.app"
-  if pgrep -f "WebMCP Vault.app/Contents/MacOS/WebMCP Vault" >/dev/null 2>&1; then
+  if launchctl print "gui/$(id -u)/io.webmcp-vault.tray" >/dev/null 2>&1; then
+    launchctl kickstart -k "gui/$(id -u)/io.webmcp-vault.tray" >/dev/null 2>&1 || true
+  elif pgrep -f "WebMCP Vault.app/Contents/MacOS/WebMCP Vault" >/dev/null 2>&1; then
     killall "WebMCP Vault" 2>/dev/null || true
     sleep 0.3
     open -g -a "$APPLICATIONS_DIR/WebMCP Vault.app" --args --tray 2>/dev/null || true

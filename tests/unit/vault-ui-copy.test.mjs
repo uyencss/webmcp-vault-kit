@@ -4,6 +4,7 @@ import { copyText, clearPendingClipboard } from '../../lib/ui/app/status.js';
 import { state } from '../../lib/ui/app/state.js';
 import { extractOtpSetupSecret, copyCurrentOtpSecret } from '../../lib/ui/app/view-fields.js';
 import { refreshEnvironmentUnlock } from '../../lib/ui/app/controller.js';
+import { hasNativeMacAutofill, autofillMacItem } from '../../lib/ui/app/item-list.js';
 
 function withDomMocks(fn) {
   const prevWindow = globalThis.window;
@@ -410,6 +411,67 @@ test('refreshEnvironmentUnlock: toggles initButton visibility based on doctor.in
       assert.equal(avail3, false);
       assert.equal(statusNodes.initButton.classList.contains('hidden'), false);
       assert.equal(statusNodes.envUnlockButton.classList.contains('hidden'), true);
+    } finally {
+      globalThis.fetch = prevFetch;
+    }
+  });
+});
+
+test('autofillMacItem: reveals login secret and invokes native macOS autofillTarget bridge', async () => {
+  await withDomMocks(async ({ statusNodes }) => {
+    const prevFetch = globalThis.fetch;
+    const posted = [];
+    let requestedUrl = '';
+
+    globalThis.document.documentElement = {
+      classList: { contains: (cls) => cls === 'is-mac-popover' },
+    };
+    globalThis.window = {
+      webkit: {
+        messageHandlers: {
+          autofillTarget: {
+            postMessage: (msg) => posted.push(msg),
+          },
+        },
+      },
+    };
+    globalThis.fetch = async (url) => {
+      requestedUrl = String(url);
+      return {
+        ok: true,
+        json: async () => ({
+          item: {
+            id: 'item-mac-1',
+            type: 'login',
+            title: 'Zoom Work',
+            username: 'alice@work.test',
+            password: 'mac-zoom-password',
+            otp: '482910',
+          },
+        }),
+      };
+    };
+
+    try {
+      assert.equal(hasNativeMacAutofill(), true);
+      const ok = await autofillMacItem({ id: 'item-mac-1', type: 'login' }, { mode: 'pass_only' });
+      assert.equal(ok, true);
+      assert.equal(requestedUrl, '/api/items/item-mac-1?reveal=1');
+      assert.deepEqual(posted, [
+        {
+          username: 'alice@work.test',
+          password: 'mac-zoom-password',
+          otp: '482910',
+          mode: 'pass_only',
+        },
+      ]);
+      assert.equal(statusNodes.status.textContent, 'AutoFill → Zoom Work');
+      assert.equal(statusNodes.status.dataset.kind, 'success');
+
+      // Typed non-login items are skipped without fetching
+      const skipped = await autofillMacItem({ id: 'token-1', type: 'api_token' });
+      assert.equal(skipped, false);
+      assert.equal(posted.length, 1);
     } finally {
       globalThis.fetch = prevFetch;
     }
