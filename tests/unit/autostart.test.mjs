@@ -117,3 +117,49 @@ test('CLI autostart status works via subprocess', () => {
   const parsedUi = JSON.parse(resUiJson.stdout);
   assert.equal(typeof parsedUi.enabled, 'boolean');
 });
+
+test('enableAutostart uses launchctl bootstrap/bootout gui/$uid, fails closed without GUI, and never falls back to open -g -a', (t) => {
+  const home = tempHome(t);
+  const failRes = enableAutostart({
+    homeDir: home,
+    rootDir: ROOT,
+    platform: 'darwin',
+    uid: 501,
+    skipAppBuild: true,
+    execFileSyncFn: (bin, args) => {
+      if (bin === '/bin/launchctl' && args[0] === 'print') throw new Error('No gui/501');
+    },
+  });
+  assert.equal(failRes.success, false);
+  assert.equal(failRes.error, 'MACOS_NO_GUI_SESSION');
+
+  const cmds = [];
+  const okRes = enableAutostart({
+    homeDir: home,
+    rootDir: ROOT,
+    platform: 'darwin',
+    uid: 501,
+    skipAppBuild: true,
+    execFileSyncFn: (bin, args) => {
+      cmds.push([bin, ...args]);
+    },
+  });
+  assert.equal(okRes.success, true);
+  assert.ok(cmds.some((c) => c[0] === '/bin/launchctl' && c[1] === 'print' && c[2] === 'gui/501'));
+  assert.ok(cmds.some((c) => c[0] === '/bin/launchctl' && c[1] === 'bootstrap' && c[2] === 'gui/501'));
+  assert.equal(cmds.some((c) => c[0] === '/usr/bin/open'), false);
+  assert.equal(cmds.some((c) => c[1] === 'load' || c[1] === 'unload'), false);
+
+  const offCmds = [];
+  const offRes = disableAutostart({
+    homeDir: home,
+    rootDir: ROOT,
+    platform: 'darwin',
+    uid: 501,
+    execFileSyncFn: (bin, args) => {
+      offCmds.push([bin, ...args]);
+    },
+  });
+  assert.equal(offRes.success, true);
+  assert.ok(offCmds.some((c) => c[0] === '/bin/launchctl' && c[1] === 'bootout' && c[2] === 'gui/501/io.webmcp-vault'));
+});
