@@ -404,3 +404,28 @@ test('vault name uniqueness is scoped to (scope, parentId) siblings', () => {
   const movedGh = store.updateVault(sshGh.id, { parentId: envs.id });
   assert.equal(movedGh.parentId, envs.id);
 });
+
+test('key-source fails loudly on darwin under SSH or locked Keychain without invoking security', () => {
+  const { readKeychainKey, saveKeychainKey, readKeySource } = require('../../lib/vault/key-source.js');
+  let securityCalled = false;
+  const mockExec = (bin) => {
+    if (String(bin).includes('security')) securityCalled = true;
+    if (bin === '/bin/launchctl') return 'Aqua\n';
+    if (bin === '/usr/bin/osascript') throw new Error('LOCKED');
+    return '';
+  };
+
+  assert.throws(
+    () => readKeychainKey({ platform: 'darwin', env: { SSH_CONNECTION: '10.0.0.1 22' }, execFileSyncFn: mockExec }),
+    /ERR_MACOS_NON_AQUA_KEYCHAIN_BLOCKED/,
+  );
+  assert.throws(
+    () => saveKeychainKey('secret-key-val', { platform: 'darwin', env: {}, execFileSyncFn: mockExec }),
+    /ERR_MACOS_KEYCHAIN_LOCKED/,
+  );
+  assert.throws(
+    () => readKeySource({ allowKeychain: true, platform: 'darwin', env: { SSH_CLIENT: '1.2.3.4 22' }, execFileSyncFn: mockExec }),
+    /ERR_MACOS_NON_AQUA_KEYCHAIN_BLOCKED/,
+  );
+  assert.equal(securityCalled, false, 'Must never invoke security when Aqua/Keychain probe fails');
+});

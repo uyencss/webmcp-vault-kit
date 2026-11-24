@@ -102,22 +102,26 @@ if [ -d "$APPLICATIONS_DIR" ] && [ -w "$APPLICATIONS_DIR" ]; then
     "$LSREGISTER" -f "$APPLICATIONS_DIR/WebMCP Vault.app" >/dev/null 2>&1 || true
   fi
   echo "🚀 Đã đồng bộ cài đặt vào $APPLICATIONS_DIR/WebMCP Vault.app"
-  UID_NUM="$(id -u)"
-  TRAY_PLIST="$HOME/Library/LaunchAgents/io.webmcp-vault.tray.plist"
-  if launchctl print "gui/$UID_NUM/io.webmcp-vault.tray" >/dev/null 2>&1; then
-    launchctl kickstart -k "gui/$UID_NUM/io.webmcp-vault.tray" >/dev/null 2>&1 || true
-  elif [ -f "$TRAY_PLIST" ] && launchctl print "gui/$UID_NUM" >/dev/null 2>&1; then
-    killall "WebMCP Vault" 2>/dev/null || true
-    sleep 0.3
-    launchctl bootstrap "gui/$UID_NUM" "$TRAY_PLIST" >/dev/null 2>&1 || true
-  elif pgrep -f "WebMCP Vault.app/Contents/MacOS/WebMCP Vault" >/dev/null 2>&1; then
-    if [ -z "${SSH_CONNECTION:-}${SSH_CLIENT:-}${SSH_TTY:-}" ] && [ "$(/bin/launchctl managername 2>/dev/null || true)" = "Aqua" ]; then
-      killall "WebMCP Vault" 2>/dev/null || true
-      sleep 0.3
-      open -g -a "$APPLICATIONS_DIR/WebMCP Vault.app" --args --tray 2>/dev/null || true
-    else
-      echo "⚠️  Non-Aqua/SSH session without LaunchAgent: refusing raw 'open -g -a WebMCP Vault.app' in Background (run 'webmcp-vault autostart on' inside Aqua GUI)." >&2
-      exit 1
+  if [ "${WEBMCP_VAULT_NO_RELOAD:-0}" != "1" ]; then
+    UID_NUM="$(id -u)"
+    TRAY_PLIST="$HOME/Library/LaunchAgents/io.webmcp-vault.tray.plist"
+    if launchctl print "gui/$UID_NUM/io.webmcp-vault.tray" >/dev/null 2>&1; then
+      launchctl kickstart -k "gui/$UID_NUM/io.webmcp-vault.tray"
+    elif [ -f "$TRAY_PLIST" ] && launchctl print "gui/$UID_NUM" >/dev/null 2>&1; then
+      if pgrep -x "WebMCP Vault" >/dev/null 2>&1; then
+        killall "WebMCP Vault"
+        sleep 0.3
+      fi
+      launchctl bootstrap "gui/$UID_NUM" "$TRAY_PLIST"
+    elif pgrep -f "WebMCP Vault.app/Contents/MacOS/WebMCP Vault" >/dev/null 2>&1; then
+      if [ -z "${SSH_CONNECTION:-}${SSH_CLIENT:-}${SSH_TTY:-}" ] && [ "$(/bin/launchctl managername)" = "Aqua" ]; then
+        killall "WebMCP Vault"
+        sleep 0.3
+        open -g -a "$APPLICATIONS_DIR/WebMCP Vault.app" --args --tray
+      else
+        echo "❌ ERR_MACOS_NON_AQUA_KEYCHAIN_BLOCKED: Non-Aqua/SSH session without LaunchAgent: refusing raw 'open -g -a WebMCP Vault.app' in Background." >&2
+        exit 1
+      fi
     fi
   fi
 fi

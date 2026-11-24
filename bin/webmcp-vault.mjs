@@ -2,9 +2,10 @@
 
 import process from 'node:process';
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, lstatSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
+import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -19,14 +20,72 @@ function getVaultBroker() {
   return requireFromBin(resolve(ROOT, 'lib', 'broker.js'));
 }
 
-function openVaultMacApp({ background = false } = {}) {
+function readGatewayBearerToken() {
+  if (process.env.WEBMCP_GATEWAY_TOKEN) return process.env.WEBMCP_GATEWAY_TOKEN.trim();
+  for (const p of [resolve(homedir(), '.webmcp', 'gateway.token'), resolve(homedir(), '.webmcp', 'gateway-token')]) {
+    try {
+      if (existsSync(p) && !lstatSync(p).isSymbolicLink()) {
+        const tok = readFileSync(p, 'utf8').trim();
+        if (tok) return tok;
+      }
+    } catch {}
+  }
+  return '';
+}
+
+async function openVaultViaAquaGateway({ background = false, fetchFn = fetch, env = process.env } = {}) {
+  const baseUrl = (env.WEBMCP_AQUA_GATEWAY_URL || 'http://127.0.0.1:7865').replace(/\/+$/, '');
+  const token = readGatewayBearerToken();
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  let res;
+  try {
+    res = await fetchFn(`${baseUrl}/api/aqua/app-open`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ app: 'webmcp-vault', ...(background ? { background: true } : {}) }),
+      signal: AbortSignal.timeout(5000),
+    });
+  } catch (err) {
+    return {
+      ok: false,
+      app: false,
+      code: 'ERR_MACOS_AQUA_SERVICE_UNAVAILABLE',
+      error: `ERR_MACOS_AQUA_SERVICE_UNAVAILABLE: Aqua Gateway (${baseUrl}/api/aqua/app-open) unreachable: ${err.message}`,
+    };
+  }
+  const text = await res.text();
+  let payload = {};
+  try { payload = text ? JSON.parse(text) : {}; } catch {}
+  if (!res.ok || payload?.error) {
+    const code = payload?.code || (res.status === 503 ? 'ERR_MACOS_NON_AQUA_KEYCHAIN_BLOCKED' : 'ERR_MACOS_AQUA_SERVICE_UNAVAILABLE');
+    return {
+      ok: false,
+      app: false,
+      code,
+      error: `${code}: ${payload?.error || payload?.message || `HTTP ${res.status}`}`,
+    };
+  }
+  return { ok: true, app: true, via: 'aqua-gateway', appPath: payload?.appPath || '/Applications/WebMCP Vault.app' };
+}
+
+async function openVaultMacApp({ background = false, env = process.env, spawnSyncFn = spawnSync, fetchFn = fetch } = {}) {
+  const { probeMacosAquaKeychainSession } = requireFromBin(resolve(ROOT, 'lib', 'vault', 'key-source.js'));
+  const probe = probeMacosAquaKeychainSession({ env });
+  if (!probe?.ok) {
+    return openVaultViaAquaGateway({ background, fetchFn, env });
+  }
+
   const appPath = '/Applications/WebMCP Vault.app';
   const localAppPath = resolve(ROOT, 'platforms', 'macos', 'build', 'WebMCP Vault.app');
   let buildError = '';
   if (!existsSync(appPath) && !existsSync(localAppPath)) {
     const buildScript = resolve(ROOT, 'platforms', 'macos', 'build.sh');
     if (existsSync(buildScript)) {
-      const buildRes = spawnSync('bash', [buildScript], { encoding: 'utf8' });
+      const buildRes = spawnSyncFn('bash', [buildScript], {
+        encoding: 'utf8',
+        env: { ...env, WEBMCP_VAULT_NO_RELOAD: '1' },
+      });
       if (buildRes.status !== 0) {
         buildError = (buildRes.stderr || buildRes.stdout || 'Build failed (ensure Xcode Command Line Tools are installed via `xcode-select --install`)').trim();
       }
@@ -35,7 +94,11 @@ function openVaultMacApp({ background = false } = {}) {
   const targetApp = existsSync(appPath) ? appPath : localAppPath;
   if (existsSync(targetApp)) {
     const openArgs = background ? ['-g', '-a', targetApp, '--args', '--tray'] : ['-a', targetApp];
-    spawnSync('/usr/bin/open', openArgs, { stdio: 'ignore' });
+    const openRes = spawnSyncFn('/usr/bin/open', openArgs, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    if (openRes.error || openRes.status !== 0) {
+      const detail = openRes.error ? openRes.error.message : String(openRes.stderr || openRes.stdout || `exit ${openRes.status}`).trim();
+      return { ok: false, app: false, appPath: targetApp, error: `Failed to open ${targetApp}: ${detail}` };
+    }
     return { ok: true, app: true, appPath: targetApp };
   }
   return { ok: false, app: false, error: buildError || 'App bundle not found (ensure Xcode Command Line Tools are installed)' };
@@ -869,8 +932,8 @@ async function run(args) {
     const uiResult = await ensureVaultUiServer({ host, port, bypassToken });
 
     if (process.platform === 'darwin') {
-      const appResult = openVaultMacApp();
-      const payload = { ok: appResult.ok, app: appResult.app, appPath: appResult.appPath, url: uiResult.url, error: appResult.error };
+      const appResult = await openVaultMacApp();
+      const payload = { ok: appResult.ok, app: appResult.app, appPath: appResult.appPath, url: uiResult.url, ...(appResult.code ? { code: appResult.code } : {}), error: appResult.error };
       printJsonOrHuman(
         payload,
         json,
@@ -930,11 +993,16 @@ async function run(args) {
     const server = await startVaultUiServer({ host, port, bypassToken });
     if (process.platform === 'darwin' && flags['no-tray'] !== true && process.env.NODE_TEST_CONTEXT === undefined) {
       try {
-        const pgrep = spawnSync('/usr/bin/pgrep', ['-f', 'WebMCP Vault.app/Contents/MacOS/WebMCP Vault'], { stdio: 'ignore' });
+        const pgrep = spawnSync('/usr/bin/pgrep', ['-f', 'WebMCP Vault.app/Contents/MacOS/WebMCP Vault'], { stdio: ['ignore', 'pipe', 'pipe'] });
         if (pgrep.status !== 0) {
-          openVaultMacApp({ background: true });
+          const trayRes = await openVaultMacApp({ background: true });
+          if (!trayRes.ok) {
+            console.warn(`⚠️ ${trayRes.error}`);
+          }
         }
-      } catch {}
+      } catch (err) {
+        console.warn(`⚠️ Tray launch check failed: ${err.message}`);
+      }
     }
     const payload = { ok: true, url: server.url, host: server.host, port: server.port, token: server.token, pid: process.pid };
     if (json) console.log(JSON.stringify(payload, null, 2));

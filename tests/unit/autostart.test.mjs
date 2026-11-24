@@ -118,7 +118,7 @@ test('CLI autostart status works via subprocess', () => {
   assert.equal(typeof parsedUi.enabled, 'boolean');
 });
 
-test('enableAutostart uses launchctl bootstrap/bootout gui/$uid, fails closed without GUI, and never falls back to open -g -a', (t) => {
+test('enableAutostart uses safe launchctl lifecycle (polling, enable, rollback, self-bootout) and never falls back to open -g -a', (t) => {
   const home = tempHome(t);
   const failRes = enableAutostart({
     homeDir: home,
@@ -132,7 +132,9 @@ test('enableAutostart uses launchctl bootstrap/bootout gui/$uid, fails closed wi
   });
   assert.equal(failRes.success, false);
   assert.equal(failRes.error, 'MACOS_NO_GUI_SESSION');
+  assert.equal(failRes.code, 'ERR_MACOS_NO_GUI_SESSION');
 
+  let loaded = true;
   const cmds = [];
   const okRes = enableAutostart({
     homeDir: home,
@@ -140,24 +142,75 @@ test('enableAutostart uses launchctl bootstrap/bootout gui/$uid, fails closed wi
     platform: 'darwin',
     uid: 501,
     skipAppBuild: true,
+    sleepSync: () => {},
     execFileSyncFn: (bin, args) => {
       cmds.push([bin, ...args]);
+      if (args[0] === 'bootout' && String(args[1] || '').startsWith('gui/501/')) {
+        loaded = false;
+      }
+      if (args[0] === 'print' && String(args[1] || '').startsWith('gui/501/io.webmcp-vault') && !loaded) {
+        throw new Error('Could not find service');
+      }
+      return '';
     },
   });
   assert.equal(okRes.success, true);
   assert.ok(cmds.some((c) => c[0] === '/bin/launchctl' && c[1] === 'print' && c[2] === 'gui/501'));
+  assert.ok(cmds.some((c) => c[0] === '/bin/launchctl' && c[1] === 'bootout' && c[2] === 'user/501/io.webmcp-vault'));
+  assert.ok(cmds.some((c) => c[0] === '/bin/launchctl' && c[1] === 'enable' && c[2] === 'gui/501/io.webmcp-vault'));
   assert.ok(cmds.some((c) => c[0] === '/bin/launchctl' && c[1] === 'bootstrap' && c[2] === 'gui/501'));
   assert.equal(cmds.some((c) => c[0] === '/usr/bin/open'), false);
   assert.equal(cmds.some((c) => c[1] === 'load' || c[1] === 'unload'), false);
 
+  // Self-bootout refusal
+  const selfRes = enableAutostart({
+    homeDir: home,
+    rootDir: ROOT,
+    platform: 'darwin',
+    uid: 501,
+    skipAppBuild: true,
+    env: { XPC_SERVICE_NAME: 'io.webmcp-vault' },
+    execFileSyncFn: () => '',
+  });
+  assert.equal(selfRes.success, false);
+  assert.equal(selfRes.code, 'ERR_LAUNCHD_SELF_BOOTOUT');
+
+  // Bootstrap failure rolls back plist
+  const rollRes = enableAutostart({
+    homeDir: home,
+    rootDir: ROOT,
+    platform: 'darwin',
+    uid: 501,
+    skipAppBuild: true,
+    sleepSync: () => {},
+    execFileSyncFn: (bin, args) => {
+      if (args[0] === 'print' && String(args[1] || '').startsWith('gui/501/io.webmcp-vault')) {
+        throw new Error('Could not find service');
+      }
+      if (args[0] === 'bootstrap') throw new Error('Bootstrap failed: 5');
+      return '';
+    },
+  });
+  assert.equal(rollRes.success, false);
+  assert.equal(rollRes.code, 'ERR_LAUNCHD_BOOTSTRAP_FAILED');
+
+  loaded = true;
   const offCmds = [];
   const offRes = disableAutostart({
     homeDir: home,
     rootDir: ROOT,
     platform: 'darwin',
     uid: 501,
+    sleepSync: () => {},
     execFileSyncFn: (bin, args) => {
       offCmds.push([bin, ...args]);
+      if (args[0] === 'bootout' && String(args[1] || '').startsWith('gui/501/')) {
+        loaded = false;
+      }
+      if (args[0] === 'print' && String(args[1] || '').startsWith('gui/501/io.webmcp-vault') && !loaded) {
+        throw new Error('Could not find service');
+      }
+      return '';
     },
   });
   assert.equal(offRes.success, true);
